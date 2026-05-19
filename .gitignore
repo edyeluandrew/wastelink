@@ -59,3 +59,16 @@ pnpm-lock.yaml
 .env.*.secret
 credentials.json
 secrets.json
+
+# Test files with credentials
+test-*.js
+test-*.mjs
+*-test.js
+*-test.mjs
+quick-test.*
+simple-test.*
+
+# Database backup files
+*.backup
+*.dump
+*.sql
