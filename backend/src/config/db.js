@@ -27,15 +27,16 @@ const sslEnabled = process.env.DATABASE_SSL === "true";
 console.log("[DB] Connection Configuration:");
 console.log("[DB]   - Hostname:", dbHostname);
 console.log("[DB]   - SSL Enabled:", sslEnabled);
-console.log("[DB]   - Connection Timeout: 15000ms");
-console.log("[DB]   - Idle Timeout: 30000ms");
+console.log("[DB]   - Connection Timeout: 30000ms");
+console.log("[DB]   - Idle Timeout: 60000ms");
+console.log("[DB]   - Max Pool Connections: 20");
 
 const poolConfig = {
   connectionString: process.env.DATABASE_URL,
   ssl: sslEnabled ? { rejectUnauthorized: false } : false,
-  connectionTimeoutMillis: 15000,
-  idleTimeoutMillis: 30000,
-  max: 5,
+  connectionTimeoutMillis: 30000,
+  idleTimeoutMillis: 60000,
+  max: 20,
 };
 
 const pool = new Pool(poolConfig);

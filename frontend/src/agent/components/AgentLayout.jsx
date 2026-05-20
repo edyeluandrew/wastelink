@@ -1,9 +1,9 @@
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Menu, LogOut } from 'lucide-react';
 import { getAgentCollectionPoint, clearAgentCollectionPoint } from '../utils/agentSession';
 
-export default function AgentLayout({ children }) {
+export default function AgentLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -123,7 +123,7 @@ export default function AgentLayout({ children }) {
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-4 md:p-6">
-          {children}
+          <Outlet />
         </div>
       </div>
     </div>

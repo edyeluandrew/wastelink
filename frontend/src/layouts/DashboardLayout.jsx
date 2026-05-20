@@ -1,6 +1,7 @@
+import { Outlet } from 'react-router-dom';
 import { Sidebar, Topbar } from '../components';
 
-export default function DashboardLayout({ children }) {
+export default function DashboardLayout() {
   return (
     <div className="flex h-screen bg-wastelink-background">
       {/* Sidebar */}
@@ -14,7 +15,7 @@ export default function DashboardLayout({ children }) {
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="p-8">
-            {children}
+            <Outlet />
           </div>
         </main>
       </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/axios';
 import { getAgentCollectionPoint } from '../utils/agentSession';
-import AgentLayout from '../components/AgentLayout';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
 
@@ -73,55 +72,53 @@ export default function PendingLogs() {
   };
 
   return (
-    <AgentLayout>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Pending Deliveries</h2>
-          <button
-            onClick={fetchPendingLogs}
-            className="px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition text-sm font-semibold"
-          >
-            🔄 Refresh
-          </button>
-        </div>
-
-        {loading && <LoadingState message="Loading pending logs..." />}
-
-        {error && <ErrorState error={error} onRetry={fetchPendingLogs} />}
-
-        {!loading && !error && logs.length === 0 && (
-          <EmptyState message="No pending deliveries for this collection point" />
-        )}
-
-        {!loading && !error && logs.length > 0 && (
-          <div>
-            <p className="text-sm text-gray-600 mb-3">
-              {logs.length} {logs.length === 1 ? 'delivery' : 'deliveries'} waiting for verification
-            </p>
-            <div className="space-y-3">
-              {logs.map((log) => (
-                <AgentWasteLogCard
-                  key={log.id}
-                  log={log}
-                  showActions={true}
-                  onVerify={handleVerify}
-                  onReject={handleReject}
-                  isProcessing={refreshing}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="pt-4">
-          <button
-            onClick={() => navigate('/agent/dashboard')}
-            className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Pending Deliveries</h2>
+        <button
+          onClick={fetchPendingLogs}
+          className="px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition text-sm font-semibold"
+        >
+          🔄 Refresh
+        </button>
       </div>
-    </AgentLayout>
+
+      {loading && <LoadingState message="Loading pending logs..." />}
+
+      {error && <ErrorState error={error} onRetry={fetchPendingLogs} />}
+
+      {!loading && !error && logs.length === 0 && (
+        <EmptyState message="No pending deliveries for this collection point" />
+      )}
+
+      {!loading && !error && logs.length > 0 && (
+        <div>
+          <p className="text-sm text-gray-600 mb-3">
+            {logs.length} {logs.length === 1 ? 'delivery' : 'deliveries'} waiting for verification
+          </p>
+          <div className="space-y-3">
+            {logs.map((log) => (
+              <AgentWasteLogCard
+                key={log.id}
+                log={log}
+                showActions={true}
+                onVerify={handleVerify}
+                onReject={handleReject}
+                isProcessing={refreshing}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="pt-4">
+        <button
+          onClick={() => navigate('/agent/dashboard')}
+          className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+    </div>
   );
 }
