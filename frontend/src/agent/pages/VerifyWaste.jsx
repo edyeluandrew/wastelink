@@ -28,7 +28,7 @@ export default function VerifyWaste() {
     setLog(null);
 
     try {
-      const response = await apiClient.get(`/waste-logs/search?jobCode=${jobCode}`);
+      const response = await apiClient.get(`/waste-logs/job/${jobCode}`);
       if (response.data.success && response.data.data) {
         const foundLog = response.data.data;
 
