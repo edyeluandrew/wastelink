@@ -226,7 +226,12 @@ export const getWasteLogById = async (req, res, next) => {
 // GET /api/waste-logs/job/:jobCode - Get waste log by job code
 export const getWasteLogByJobCode = async (req, res, next) => {
   try {
-    const { jobCode } = req.params;
+    // Handle both path params (/job/:jobCode) and query params (/search?jobCode=...)
+    const jobCode = req.params.jobCode || req.query.jobCode;
+
+    if (!jobCode) {
+      return sendError(res, "Job code is required", 400);
+    }
 
     const result = await pool.query(
       `SELECT 

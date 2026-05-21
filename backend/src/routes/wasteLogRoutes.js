@@ -13,7 +13,8 @@ const router = Router();
 
 router.post("/", createWasteLog);
 router.get("/", getWasteLogs);
-router.get("/job/:jobCode", getWasteLogByJobCode);
+router.get("/search", getWasteLogByJobCode); // Search by query param (must come BEFORE /:id)
+router.get("/job/:jobCode", getWasteLogByJobCode); // Search by path param
 router.get("/:id", getWasteLogById);
 router.patch("/:id/verify", verifyWasteLog);
 router.patch("/:id/reject", rejectWasteLog);
