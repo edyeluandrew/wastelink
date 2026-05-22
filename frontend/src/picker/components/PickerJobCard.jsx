@@ -1,66 +1,76 @@
-import { StatusBadge } from '../../components';
 import { formatDate, formatUGX } from '../../utils/formatters';
+import { MapPin, Clock, CheckCircle, XCircle, CreditCard } from 'lucide-react';
 
 export default function PickerJobCard({ job }) {
   return (
-    <div className="bg-white border border-gray-300 rounded-lg p-4 mb-3">
-      <div className="flex items-start justify-between mb-2">
+    <div className="border border-gray-300 rounded-lg p-4 bg-white hover:shadow-md transition">
+      <div className="flex justify-between items-start mb-3">
         <div>
-          <p className="font-bold text-gray-900">Job Code: {job.job_code}</p>
+          <p className="font-semibold text-gray-900">Job Code: {job.job_code}</p>
           <p className="text-sm text-gray-600">{job.waste_type}</p>
         </div>
-        <StatusBadge status={job.status} />
+        <div className="text-right">
+          <p className="text-xs font-medium text-gray-500">Status</p>
+          <p className={`text-sm font-semibold ${
+            job.status === 'PENDING' ? 'text-amber-700' :
+            job.status === 'VERIFIED' ? 'text-green-700' :
+            job.status === 'REJECTED' ? 'text-red-700' :
+            'text-blue-700'
+          }`}>
+            {job.status}
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+      <div className="grid grid-cols-2 gap-4 mb-3">
         <div>
-          <p className="text-xs text-gray-600">Estimated</p>
-          <p className="font-semibold">{job.estimated_kg || 0} kg</p>
+          <p className="text-xs text-gray-500">Estimated</p>
+          <p className="text-lg font-semibold text-gray-900">{job.estimated_kg} kg</p>
         </div>
-        {job.verified_kg && (
+        {job.verified_kg !== null && (
           <div>
-            <p className="text-xs text-gray-600">Verified</p>
-            <p className="font-semibold">{job.verified_kg} kg</p>
+            <p className="text-xs text-gray-500">Verified</p>
+            <p className="text-lg font-semibold text-green-700">{job.verified_kg} kg</p>
+          </div>
+        )}
+        {job.earning && (
+          <div>
+            <p className="text-xs text-gray-500">Earning</p>
+            <p className="text-lg font-semibold text-green-700">{formatUGX(job.earning.amount)}</p>
           </div>
         )}
       </div>
 
-      {job.collection_point_name && (
-        <p className="text-xs text-gray-600 mb-2">
-          📍 {job.collection_point_name}
-        </p>
-      )}
-
-      {job.earning && (
-        <div className="text-sm font-semibold text-green-700 mb-2">
-          Earning: {formatUGX(job.earning.amount || 0)}
+      <div className="border-t pt-3 space-y-2">
+        <div className="text-sm text-gray-600 space-y-1">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            <span>{job.collection_point_name}</span>
+          </div>
+          <p className="text-xs text-gray-500">{formatDate(job.logged_at)}</p>
         </div>
-      )}
 
-      <p className="text-xs text-gray-500">
-        {formatDate(job.logged_at || new Date())}
-      </p>
-
-      {job.status === 'PENDING' && (
-        <p className="text-xs text-amber-700 mt-2 font-medium">
-          ⏳ Waiting for verification at collection point
-        </p>
-      )}
-      {job.status === 'VERIFIED' && (
-        <p className="text-xs text-green-700 mt-2 font-medium">
-          ✅ Verified and earnings calculated
-        </p>
-      )}
-      {job.status === 'REJECTED' && (
-        <p className="text-xs text-red-700 mt-2 font-medium">
-          ❌ Not accepted - {job.rejection_reason || 'See agent for details'}
-        </p>
-      )}
-      {job.status === 'PAID' && (
-        <p className="text-xs text-blue-700 mt-2 font-medium">
-          💳 Payment completed
-        </p>
-      )}
+        {job.status === 'PENDING' && (
+          <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+            <Clock className="w-3 h-3" /> Waiting for verification at collection point
+          </p>
+        )}
+        {job.status === 'VERIFIED' && (
+          <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
+            <CheckCircle className="w-3 h-3" /> Verified and earnings calculated
+          </p>
+        )}
+        {job.status === 'REJECTED' && (
+          <p className="text-xs text-red-700 mt-2 flex items-center gap-1">
+            <XCircle className="w-3 h-3" /> Not accepted - {job.rejection_reason || 'See agent for details'}
+          </p>
+        )}
+        {job.status === 'PAID' && (
+          <p className="text-xs text-blue-700 mt-2 flex items-center gap-1">
+            <CreditCard className="w-3 h-3" /> Payment completed
+          </p>
+        )}
+      </div>
     </div>
   );
 }
