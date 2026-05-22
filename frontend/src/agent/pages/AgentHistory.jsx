@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/axios';
 import { getAgentCollectionPoint } from '../utils/agentSession';
@@ -7,40 +7,66 @@ import { LoadingState, ErrorState, EmptyState } from '../../components';
 
 export default function AgentHistory() {
   const navigate = useNavigate();
-  const collectionPoint = getAgentCollectionPoint();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('ALL'); // ALL, VERIFIED, REJECTED, PAID
+  const [filter, setFilter] = useState('ALL');
 
-  useEffect(() => {
-    if (!collectionPoint) {
-      navigate('/agent/select-point');
-      return;
-    }
-    fetchHistory();
-  }, [collectionPoint, navigate]);
-
-  const fetchHistory = async () => {
+  // Memoized fetch function to avoid unnecessary re-renders
+  const fetchHistory = useCallback(async () => {
+    console.log('[AgentHistory] fetchHistory started');
     setLoading(true);
     setError(null);
+
     try {
-      const response = await apiClient.get(
-        `/waste-logs?collection_point_id=${collectionPoint.id}&limit=200`
-      );
-      if (response.data.success) {
+      const collectionPoint = getAgentCollectionPoint();
+      console.log('[AgentHistory] Selected collection point:', collectionPoint);
+
+      if (!collectionPoint?.id) {
+        console.warn('[AgentHistory] No collection point selected, redirecting');
+        navigate('/agent/select-point');
+        return;
+      }
+
+      const url = `/waste-logs?collection_point_id=${collectionPoint.id}`;
+      console.log('[AgentHistory] Fetching from API URL:', url);
+
+      const response = await apiClient.get(url);
+      console.log('[AgentHistory] API response received:', response.data);
+
+      if (response.data?.success) {
         const allLogs = response.data.data || [];
+        console.log('[AgentHistory] Total logs received:', allLogs.length);
+
         // Filter out pending logs
         const processedLogs = allLogs.filter((log) => log.status !== 'PENDING');
+        console.log('[AgentHistory] Non-pending logs (processed):', processedLogs.length);
+
         setLogs(processedLogs);
+        console.log('[AgentHistory] Logs state updated successfully');
+      } else {
+        console.warn('[AgentHistory] Response success flag was false or missing');
+        setError('Invalid response from server');
       }
     } catch (err) {
-      console.error('Error fetching history:', err);
+      console.error('[AgentHistory] Fetch error:', {
+        message: err.message,
+        status: err.response?.status,
+        responseData: err.response?.data,
+        url: err.config?.url,
+      });
       setError(err.response?.data?.message || 'Failed to load history');
     } finally {
+      console.log('[AgentHistory] Setting loading to false');
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  // Fetch on mount only
+  useEffect(() => {
+    console.log('[AgentHistory] Component mounted, calling fetchHistory');
+    fetchHistory();
+  }, [fetchHistory]);
 
   const getFilteredLogs = () => {
     if (filter === 'ALL') return logs;

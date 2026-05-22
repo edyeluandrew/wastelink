@@ -75,4 +75,4 @@ class MockDB {
   }
 }
 
-export default new MockDB();
+export default MockDB;

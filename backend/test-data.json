@@ -1,0 +1,18 @@
+{
+  "picker": {
+    "picker_code": "PK001",
+    "name": "John Doe",
+    "phone": "256701000001",
+    "gender": "Male",
+    "age_group": "25-35",
+    "division": "Kampala",
+    "main_waste_type": "Plastic"
+  },
+  "collectionPoint": {
+    "point_code": "CP001",
+    "name": "Kampala Central Hub",
+    "division": "Kampala",
+    "latitude": 0.3476,
+    "longitude": 32.5825
+  }
+}
