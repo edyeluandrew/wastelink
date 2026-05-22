@@ -14,6 +14,16 @@ import AgentDashboard from './agent/pages/AgentDashboard'
 import PendingLogs from './agent/pages/PendingLogs'
 import VerifyWaste from './agent/pages/VerifyWaste'
 import AgentHistory from './agent/pages/AgentHistory'
+import PickerLayout from './picker/components/PickerLayout'
+import PickerRouteRedirect from './picker/pages/PickerRouteRedirect'
+import PickerStart from './picker/pages/PickerStart'
+import PickerRegister from './picker/pages/PickerRegister'
+import PickerDashboard from './picker/pages/PickerDashboard'
+import LogWaste from './picker/pages/LogWaste'
+import MyJobs from './picker/pages/MyJobs'
+import MyEarnings from './picker/pages/MyEarnings'
+import PickerCollectionPoints from './picker/pages/PickerCollectionPoints'
+import PickerHelp from './picker/pages/PickerHelp'
 
 const router = createBrowserRouter([
   {
@@ -43,6 +53,21 @@ const router = createBrowserRouter([
       { path: 'pending', element: <PendingLogs /> },
       { path: 'verify', element: <VerifyWaste /> },
       { path: 'history', element: <AgentHistory /> },
+    ],
+  },
+  {
+    path: 'picker',
+    element: <PickerLayout />,
+    children: [
+      { index: true, element: <PickerRouteRedirect /> },
+      { path: 'start', element: <PickerStart /> },
+      { path: 'register', element: <PickerRegister /> },
+      { path: 'dashboard', element: <PickerDashboard /> },
+      { path: 'log-waste', element: <LogWaste /> },
+      { path: 'jobs', element: <MyJobs /> },
+      { path: 'earnings', element: <MyEarnings /> },
+      { path: 'collection-points', element: <PickerCollectionPoints /> },
+      { path: 'help', element: <PickerHelp /> },
     ],
   },
 ])
