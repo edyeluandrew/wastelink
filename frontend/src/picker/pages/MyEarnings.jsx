@@ -4,6 +4,7 @@ import { LoadingState, ErrorState, EmptyState } from '../../components';
 import apiClient from '../../api/axios';
 import { getPickerSession } from '../utils/pickerSession';
 import { formatUGX, formatDate } from '../../utils/formatters';
+import { Wallet } from 'lucide-react';
 
 export default function MyEarnings() {
   const navigate = useNavigate();
@@ -80,7 +81,7 @@ export default function MyEarnings() {
   }
 
   if (!earnings) {
-    return <EmptyState title="No earnings yet" message="Verify some waste to start earning" icon="💰" />;
+    return <EmptyState title="No earnings yet" message="Verify some waste to start earning" icon={Wallet} />;
   }
 
   return (

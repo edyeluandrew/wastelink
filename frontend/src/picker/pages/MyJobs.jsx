@@ -4,6 +4,7 @@ import { LoadingState, ErrorState, EmptyState } from '../../components';
 import PickerJobCard from '../components/PickerJobCard';
 import apiClient from '../../api/axios';
 import { getPickerSession } from '../utils/pickerSession';
+import { Briefcase } from 'lucide-react';
 
 const FILTER_OPTIONS = [
   { value: 'ALL', label: 'All' },
@@ -77,7 +78,7 @@ export default function MyJobs() {
       <EmptyState
         title="No jobs yet"
         message="Log your first waste to get started"
-        icon="💼"
+        icon={Briefcase}
       />
     );
   }
