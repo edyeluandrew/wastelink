@@ -8,7 +8,7 @@ export default function PickerHelp() {
 
       {/* Getting Started */}
       <div className="bg-white border border-gray-300 rounded-lg p-5">
-        <h2 className="text-lg font-bold text-gray-900 mb-3">🚀 Getting Started</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-3"><Zap className="inline w-5 h-5 text-green-700 mr-2" /> Getting Started</h2>
         <ol className="space-y-2 text-sm text-gray-700">
           <li><strong>1. Create Account</strong> - Register with your phone number</li>
           <li><strong>2. Log Waste</strong> - Tell us what waste you collected and how much</li>
@@ -21,7 +21,7 @@ export default function PickerHelp() {
 
       {/* Job Status Guide */}
       <div className="bg-white border border-gray-300 rounded-lg p-5">
-        <h2 className="text-lg font-bold text-gray-900 mb-3">📊 Understanding Job Status</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-3"><BarChart3 className="inline w-5 h-5 text-blue-700 mr-2" /> Understanding Job Status</h2>
         <div className="space-y-3">
           <div className="border-l-4 border-amber-400 pl-3">
             <p className="font-semibold text-amber-900">⏳ PENDING</p>
@@ -44,7 +44,7 @@ export default function PickerHelp() {
 
       {/* Job Code Info */}
       <div className="bg-blue-50 border border-blue-300 rounded-lg p-5">
-        <h2 className="text-lg font-bold text-blue-900 mb-2">📝 What's a Job Code?</h2>
+        <h2 className="text-lg font-bold text-blue-900 mb-2"><FileText className="inline w-5 h-5 text-blue-700 mr-2" /> What's a Job Code?</h2>
         <p className="text-sm text-blue-800 mb-2">
           When you log waste in WasteLink, we create a unique Job Code for you. This is like a receipt number.
         </p>
@@ -58,31 +58,31 @@ export default function PickerHelp() {
 
       {/* Waste Types */}
       <div className="bg-white border border-gray-300 rounded-lg p-5">
-        <h2 className="text-lg font-bold text-gray-900 mb-3">🗑️ Types of Waste We Accept</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-3"><Trash2 className="inline w-5 h-5 text-gray-700 mr-2" /> Types of Waste We Accept</h2>
         <div className="grid grid-cols-1 gap-2 text-sm">
           <div className="flex gap-2">
-            <span>♻️</span>
+            <Recycle className="w-5 h-5 text-green-600" />
             <div>
               <p className="font-semibold">PLASTIC</p>
               <p className="text-gray-600">Bottles, bags, containers</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <span>📦</span>
+            <Package className="w-5 h-5 text-amber-600" />
             <div>
               <p className="font-semibold">MIXED RECYCLABLES</p>
               <p className="text-gray-600">Mixed clean recyclables</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <span>🍃</span>
+            <Leaf className="w-5 h-5 text-green-600" />
             <div>
               <p className="font-semibold">ORGANIC</p>
               <p className="text-gray-600">Food waste, garden waste</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <span>💻</span>
+            <Cpu className="w-5 h-5 text-blue-600" />
             <div>
               <p className="font-semibold">E-WASTE</p>
               <p className="text-gray-600">Electronics, phones, computers</p>
@@ -100,7 +100,7 @@ export default function PickerHelp() {
 
       {/* Earnings Info */}
       <div className="bg-green-50 border border-green-300 rounded-lg p-5">
-        <h2 className="text-lg font-bold text-green-900 mb-2">💰 How Earnings Work</h2>
+        <h2 className="text-lg font-bold text-green-900 mb-2"><Wallet className="inline w-5 h-5 text-green-700 mr-2" /> How Earnings Work</h2>
         <ul className="text-sm text-green-800 space-y-1 list-disc list-inside">
           <li>You earn money when waste is <strong>VERIFIED</strong></li>
           <li>Amount depends on waste type and actual weight</li>

@@ -6,6 +6,7 @@ import PickerJobCard from '../components/PickerJobCard';
 import apiClient from '../../api/axios';
 import { getPickerSession } from '../utils/pickerSession';
 import { formatUGX } from '../../utils/formatters';
+import { Wind, FileText, Wallet } from 'lucide-react';
 
 export default function PickerDashboard() {
   const navigate = useNavigate();
@@ -79,7 +80,7 @@ export default function PickerDashboard() {
       {/* Welcome Card */}
       <div className="bg-green-100 border border-green-300 rounded-lg p-5">
         <p className="text-lg font-bold text-green-900 mb-1">
-          Welcome, {picker.name}! 👋
+          Welcome, {picker.name}!
         </p>
         <p className="text-sm text-green-800 mb-3">
           Code: <span className="font-mono font-semibold">{picker.picker_code}</span>
@@ -119,13 +120,13 @@ export default function PickerDashboard() {
           onClick={() => navigate('/picker/log-waste')}
           className="bg-green-700 text-white hover:bg-green-800"
         >
-          📝 Log Waste
+          <FileText className="w-5 h-5" /> Log Waste
         </Button>
         <Button
           onClick={() => navigate('/picker/earnings')}
           className="bg-blue-700 text-white hover:bg-blue-800"
         >
-          💰 My Earnings
+          <Wallet className="w-5 h-5" /> My Earnings
         </Button>
       </div>
 
