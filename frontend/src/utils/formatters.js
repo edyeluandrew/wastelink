@@ -127,3 +127,10 @@ export const formatStatus = (status) => {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 };
+
+/**
+ * Alias for formatCurrencyUGX - format currency as Ugandan Shillings
+ * @param {number} amount
+ * @returns {string}
+ */
+export const formatUGX = formatCurrencyUGX;
