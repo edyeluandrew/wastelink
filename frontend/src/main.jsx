@@ -8,6 +8,7 @@ import WasteLogs from './pages/WasteLogs'
 import Divisions from './pages/Divisions'
 import Earnings from './pages/Earnings'
 import Reports from './pages/Reports'
+import Login from './pages/Login'
 import AgentLayout from './agent/components/AgentLayout'
 import SelectCollectionPoint from './agent/pages/SelectCollectionPoint'
 import AgentDashboard from './agent/pages/AgentDashboard'
@@ -42,6 +43,10 @@ const router = createBrowserRouter([
   {
     path: 'route-test',
     element: <div style={{padding: '40px', fontSize: '24px', color: '#238636'}}>✅ Route test works!</div>,
+  },
+  {
+    path: 'login',
+    element: <Login />,
   },
   {
     path: 'agent',

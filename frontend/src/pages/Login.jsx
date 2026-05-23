@@ -1,0 +1,147 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '../components';
+import apiClient from '../api/axios';
+import { getAuthToken, getUserRole, setAuthSession } from '../utils/auth';
+import { Lock, Mail, ShieldCheck, LogIn } from 'lucide-react';
+
+export default function Login() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (getAuthToken() && getUserRole() === 'SUPER_ADMIN') {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+
+    if (!email.trim() || !password) {
+      setError('Email and password are required');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await apiClient.post('/auth/login', {
+        email: email.trim(),
+        password,
+      });
+
+      if (response.data?.success && response.data.data?.token && response.data.data?.user) {
+        setAuthSession(response.data.data.token, response.data.data.user);
+
+        if (response.data.data.user.role === 'SUPER_ADMIN') {
+          navigate('/', { replace: true });
+          return;
+        }
+
+        navigate('/', { replace: true });
+        return;
+      }
+
+      setError(response.data?.message || 'Login failed');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[linear-gradient(180deg,#EAF6EA_0%,#F8F9FA_45%,#FFFFFF_100%)] px-4 py-10">
+      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-5xl items-center justify-center">
+        <div className="grid w-full overflow-hidden rounded-[2rem] border border-[#BDE5BF] bg-white shadow-[0_20px_80px_rgba(17,17,17,0.08)] md:grid-cols-[1.05fr_0.95fr]">
+          <div className="flex flex-col justify-between bg-[linear-gradient(135deg,#238636_0%,#2F9E44_100%)] p-8 text-white md:p-10">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-sm font-semibold backdrop-blur">
+                <ShieldCheck size={16} /> Super Admin Access
+              </div>
+              <h1 className="mt-6 text-4xl font-bold tracking-tight md:text-5xl" style={{ fontFamily: 'Orbitron' }}>
+                WasteLink Uganda
+              </h1>
+              <p className="mt-4 max-w-md text-sm leading-6 text-white/85 md:text-base">
+                Sign in to manage the platform as Super Admin. This module keeps the existing admin, agent, and picker flows untouched.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-3 text-sm text-white/90">
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                Super Admin login only
+              </div>
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                JWT session stored locally for the admin dashboard
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8 md:p-10">
+            <div className="mb-8">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#238636]">Login</p>
+              <h2 className="mt-2 text-3xl font-bold text-[#111111]" style={{ fontFamily: 'Orbitron' }}>
+                Super Admin Sign In
+              </h2>
+              <p className="mt-2 text-sm text-[#6B7280]">
+                Use the email and password configured in your backend `.env`.
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-[#111111]">Email</span>
+                <div className="flex items-center gap-3 rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] px-4 py-3 focus-within:border-[#238636]">
+                  <Mail size={18} className="shrink-0 text-[#6B7280]" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="superadmin@example.com"
+                    className="w-full bg-transparent text-sm outline-none"
+                    autoComplete="email"
+                    disabled={loading}
+                  />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-[#111111]">Password</span>
+                <div className="flex items-center gap-3 rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] px-4 py-3 focus-within:border-[#238636]">
+                  <Lock size={18} className="shrink-0 text-[#6B7280]" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-transparent text-sm outline-none"
+                    autoComplete="current-password"
+                    disabled={loading}
+                  />
+                </div>
+              </label>
+
+              {error && (
+                <div className="rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="inline-flex w-full items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2F9E44]"
+              >
+                <LogIn size={16} /> {loading ? 'Signing in...' : 'Login'}
+              </Button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

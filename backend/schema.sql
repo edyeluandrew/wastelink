@@ -5,12 +5,18 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(30),
   password_hash TEXT,
   role VARCHAR(30) NOT NULL CHECK (role IN (
+    'SUPER_ADMIN',
+    'CITY_ADMIN',
     'ADMIN',
     'MUNICIPAL_OFFICER',
     'AGENT',
     'PICKER'
   )),
   status VARCHAR(30) DEFAULT 'ACTIVE',
+  city VARCHAR(100),
+  division VARCHAR(100),
+  collection_point_id INT,
+  picker_id INT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
