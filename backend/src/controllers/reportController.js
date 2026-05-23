@@ -70,11 +70,11 @@ export const getMonthlyReport = async (req, res, next) => {
       SELECT
         COUNT(*) as total_waste_logs,
         COUNT(CASE WHEN wl.status = 'PENDING' THEN 1 END) as pending_logs,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as verified_logs,
+        COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
         COUNT(CASE WHEN wl.status = 'REJECTED' THEN 1 END) as rejected_logs,
         COUNT(CASE WHEN wl.status = 'PAID' THEN 1 END) as paid_logs,
         COALESCE(SUM(wl.estimated_kg), 0) as total_estimated_kg,
-        COALESCE(SUM(wl.verified_kg), 0) as total_verified_kg
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg
       FROM waste_logs wl
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
     `, [startDate, endDate]);
@@ -111,8 +111,8 @@ export const getMonthlyReport = async (req, res, next) => {
       SELECT
         wl.waste_type,
         COUNT(*) as total_logs,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as verified_logs,
-        COALESCE(SUM(wl.verified_kg), 0) as total_verified_kg,
+        COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
         COALESCE(SUM(e.amount), 0) as total_earnings
       FROM waste_logs wl
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
@@ -127,8 +127,8 @@ export const getMonthlyReport = async (req, res, next) => {
         p.division,
         COUNT(DISTINCT p.id) as total_pickers,
         COUNT(DISTINCT wl.id) as total_logs,
-        COUNT(DISTINCT CASE WHEN wl.status = 'VERIFIED' THEN wl.id END) as verified_logs,
-        COALESCE(SUM(wl.verified_kg), 0) as total_verified_kg,
+        COUNT(DISTINCT CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.id END) as verified_logs,
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
         COALESCE(SUM(e.amount), 0) as total_earnings
       FROM pickers p
       LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
@@ -145,8 +145,8 @@ export const getMonthlyReport = async (req, res, next) => {
         cp.name,
         cp.division,
         COUNT(wl.id) as total_logs,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as verified_logs,
-        COALESCE(SUM(wl.verified_kg), 0) as total_verified_kg,
+        COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
         COALESCE(SUM(e.amount), 0) as total_earnings
       FROM collection_points cp
       LEFT JOIN waste_logs wl ON cp.id = wl.collection_point_id AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
@@ -166,13 +166,13 @@ export const getMonthlyReport = async (req, res, next) => {
         p.age_group,
         p.division,
         COUNT(wl.id) as verified_jobs,
-        COALESCE(SUM(wl.verified_kg), 0) as total_verified_kg,
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
         COALESCE(SUM(e.amount), 0) as total_earnings
       FROM pickers p
-      LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND wl.status = 'VERIFIED' AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
+      LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND wl.status IN ('VERIFIED', 'PAID') AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
       GROUP BY p.id, p.picker_code, p.name, p.phone, p.gender, p.age_group, p.division
-      HAVING COALESCE(SUM(wl.verified_kg), 0) > 0
+      HAVING COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) > 0
       ORDER BY total_verified_kg DESC
       LIMIT 10
     `, [startDate, endDate]);
@@ -194,7 +194,7 @@ export const getMonthlyReport = async (req, res, next) => {
       JOIN pickers p ON wl.picker_id = p.id
       JOIN collection_points cp ON wl.collection_point_id = cp.id
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
-      WHERE wl.status = 'VERIFIED' AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
+      WHERE wl.status IN ('VERIFIED', 'PAID') AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       ORDER BY wl.verified_at DESC
       LIMIT 20
     `, [startDate, endDate]);
@@ -307,8 +307,8 @@ export const getPlatformSummary = async (req, res, next) => {
     // Get all-time waste stats
     const wasteResult = await pool.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN wl.status = 'VERIFIED' THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as total_verified_jobs,
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
+        COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as total_verified_jobs,
         COUNT(CASE WHEN wl.status = 'REJECTED' THEN 1 END) as total_rejected_jobs
       FROM waste_logs wl
     `);
@@ -421,7 +421,7 @@ export const getUndpPilotReport = async (req, res, next) => {
     // Get environmental impact for the period
     const environmentalResult = await pool.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN wl.status = 'VERIFIED' THEN wl.verified_kg ELSE 0 END), 0) as verified_waste_kg
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_waste_kg
       FROM waste_logs wl
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
     `, [startDate, endDate]);
@@ -433,7 +433,7 @@ export const getUndpPilotReport = async (req, res, next) => {
     const wasteTypeBreakdownResult = await pool.query(`
       SELECT
         wl.waste_type,
-        COALESCE(SUM(CASE WHEN wl.status = 'VERIFIED' THEN wl.verified_kg ELSE 0 END), 0) as verified_kg
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_kg
       FROM waste_logs wl
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       GROUP BY wl.waste_type
@@ -471,7 +471,7 @@ export const getUndpPilotReport = async (req, res, next) => {
       SELECT
         COUNT(DISTINCT cp.id) as collection_points_active,
         COUNT(wl.id) as total_waste_logs,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as verified_logs,
+        COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
         COUNT(CASE WHEN wl.status = 'REJECTED' THEN 1 END) as rejected_logs,
         COUNT(CASE WHEN wl.status = 'PENDING' THEN 1 END) as pending_logs
       FROM collection_points cp
@@ -492,8 +492,8 @@ export const getUndpPilotReport = async (req, res, next) => {
         p.division,
         COUNT(DISTINCT p.id) as pickers_count,
         COUNT(wl.id) as total_logs,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as verified_logs,
-        COALESCE(SUM(CASE WHEN wl.status = 'VERIFIED' THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
+        COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
         COALESCE(SUM(e.amount), 0) as total_earnings
       FROM pickers p
       LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
@@ -521,8 +521,8 @@ export const getUndpPilotReport = async (req, res, next) => {
         cp.division,
         cp.agent_name,
         COUNT(wl.id) as total_logs,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as verified_logs,
-        COALESCE(SUM(CASE WHEN wl.status = 'VERIFIED' THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
+        COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
         COALESCE(SUM(e.amount), 0) as total_earnings
       FROM collection_points cp
       LEFT JOIN waste_logs wl ON cp.id = wl.collection_point_id AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
@@ -554,13 +554,13 @@ export const getUndpPilotReport = async (req, res, next) => {
         p.age_group,
         p.division,
         COUNT(wl.id) as verified_jobs,
-        COALESCE(SUM(CASE WHEN wl.status = 'VERIFIED' THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
+        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
         COALESCE(SUM(e.amount), 0) as total_earnings
       FROM pickers p
-      LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND wl.status = 'VERIFIED' AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
+      LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND wl.status IN ('VERIFIED', 'PAID') AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
       GROUP BY p.id, p.picker_code, p.name, p.phone, p.gender, p.age_group, p.division
-      HAVING COALESCE(SUM(CASE WHEN wl.status = 'VERIFIED' THEN wl.verified_kg ELSE 0 END), 0) > 0
+      HAVING COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) > 0
       ORDER BY verified_kg DESC
       LIMIT 10
     `, [startDate, endDate]);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { StatusBadge, Button, Modal } from '../../components';
+import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
 
 export default function AgentWasteLogCard({
   log,
@@ -59,6 +60,11 @@ export default function AgentWasteLogCard({
     return parseFloat(num).toFixed(2);
   };
 
+  const estimatedKg = Number(log?.estimated_kg ?? log?.estimatedKg ?? 0);
+  const verifiedKgValue = Number(log?.verified_kg ?? log?.verifiedKg ?? 0);
+  const earningAmount = getEarningAmount(log);
+  const earningStatus = getEarningStatus(log);
+
   return (
     <>
       <div className="bg-white rounded-lg border border-gray-300 overflow-hidden hover:shadow-md transition">
@@ -73,7 +79,7 @@ export default function AgentWasteLogCard({
                 <StatusBadge status={log.status} />
               </div>
               <p className="text-xs text-gray-600 mt-1">
-                {log.picker_name || 'Unknown Picker'} • {log.waste_type || 'N/A'} • {formatNumber(log.logged_kg)} kg
+                {log.picker_name || 'Unknown Picker'} • {log.waste_type || 'N/A'} • {formatNumber(estimatedKg)} kg
               </p>
               <p className="text-xs text-gray-500 mt-1">{formatDate(log.created_at)}</p>
             </div>
@@ -96,16 +102,17 @@ export default function AgentWasteLogCard({
               </div>
               <div>
                 <p className="text-xs text-gray-600">Logged Weight</p>
-                <p className="font-semibold text-gray-900">{formatNumber(log.logged_kg)} kg</p>
+                <p className="font-semibold text-gray-900">{formatNumber(estimatedKg)} kg</p>
               </div>
               <div>
                 <p className="text-xs text-gray-600">Verified Weight</p>
-                <p className="font-semibold text-gray-900">{log.verified_kg ? formatNumber(log.verified_kg) + ' kg' : 'Pending'}</p>
+                <p className="font-semibold text-gray-900">{verifiedKgValue ? formatNumber(verifiedKgValue) + ' kg' : 'Pending'}</p>
               </div>
-              {log.status === 'VERIFIED' && log.earnings_ugx && (
+              {earningAmount > 0 && (
                 <div className="col-span-2">
                   <p className="text-xs text-gray-600">Earnings Generated</p>
-                  <p className="font-semibold text-green-700">{parseInt(log.earnings_ugx).toLocaleString()} UGX</p>
+                  <p className="font-semibold text-green-700">{earningAmount.toLocaleString()} UGX</p>
+                  <p className="text-xs text-green-700 mt-1">Status: {earningStatus}</p>
                 </div>
               )}
             </div>
@@ -147,7 +154,7 @@ export default function AgentWasteLogCard({
             <label className="block text-sm font-semibold text-gray-900 mb-1">
               Logged Weight
             </label>
-            <p className="text-2xl font-bold text-gray-700">{formatNumber(log.logged_kg)} kg</p>
+            <p className="text-2xl font-bold text-gray-700">{formatNumber(estimatedKg)} kg</p>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-1">

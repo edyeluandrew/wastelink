@@ -5,6 +5,7 @@ import apiClient from '../../api/axios';
 import { getPickerSession } from '../utils/pickerSession';
 import { formatUGX, formatDate } from '../../utils/formatters';
 import { Wallet } from 'lucide-react';
+import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
 
 export default function MyEarnings() {
   const navigate = useNavigate();
@@ -38,13 +39,13 @@ export default function MyEarnings() {
         
         // Calculate earnings
         const verified = allJobs.filter(j => j.status === 'VERIFIED' || j.status === 'PAID');
-        const totalEarnings = verified.reduce((sum, j) => sum + (j.earning?.amount || 0), 0);
+        const totalEarnings = verified.reduce((sum, j) => sum + getEarningAmount(j), 0);
         const paidEarnings = allJobs
-          .filter(j => j.status === 'PAID')
-          .reduce((sum, j) => sum + (j.earning?.amount || 0), 0);
+          .filter(j => getEarningStatus(j) === 'PAID')
+          .reduce((sum, j) => sum + getEarningAmount(j), 0);
         const pendingEarnings = allJobs
-          .filter(j => j.status === 'VERIFIED' && (!j.earning?.status || j.earning?.status !== 'PAID'))
-          .reduce((sum, j) => sum + (j.earning?.amount || 0), 0);
+          .filter(j => getEarningStatus(j) === 'PENDING')
+          .reduce((sum, j) => sum + getEarningAmount(j), 0);
         const totalKg = verified.reduce((sum, j) => sum + (j.verified_kg || 0), 0);
         const paidJobs = allJobs.filter(j => j.status === 'PAID').length;
         const unpaidJobs = allJobs.filter(j => j.status === 'VERIFIED').length;
@@ -60,7 +61,7 @@ export default function MyEarnings() {
 
         // Set jobs with earnings for display
         const earningJobs = verified
-          .filter(j => j.earning?.amount > 0)
+          .filter(j => getEarningAmount(j) > 0)
           .sort((a, b) => new Date(b.verified_at || b.logged_at) - new Date(a.verified_at || a.logged_at));
         setJobs(earningJobs);
       }
@@ -86,6 +87,15 @@ export default function MyEarnings() {
 
   return (
     <div className="space-y-4">
+      <div>
+        <button
+          onClick={() => navigate('/picker/dashboard')}
+          className="text-sm font-semibold text-green-700 hover:text-green-800"
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+
       <h1 className="text-2xl font-bold text-gray-900 mb-4">My Earnings</h1>
 
       {/* Main Earnings Cards */}
@@ -132,9 +142,9 @@ export default function MyEarnings() {
                     <p className="font-semibold text-gray-900">{job.job_code}</p>
                     <p className="text-sm text-gray-600">{job.waste_type}</p>
                   </div>
-                  {job.earning?.amount && (
+                  {getEarningAmount(job) > 0 && (
                     <p className="font-bold text-green-700 text-lg">
-                      {formatUGX(job.earning.amount)}
+                      {formatUGX(getEarningAmount(job))}
                     </p>
                   )}
                 </div>
@@ -142,7 +152,7 @@ export default function MyEarnings() {
                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-2">
                   <div>Verified: {job.verified_kg || 0} kg</div>
                   <div>
-                    {job.status === 'PAID' ? '✅ Paid' : job.status === 'VERIFIED' ? '⏳ Pending' : job.status}
+                    {getEarningStatus(job) === 'PAID' ? '✅ Paid' : getEarningStatus(job) === 'PENDING' ? '⏳ Pending' : job.status}
                   </div>
                 </div>
 

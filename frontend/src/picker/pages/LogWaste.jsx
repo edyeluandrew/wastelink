@@ -119,32 +119,34 @@ export default function LogWaste() {
   }
 
   if (successJobCode) {
-    const selectedPoint = collectionPoints.find(
-      p => p.id === parseInt(form.collection_point_id)
-    );
-
     return (
-      <Modal>
-        <div className="bg-white rounded-lg p-8 max-w-sm mx-auto text-center">
-          <div className="text-5xl mb-4">✅</div>
-          <h2 className="text-2xl font-bold text-green-900 mb-2">Waste Logged!</h2>
-          
-          <div className="bg-green-100 border-2 border-green-600 rounded-lg p-4 my-6">
-            <p className="text-xs text-green-700 font-medium mb-1">Your Job Code</p>
+      <div className="max-w-sm mx-auto">
+        <div className="bg-green-50 border border-green-300 rounded-lg p-6">
+          <div className="text-center mb-4">
+            <div className="text-5xl mb-3">✅</div>
+            <h2 className="text-2xl font-bold text-green-900 mb-1">Waste Logged</h2>
+            <p className="text-sm text-green-800">Keep this Job Code for verification</p>
+          </div>
+
+          <div className="bg-white border-2 border-green-600 rounded-lg p-4 mb-5">
+            <p className="text-xs text-green-700 font-medium mb-1">Job Code</p>
             <p className="text-3xl font-mono font-bold text-green-900">
               {successJobCode.job_code}
             </p>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-amber-700">
+              Status: PENDING
+            </p>
           </div>
 
-          <div className="text-left space-y-2 mb-6 text-sm">
-            <p><strong>Waste Type:</strong> {form.waste_type}</p>
-            <p><strong>Estimated:</strong> {form.estimated_kg} kg</p>
-            <p><strong>Collection Point:</strong> {selectedPoint?.name}</p>
+          <div className="space-y-2 mb-5 text-sm text-gray-700">
+            <p><strong>Waste Type:</strong> {successJobCode.waste_type || form.waste_type}</p>
+            <p><strong>Estimated Weight:</strong> {successJobCode.estimated_kg || form.estimated_kg} kg</p>
+            <p><strong>Collection Point:</strong> {successJobCode.collection_point_name}</p>
           </div>
 
-          <p className="text-gray-700 text-sm mb-6">
-            📍 Take your waste to <strong>{selectedPoint?.name}</strong> for weighing and verification.
-          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-5 text-sm text-blue-900">
+            Take your waste to this collection point for weighing and verification.
+          </div>
 
           <div className="space-y-2">
             <Button
@@ -153,6 +155,12 @@ export default function LogWaste() {
             >
               View My Jobs
             </Button>
+            <Button
+              onClick={() => navigate('/picker/dashboard')}
+              className="w-full bg-blue-700 text-white hover:bg-blue-800"
+            >
+              Go to Dashboard
+            </Button>
             <button
               onClick={() => {
                 setSuccessJobCode(null);
@@ -160,16 +168,25 @@ export default function LogWaste() {
               }}
               className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium"
             >
-              Log Another Waste
+              Log Another
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
     );
   }
 
   return (
     <div className="max-w-sm mx-auto">
+      <div className="mb-4">
+        <button
+          onClick={() => navigate('/picker/dashboard')}
+          className="text-sm font-semibold text-green-700 hover:text-green-800"
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Log Waste</h1>
         <p className="text-sm text-gray-600">Create a new waste log and get your Job Code</p>

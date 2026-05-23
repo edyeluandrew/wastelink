@@ -79,6 +79,15 @@ export default function PickerCollectionPoints() {
   return (
     <div className="space-y-4">
       <div>
+        <button
+          onClick={() => navigate('/picker/dashboard')}
+          className="text-sm font-semibold text-green-700 hover:text-green-800"
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+
+      <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Collection Points</h1>
         <p className="text-sm text-gray-600 mb-4">
           Choose one when logging your waste

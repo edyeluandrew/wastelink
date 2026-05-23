@@ -1,6 +1,7 @@
 import pool from "../config/db.js";
 import { generateWasteJobCode } from "../utils/generateCodes.js";
 import { calculateEarnings } from "../utils/calculateEarnings.js";
+import { recordManualPayoutTransaction } from "../services/payment/paymentService.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 
 // POST /api/waste-logs - Create a new waste log
@@ -145,7 +146,7 @@ export const getWasteLogs = async (req, res, next) => {
         created_at: row.created_at,
         // Flat earning fields for convenience
         earning_id: row.earning_id,
-        amount: row.amount ? parseInt(row.amount) : null,
+        amount: row.amount !== null ? parseInt(row.amount) : null,
         rate_per_kg: row.rate_per_kg,
         earning_status: row.earning_status,
         paid_at: row.paid_at,
@@ -400,7 +401,7 @@ export const verifyWasteLog = async (req, res, next) => {
       const earningResult = await client.query(
         `INSERT INTO earnings (picker_id, waste_log_id, rate_per_kg, amount, status)
          VALUES ($1, $2, $3, $4, 'PENDING')
-         RETURNING id, rate_per_kg, amount, status, created_at`,
+         RETURNING id, rate_per_kg, amount, status, created_at, paid_at`,
         [wasteLog.picker_id, id, ratePerKg, amount]
       );
 
@@ -421,6 +422,7 @@ export const verifyWasteLog = async (req, res, next) => {
           amount: earning.amount,
           status: earning.status,
           created_at: earning.created_at,
+          paid_at: earning.paid_at,
         },
       });
     } catch (error) {
@@ -495,7 +497,7 @@ export const markWasteLogPaid = async (req, res, next) => {
     try {
       // Check if waste log exists and is VERIFIED
       const wasteLogResult = await client.query(
-        "SELECT id, status FROM waste_logs WHERE id = $1 FOR UPDATE",
+        "SELECT id, status, picker_id FROM waste_logs WHERE id = $1 FOR UPDATE",
         [id]
       );
 
@@ -546,6 +548,15 @@ export const markWasteLogPaid = async (req, res, next) => {
 
       const updatedWasteLog = updatedWasteLogResult.rows[0];
 
+      const payoutTransaction = await recordManualPayoutTransaction(client, {
+        earningId: updatedEarning.id,
+        wasteLogId: updatedWasteLog.id,
+        pickerId: wasteLog.picker_id,
+        amount: updatedEarning.amount,
+        phone: null,
+        currency: 'UGX',
+      });
+
       await client.query("COMMIT");
 
       sendSuccess(res, "Waste log marked as paid successfully", {
@@ -559,6 +570,13 @@ export const markWasteLogPaid = async (req, res, next) => {
           amount: updatedEarning.amount,
           status: updatedEarning.status,
           paid_at: updatedEarning.paid_at,
+        },
+        payout_transaction: {
+          id: payoutTransaction.id,
+          provider: payoutTransaction.provider,
+          provider_transaction_id: payoutTransaction.provider_transaction_id,
+          status: payoutTransaction.status,
+          paid_at: payoutTransaction.paid_at,
         },
       });
     } catch (error) {

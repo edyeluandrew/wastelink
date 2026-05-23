@@ -86,6 +86,15 @@ export default function MyJobs() {
   return (
     <div className="space-y-4">
       <div>
+        <button
+          onClick={() => navigate('/picker/dashboard')}
+          className="text-sm font-semibold text-green-700 hover:text-green-800"
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+
+      <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-4">My Jobs</h1>
         
         {/* Filter Buttons */}

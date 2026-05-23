@@ -78,3 +78,26 @@ CREATE TABLE IF NOT EXISTS earnings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   paid_at TIMESTAMPTZ
 );
+
+CREATE TABLE IF NOT EXISTS payout_transactions (
+  id SERIAL PRIMARY KEY,
+  earning_id INT NOT NULL UNIQUE REFERENCES earnings(id),
+  waste_log_id INT NOT NULL UNIQUE REFERENCES waste_logs(id),
+  picker_id INT NOT NULL REFERENCES pickers(id),
+  provider VARCHAR(50) NOT NULL DEFAULT 'MANUAL',
+  phone VARCHAR(30),
+  amount INT NOT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'UGX',
+  provider_transaction_id VARCHAR(120),
+  status VARCHAR(20) NOT NULL CHECK (status IN (
+    'INITIATED',
+    'PROCESSING',
+    'SUCCESS',
+    'FAILED',
+    'CANCELLED'
+  )),
+  failure_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  paid_at TIMESTAMPTZ
+);

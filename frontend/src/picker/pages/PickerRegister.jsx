@@ -76,6 +76,16 @@ export default function PickerRegister() {
 
   return (
     <div className="max-w-sm mx-auto pt-8 pb-12">
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => navigate('/picker/start')}
+          className="text-sm font-semibold text-green-700 hover:text-green-800"
+        >
+          ← Back to Start
+        </button>
+      </div>
+
       <div className="text-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Register as Picker</h1>
         <p className="text-sm text-gray-600">Fill in your information</p>
