@@ -353,7 +353,7 @@ export const verifyWasteLog = async (req, res, next) => {
     try {
       // Check if waste log exists and is PENDING
       const wasteLogResult = await client.query(
-        "SELECT id, status, waste_type, picker_id, job_code FROM waste_logs WHERE id = $1 FOR UPDATE",
+        "SELECT id, status, waste_type, picker_id, job_code, collection_point_id FROM waste_logs WHERE id = $1 FOR UPDATE",
         [id]
       );
 
@@ -367,6 +367,14 @@ export const verifyWasteLog = async (req, res, next) => {
       if (wasteLog.status !== "PENDING") {
         await client.query("ROLLBACK");
         return sendError(res, `Waste log cannot be verified. Current status: ${wasteLog.status}`, 400);
+      }
+
+      if (
+        req.user?.role === "AGENT" &&
+        String(req.user.collection_point_id || "") !== String(wasteLog.collection_point_id || "")
+      ) {
+        await client.query("ROLLBACK");
+        return sendError(res, "You can only verify waste assigned to your collection point.", 403);
       }
 
       // Check if earnings already exist (prevent duplicates)
@@ -441,11 +449,12 @@ export const verifyWasteLog = async (req, res, next) => {
 export const rejectWasteLog = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { reason } = req.body;
+    const { reason, rejection_reason } = req.body;
+    const resolvedReason = reason ?? rejection_reason;
 
     // Check if waste log exists and is PENDING
     const wasteLogResult = await pool.query(
-      "SELECT id, status, job_code FROM waste_logs WHERE id = $1",
+      "SELECT id, status, job_code, collection_point_id FROM waste_logs WHERE id = $1",
       [id]
     );
 
@@ -459,13 +468,20 @@ export const rejectWasteLog = async (req, res, next) => {
       return sendError(res, `Waste log cannot be rejected. Current status: ${wasteLog.status}`, 400);
     }
 
+    if (
+      req.user?.role === "AGENT" &&
+      String(req.user.collection_point_id || "") !== String(wasteLog.collection_point_id || "")
+    ) {
+      return sendError(res, "You can only verify waste assigned to your collection point.", 403);
+    }
+
     // Update waste log
     const updateResult = await pool.query(
       `UPDATE waste_logs 
        SET status = 'REJECTED', rejection_reason = $1, updated_at = NOW()
        WHERE id = $2
        RETURNING id, job_code, status, waste_type, estimated_kg, rejection_reason, updated_at`,
-      [reason || null, id]
+      [resolvedReason || null, id]
     );
 
     const updatedWasteLog = updateResult.rows[0];

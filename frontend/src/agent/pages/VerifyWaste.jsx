@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/axios';
-import { getAgentCollectionPoint } from '../utils/agentSession';
+import { getAgentCollectionPoint, resolveAgentSession } from '../utils/agentSession';
 import JobSearchBox from '../components/JobSearchBox';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState } from '../../components';
@@ -10,24 +10,52 @@ import { ClipboardCheck, ArrowLeft, AlertCircle } from 'lucide-react';
 
 export default function VerifyWaste() {
   const navigate = useNavigate();
-  const collectionPoint = getAgentCollectionPoint();
+  const [collectionPoint, setCollectionPoint] = useState(getAgentCollectionPoint());
   const [searchTerm, setSearchTerm] = useState('');
   const [log, setLog] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [accessWarning, setAccessWarning] = useState('');
 
-  if (!collectionPoint) {
-    navigate('/agent/select-point');
-    return null;
-  }
+  useEffect(() => {
+    let cancelled = false;
+
+    const initialize = async () => {
+      try {
+        const session = await resolveAgentSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        const activeCollectionPoint = session.collectionPoint || getAgentCollectionPoint();
+        setCollectionPoint(activeCollectionPoint);
+
+        if (!activeCollectionPoint?.id) {
+          navigate('/agent/select-point', { replace: true });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.response?.data?.message || 'Failed to load verification session');
+        }
+      }
+    };
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const handleSearch = async (jobCode) => {
     setLoading(true);
     setError(null);
     setNotFound(false);
     setLog(null);
+    setAccessWarning('');
 
     try {
       const response = await apiClient.get(`/waste-logs/job/${jobCode}`);
@@ -41,10 +69,9 @@ export default function VerifyWaste() {
         }
 
         // Check if this log belongs to the selected collection point
-        if (foundLog.collection_point_id !== collectionPoint.id) {
-          setError(
-            `This waste log is assigned to another collection point (${foundLog.collection_point_name || 'Unknown'}). You can only verify waste logs for your current location.`
-          );
+        if (collectionPoint?.id && foundLog.collection_point_id !== collectionPoint.id) {
+          setAccessWarning('This job is assigned to another collection point.');
+          setLog(foundLog);
           return;
         }
 
@@ -108,6 +135,15 @@ export default function VerifyWaste() {
       {/* Search Box */}
       <JobSearchBox onSearch={handleSearch} isLoading={loading} />
 
+      {accessWarning && log && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">{accessWarning}</p>
+          <p className="mt-1 text-sm text-amber-800">
+            {log.collection_point_name || 'Unknown collection point'}
+          </p>
+        </div>
+      )}
+
       {/* Loading State */}
       {loading && <LoadingState message="Searching for waste log..." />}
 
@@ -145,7 +181,7 @@ export default function VerifyWaste() {
 
           <AgentWasteLogCard
             log={log}
-            showActions={true}
+            showActions={!accessWarning}
             onVerify={handleVerify}
             onReject={handleReject}
             isProcessing={refreshing}

@@ -23,6 +23,17 @@ export const safeUserFromRow = (row) => ({
   division: row.division,
   collection_point_id: row.collection_point_id,
   collection_point_name: row.collection_point_name || null,
+  collection_point: row.collection_point_id
+    ? {
+        id: row.collection_point_id,
+        point_code: row.collection_point_point_code || null,
+        name: row.collection_point_name || null,
+        division: row.collection_point_division || row.division || null,
+        agent_name: row.collection_point_agent_name || null,
+        agent_phone: row.collection_point_agent_phone || null,
+        status: row.collection_point_status || null,
+      }
+    : null,
   picker_id: row.picker_id,
   picker_name: row.picker_name || null,
   status: row.status,

@@ -2,21 +2,30 @@ import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Menu, LogOut, LayoutDashboard, Clock3, CheckCircle2, ClipboardList, MapPin } from 'lucide-react';
 import { getAgentCollectionPoint, clearAgentCollectionPoint } from '../utils/agentSession';
+import { clearAuthSession, getAuthUser } from '../../utils/auth';
 
 export default function AgentLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const authUser = getAuthUser();
   const collectionPoint = getAgentCollectionPoint();
+  const isAssignedAgent = authUser?.role === 'AGENT' && Boolean(authUser.collection_point);
 
   const handleChangePoint = () => {
+    if (isAssignedAgent) {
+      navigate('/agent/dashboard');
+      return;
+    }
+
     clearAgentCollectionPoint();
     navigate('/agent/select-point');
   };
 
   const handleLogout = () => {
+    clearAuthSession();
     clearAgentCollectionPoint();
-    navigate('/');
+    navigate('/login');
   };
 
   const isActive = (path) => location.pathname === path;
@@ -46,16 +55,18 @@ export default function AgentLayout() {
         {collectionPoint && (
           <div className="p-4 bg-green-50 border-b border-gray-300">
             <p className="text-xs text-gray-600 inline-flex items-center gap-1.5">
-              <MapPin size={12} /> Current Location
+              <MapPin size={12} /> {isAssignedAgent ? 'Assigned Location' : 'Current Location'}
             </p>
             <p className="font-semibold text-gray-900">{collectionPoint.name}</p>
             <p className="text-xs text-gray-600">{collectionPoint.division}</p>
-            <button
-              onClick={handleChangePoint}
-              className="mt-2 w-full text-xs bg-white text-green-600 border border-green-300 py-1 rounded hover:bg-green-50"
-            >
-              Change Point
-            </button>
+            {!isAssignedAgent && (
+              <button
+                onClick={handleChangePoint}
+                className="mt-2 w-full text-xs bg-white text-green-600 border border-green-300 py-1 rounded hover:bg-green-50"
+              >
+                Change Point
+              </button>
+            )}
           </div>
         )}
 

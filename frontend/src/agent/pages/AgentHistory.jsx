@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/axios';
-import { getAgentCollectionPoint } from '../utils/agentSession';
+import { getAgentCollectionPoint, resolveAgentSession } from '../utils/agentSession';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
 import { RotateCcw, ArrowLeft, CheckCircle2, CircleX, Wallet, ClipboardList } from 'lucide-react';
@@ -14,22 +14,13 @@ export default function AgentHistory() {
   const [filter, setFilter] = useState('ALL');
 
   // Memoized fetch function to avoid unnecessary re-renders
-  const fetchHistory = useCallback(async () => {
+  const fetchHistory = useCallback(async (collectionPointId) => {
     console.log('[AgentHistory] fetchHistory started');
     setLoading(true);
     setError(null);
 
     try {
-      const collectionPoint = getAgentCollectionPoint();
-      console.log('[AgentHistory] Selected collection point:', collectionPoint);
-
-      if (!collectionPoint?.id) {
-        console.warn('[AgentHistory] No collection point selected, redirecting');
-        navigate('/agent/select-point');
-        return;
-      }
-
-      const url = `/waste-logs?collection_point_id=${collectionPoint.id}`;
+      const url = `/waste-logs?collection_point_id=${collectionPointId}`;
       console.log('[AgentHistory] Fetching from API URL:', url);
 
       const response = await apiClient.get(url);
@@ -61,13 +52,43 @@ export default function AgentHistory() {
       console.log('[AgentHistory] Setting loading to false');
       setLoading(false);
     }
-  }, [navigate]);
+  }, []);
 
   // Fetch on mount only
   useEffect(() => {
-    console.log('[AgentHistory] Component mounted, calling fetchHistory');
-    fetchHistory();
-  }, [fetchHistory]);
+    let cancelled = false;
+
+    const initialize = async () => {
+      try {
+        const session = await resolveAgentSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        const activeCollectionPoint = session.collectionPoint || getAgentCollectionPoint();
+        if (!activeCollectionPoint?.id) {
+          console.warn('[AgentHistory] No collection point selected, redirecting');
+          navigate('/agent/select-point', { replace: true });
+          return;
+        }
+
+        console.log('[AgentHistory] Component mounted, calling fetchHistory');
+        await fetchHistory(activeCollectionPoint.id);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.response?.data?.message || 'Failed to load history');
+          setLoading(false);
+        }
+      }
+    };
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchHistory, navigate]);
 
   const getFilteredLogs = () => {
     if (filter === 'ALL') return logs;

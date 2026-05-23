@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/axios';
-import { getAgentCollectionPoint } from '../utils/agentSession';
+import { getAgentCollectionPoint, resolveAgentSession } from '../utils/agentSession';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
 import { RotateCcw, ArrowLeft, Clock3 } from 'lucide-react';
@@ -15,19 +15,45 @@ export default function PendingLogs() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!collectionPoint) {
-      navigate('/agent/select-point');
-      return;
-    }
-    fetchPendingLogs();
-  }, [collectionPoint, navigate]);
+    let cancelled = false;
 
-  const fetchPendingLogs = async () => {
+    const initialize = async () => {
+      try {
+        const session = await resolveAgentSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        const activeCollectionPoint = session.collectionPoint || getAgentCollectionPoint();
+
+        if (!activeCollectionPoint?.id) {
+          navigate('/agent/select-point', { replace: true });
+          return;
+        }
+
+        await fetchPendingLogs(activeCollectionPoint.id);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.response?.data?.message || 'Failed to load pending logs');
+          setLoading(false);
+        }
+      }
+    };
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
+  const fetchPendingLogs = async (collectionPointId) => {
     setLoading(true);
     setError(null);
     try {
       const response = await apiClient.get(
-        `/waste-logs?status=PENDING&collection_point_id=${collectionPoint.id}`
+        `/waste-logs?status=PENDING&collection_point_id=${collectionPointId}`
       );
       if (response.data.success) {
         setLogs(response.data.data || []);

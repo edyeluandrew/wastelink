@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/axios';
-import { getAgentCollectionPoint } from '../utils/agentSession';
+import { getAgentCollectionPoint, resolveAgentSession } from '../utils/agentSession';
 import AgentStatCard from '../components/AgentStatCard';
 import { LoadingState, ErrorState } from '../../components';
 import { getEarningAmount } from '../../utils/earningsHelper';
@@ -19,21 +19,21 @@ import {
 
 export default function AgentDashboard() {
   const navigate = useNavigate();
-  const collectionPoint = getAgentCollectionPoint();
+  const [collectionPoint, setCollectionPoint] = useState(getAgentCollectionPoint());
   const [stats, setStats] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchDashboardData = useCallback(async () => {
-    if (!collectionPoint) return;
+  const fetchDashboardData = useCallback(async (pointId) => {
+    if (!pointId) return;
     
     setLoading(true);
     setError(null);
     try {
       // Fetch logs for this collection point to calculate stats
       const logsResponse = await apiClient.get(
-        `/waste-logs?collection_point_id=${collectionPoint.id}&limit=100`
+        `/waste-logs?collection_point_id=${pointId}&limit=100`
       );
 
       if (logsResponse.data.success) {
@@ -74,15 +74,43 @@ export default function AgentDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [collectionPoint?.id]);
+  }, []);
 
   useEffect(() => {
-    if (!collectionPoint) {
-      navigate('/agent/select-point');
-      return;
-    }
-    fetchDashboardData();
-  }, [collectionPoint?.id, fetchDashboardData, navigate]);
+    let cancelled = false;
+
+    const initialize = async () => {
+      try {
+        const session = await resolveAgentSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        const activeCollectionPoint = session.collectionPoint || getAgentCollectionPoint();
+        setCollectionPoint(activeCollectionPoint);
+
+        if (!activeCollectionPoint?.id) {
+          navigate('/agent/select-point', { replace: true });
+          return;
+        }
+
+        await fetchDashboardData(activeCollectionPoint.id);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Error initializing agent dashboard:', err);
+          setError(err.response?.data?.message || 'Failed to load dashboard data');
+          setLoading(false);
+        }
+      }
+    };
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchDashboardData, navigate]);
 
   const formatNumber = (num) => {
     if (!num) return '0';

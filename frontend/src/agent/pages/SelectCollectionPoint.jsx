@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/axios';
 import { setAgentCollectionPoint } from '../utils/agentSession';
+import { getAuthUser } from '../../utils/auth';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
 import { MapPin, Building2, UserRound, Phone, Navigation, ArrowRight, Info } from 'lucide-react';
 
@@ -10,10 +11,18 @@ export default function SelectCollectionPoint() {
   const [points, setPoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const authUser = getAuthUser();
+  const assignedPoint = authUser?.role === 'AGENT' ? authUser.collection_point || null : null;
+  const isAuthenticatedAgent = authUser?.role === 'AGENT';
 
   useEffect(() => {
+    if (isAuthenticatedAgent) {
+      setLoading(false);
+      return;
+    }
+
     fetchCollectionPoints();
-  }, []);
+  }, [isAuthenticatedAgent]);
 
   const fetchCollectionPoints = async () => {
     setLoading(true);
@@ -56,9 +65,32 @@ export default function SelectCollectionPoint() {
         <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-6 flex gap-3">
           <Info size={18} className="mt-0.5 shrink-0 text-blue-700" />
           <p className="text-sm text-blue-900">
-            <strong>Note:</strong> This is a temporary selection for the MVP demo. When authentication is implemented, your collection point will be automatically linked to your account.
+            <strong>Note:</strong> When an agent is signed in, the assigned collection point is linked by the admin and cannot be changed here.
           </p>
         </div>
+
+        {isAuthenticatedAgent && (
+          <div className="mb-6 rounded-lg border border-green-300 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-green-700">Assigned Collection Point</p>
+            {assignedPoint ? (
+              <div className="mt-3 space-y-2">
+                <p className="text-lg font-bold text-gray-900">{assignedPoint.name}</p>
+                <p className="text-sm text-gray-600">{assignedPoint.point_code || `CP-${assignedPoint.id}`}</p>
+                <p className="text-sm text-gray-600">{assignedPoint.division || 'N/A'}</p>
+                <button
+                  onClick={() => navigate('/agent/dashboard')}
+                  className="mt-2 inline-flex items-center justify-center gap-2 rounded bg-green-600 px-4 py-2 font-semibold text-white transition hover:bg-green-700"
+                >
+                  Go to Agent Dashboard <ArrowRight size={16} />
+                </button>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-amber-700">
+                No assigned collection point was found for this account. Please contact an admin.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Loading State */}
         {loading && <LoadingState message="Loading collection points..." />}
@@ -72,7 +104,7 @@ export default function SelectCollectionPoint() {
         )}
 
         {/* Points Grid */}
-        {!loading && !error && points.length > 0 && (
+        {!isAuthenticatedAgent && !loading && !error && points.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {points.map((point) => (
               <div
@@ -130,13 +162,15 @@ export default function SelectCollectionPoint() {
         )}
 
         {/* Footer */}
-        <div className="mt-8 text-center">
+        {!isAuthenticatedAgent && (
+          <div className="mt-8 text-center">
           <p className="text-xs text-gray-600">
             <a href="/" className="text-green-600 hover:underline">
               Back to Admin Dashboard
             </a>
           </p>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

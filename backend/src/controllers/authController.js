@@ -7,15 +7,41 @@ import { safeUserFromRow } from "../utils/userHelpers.js";
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, identifier, password } = req.body;
+    const loginIdentifier = String(identifier ?? email ?? "").trim();
 
-    if (!email || !password) {
-      return sendError(res, "Email and password are required", 400);
+    if (!loginIdentifier || !password) {
+      return sendError(res, "Email or phone and password are required", 400);
     }
 
     const result = await pool.query(
-      "SELECT id, name, email, password_hash, role, status FROM users WHERE email = $1 LIMIT 1",
-      [String(email).trim().toLowerCase()]
+      `SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.phone,
+        u.password_hash,
+        u.role,
+        u.city,
+        u.division,
+        u.collection_point_id,
+        cp.point_code AS collection_point_point_code,
+        cp.name AS collection_point_name,
+        cp.division AS collection_point_division,
+        cp.agent_name AS collection_point_agent_name,
+        cp.agent_phone AS collection_point_agent_phone,
+        cp.status AS collection_point_status,
+        u.picker_id,
+        p.name AS picker_name,
+        u.status,
+        u.created_at,
+        u.updated_at
+      FROM users u
+      LEFT JOIN collection_points cp ON u.collection_point_id = cp.id
+      LEFT JOIN pickers p ON u.picker_id = p.id
+      WHERE LOWER(u.email) = $1 OR u.phone = $2
+      LIMIT 1`,
+      [loginIdentifier.toLowerCase(), loginIdentifier]
     );
 
     if (result.rows.length === 0) {
@@ -26,10 +52,6 @@ export const login = async (req, res) => {
 
     if (user.status !== "ACTIVE") {
       return sendError(res, "Account is inactive", 403);
-    }
-
-    if (user.role !== "SUPER_ADMIN") {
-      return sendError(res, "Invalid email or password", 401);
     }
 
     if (!user.password_hash) {

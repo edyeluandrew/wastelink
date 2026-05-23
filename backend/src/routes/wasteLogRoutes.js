@@ -8,6 +8,7 @@ import {
   rejectWasteLog,
   markWasteLogPaid,
 } from "../controllers/wasteLogController.js";
+import { optionalAuth } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
@@ -16,8 +17,8 @@ router.get("/", getWasteLogs);
 router.get("/search", getWasteLogByJobCode); // Search by query param (must come BEFORE /:id)
 router.get("/job/:jobCode", getWasteLogByJobCode); // Search by path param
 router.get("/:id", getWasteLogById);
-router.patch("/:id/verify", verifyWasteLog);
-router.patch("/:id/reject", rejectWasteLog);
+router.patch("/:id/verify", optionalAuth, verifyWasteLog);
+router.patch("/:id/reject", optionalAuth, rejectWasteLog);
 router.patch("/:id/mark-paid", markWasteLogPaid);
 
 export default router;

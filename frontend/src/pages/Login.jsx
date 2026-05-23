@@ -7,7 +7,7 @@ import { Lock, Mail, ShieldCheck, LogIn } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,15 +22,16 @@ export default function Login() {
     event.preventDefault();
     setError('');
 
-    if (!email.trim() || !password) {
-      setError('Email and password are required');
+    if (!identifier.trim() || !password) {
+      setError('Email or phone and password are required');
       return;
     }
 
     setLoading(true);
     try {
       const response = await apiClient.post('/auth/login', {
-        email: email.trim(),
+        email: identifier.trim(),
+        identifier: identifier.trim(),
         password,
       });
 
@@ -88,16 +89,16 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#111111]">Email</span>
+                <span className="mb-2 block text-sm font-semibold text-[#111111]">Email or phone</span>
                 <div className="flex items-center gap-3 rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] px-4 py-3 focus-within:border-[#238636]">
                   <Mail size={18} className="shrink-0 text-[#6B7280]" />
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="superadmin@example.com"
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="superadmin@example.com or 0770000000"
                     className="w-full bg-transparent text-sm outline-none"
-                    autoComplete="email"
+                    autoComplete="username"
                     disabled={loading}
                   />
                 </div>
