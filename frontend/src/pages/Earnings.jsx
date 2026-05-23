@@ -9,6 +9,7 @@ import {
   Button,
 } from '../components';
 import { formatCurrencyUGX, formatKg, formatDateTime, formatStatus } from '../utils/formatters';
+import { getEarningAmount, getEarningStatus, hasEarning } from '../utils/earningsHelper';
 import api from '../api/axios';
 
 export default function Earnings() {
@@ -28,7 +29,7 @@ export default function Earnings() {
       setError(null);
       const res = await api.get('/waste-logs');
       // Filter logs that have earnings
-      const logsWithEarnings = (res.data.data || []).filter((log) => log.amount);
+      const logsWithEarnings = (res.data.data || []).filter((log) => hasEarning(log));
       setLogs(logsWithEarnings);
     } catch (err) {
       setError(err);

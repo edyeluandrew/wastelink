@@ -89,10 +89,12 @@ export const getWasteLogs = async (req, res, next) => {
         wl.waste_type, wl.estimated_kg, wl.verified_kg, wl.status,
         wl.notes, wl.logged_at, wl.verified_at, wl.created_at,
         p.picker_code, p.name as picker_name, p.phone as picker_phone,
-        cp.point_code, cp.name as collection_point_name, cp.division
+        cp.point_code, cp.name as collection_point_name, cp.division,
+        e.id as earning_id, e.rate_per_kg, e.amount, e.status as earning_status, e.paid_at
       FROM waste_logs wl
       JOIN pickers p ON wl.picker_id = p.id
       JOIN collection_points cp ON wl.collection_point_id = cp.id
+      LEFT JOIN earnings e ON wl.id = e.waste_log_id
       WHERE 1=1
     `;
     const params = [];
@@ -121,26 +123,49 @@ export const getWasteLogs = async (req, res, next) => {
     query += " ORDER BY wl.created_at DESC";
 
     const result = await pool.query(query, params);
-    const wasteLogs = result.rows.map(row => ({
-      id: row.id,
-      job_code: row.job_code,
-      picker_id: row.picker_id,
-      picker_code: row.picker_code,
-      picker_name: row.picker_name,
-      picker_phone: row.picker_phone,
-      collection_point_id: row.collection_point_id,
-      collection_point_code: row.point_code,
-      collection_point_name: row.collection_point_name,
-      division: row.division,
-      waste_type: row.waste_type,
-      estimated_kg: parseFloat(row.estimated_kg),
-      verified_kg: row.verified_kg ? parseFloat(row.verified_kg) : null,
-      status: row.status,
-      notes: row.notes,
-      logged_at: row.logged_at,
-      verified_at: row.verified_at,
-      created_at: row.created_at,
-    }));
+    const wasteLogs = result.rows.map(row => {
+      const wasteLog = {
+        id: row.id,
+        job_code: row.job_code,
+        picker_id: row.picker_id,
+        picker_code: row.picker_code,
+        picker_name: row.picker_name,
+        picker_phone: row.picker_phone,
+        collection_point_id: row.collection_point_id,
+        collection_point_code: row.point_code,
+        collection_point_name: row.collection_point_name,
+        division: row.division,
+        waste_type: row.waste_type,
+        estimated_kg: parseFloat(row.estimated_kg),
+        verified_kg: row.verified_kg ? parseFloat(row.verified_kg) : null,
+        status: row.status,
+        notes: row.notes,
+        logged_at: row.logged_at,
+        verified_at: row.verified_at,
+        created_at: row.created_at,
+        // Flat earning fields for convenience
+        earning_id: row.earning_id,
+        amount: row.amount ? parseInt(row.amount) : null,
+        rate_per_kg: row.rate_per_kg,
+        earning_status: row.earning_status,
+        paid_at: row.paid_at,
+      };
+      
+      // Also include nested earning object
+      if (row.earning_id) {
+        wasteLog.earning = {
+          id: row.earning_id,
+          rate_per_kg: row.rate_per_kg,
+          amount: parseInt(row.amount),
+          status: row.earning_status,
+          paid_at: row.paid_at,
+        };
+      } else {
+        wasteLog.earning = null;
+      }
+      
+      return wasteLog;
+    });
 
     sendSuccess(res, "Waste logs retrieved successfully", wasteLogs);
   } catch (error) {
