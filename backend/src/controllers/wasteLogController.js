@@ -548,14 +548,24 @@ export const markWasteLogPaid = async (req, res, next) => {
 
       const updatedWasteLog = updatedWasteLogResult.rows[0];
 
-      const payoutTransaction = await recordManualPayoutTransaction(client, {
-        earningId: updatedEarning.id,
-        wasteLogId: updatedWasteLog.id,
-        pickerId: wasteLog.picker_id,
-        amount: updatedEarning.amount,
-        phone: null,
-        currency: 'UGX',
-      });
+      let payoutTransaction = null;
+      try {
+        payoutTransaction = await recordManualPayoutTransaction(client, {
+          earningId: updatedEarning.id,
+          wasteLogId: updatedWasteLog.id,
+          pickerId: wasteLog.picker_id,
+          amount: updatedEarning.amount,
+          phone: null,
+          currency: 'UGX',
+        });
+      } catch (payoutError) {
+        // Keep manual mark-paid operational even if payout_transactions is not migrated yet.
+        if (payoutError?.code === '42P01') {
+          console.warn('[Payout Transaction Warning] payout_transactions table missing; continuing mark-paid without payout row');
+        } else {
+          throw payoutError;
+        }
+      }
 
       await client.query("COMMIT");
 
@@ -571,13 +581,13 @@ export const markWasteLogPaid = async (req, res, next) => {
           status: updatedEarning.status,
           paid_at: updatedEarning.paid_at,
         },
-        payout_transaction: {
+        payout_transaction: payoutTransaction ? {
           id: payoutTransaction.id,
           provider: payoutTransaction.provider,
           provider_transaction_id: payoutTransaction.provider_transaction_id,
           status: payoutTransaction.status,
           paid_at: payoutTransaction.paid_at,
-        },
+        } : null,
       });
     } catch (error) {
       await client.query("ROLLBACK");
