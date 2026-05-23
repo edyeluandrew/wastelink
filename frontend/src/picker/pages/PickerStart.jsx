@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LoadingState, ErrorState, Button } from '../../components';
 import apiClient from '../../api/axios';
 import { setPickerSession } from '../utils/pickerSession';
+import { Recycle, ArrowRight } from 'lucide-react';
 
 export default function PickerStart() {
   const navigate = useNavigate();
@@ -55,58 +56,63 @@ export default function PickerStart() {
   }
 
   return (
-    <div className="max-w-sm mx-auto pt-12 pb-12">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-green-700 mb-2" style={{ fontFamily: 'Orbitron' }}>
-          🔗 WasteLink
-        </h1>
-        <p className="text-xl text-gray-600 mb-1">Picker Portal</p>
-        <p className="text-sm text-gray-500">Earn money collecting waste</p>
-      </div>
-
-      <div className="bg-white rounded-lg p-6 border border-gray-300 mb-6">
-        <form onSubmit={handleContinue} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="256 700 000 000"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Enter the phone number you registered with
-            </p>
+    <div className="mx-auto flex min-h-[calc(100vh-140px)] max-w-2xl items-center justify-center py-10">
+      <div className="w-full rounded-3xl border border-[#BDE5BF] bg-[linear-gradient(135deg,#EAF6EA_0%,#FFFFFF_70%)] p-6 shadow-sm">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-[#238636] shadow-sm">
+            <Recycle size={30} />
           </div>
+          <h1 className="text-3xl font-bold text-[#238636]" style={{ fontFamily: 'Orbitron' }}>
+            WasteLink
+          </h1>
+          <p className="mt-2 text-lg text-[#111111]">Picker Portal</p>
+          <p className="text-sm text-[#6B7280]">Earn money collecting waste.</p>
+        </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-300 rounded-lg p-3">
-              <p className="text-sm text-red-700">{error}</p>
+        <div className="rounded-3xl border border-[#D9D9D9] bg-white p-5 shadow-sm">
+          <form onSubmit={handleContinue} className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-[#111111] mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="256 700 000 000"
+                className="w-full rounded-2xl border border-[#D9D9D9] px-4 py-3 focus:border-[#238636] focus:outline-none"
+                disabled={loading}
+              />
+              <p className="mt-2 text-xs text-[#6B7280]">
+                Enter the phone number you registered with.
+              </p>
             </div>
-          )}
 
-          <Button
-            onClick={handleContinue}
-            disabled={loading || !phone.trim()}
-            className="w-full"
+            {error && (
+              <div className="rounded-2xl border border-red-300 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            <Button
+              onClick={handleContinue}
+              disabled={loading || !phone.trim()}
+              className="flex w-full items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2F9E44]"
+            >
+              Continue <ArrowRight size={16} />
+            </Button>
+          </form>
+        </div>
+
+        <div className="mt-5 text-center">
+          <p className="text-sm text-[#6B7280] mb-2">Don't have an account yet?</p>
+          <button
+            onClick={() => navigate('/picker/register')}
+            className="text-[#238636] font-semibold hover:underline"
           >
-            Continue
-          </Button>
-        </form>
-      </div>
-
-      <div className="text-center">
-        <p className="text-sm text-gray-600 mb-2">Don't have an account yet?</p>
-        <button
-          onClick={() => navigate('/picker/register')}
-          className="text-green-700 font-semibold hover:underline"
-        >
-          Register as a new picker →
-        </button>
+            Register as a new picker →
+          </button>
+        </div>
       </div>
     </div>
   );

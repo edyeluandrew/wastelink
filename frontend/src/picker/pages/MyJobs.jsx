@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LoadingState, ErrorState, EmptyState } from '../../components';
+import { LoadingState, ErrorState, EmptyState, StatusBadge } from '../../components';
 import PickerJobCard from '../components/PickerJobCard';
 import apiClient from '../../api/axios';
 import { getPickerSession } from '../utils/pickerSession';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, Filter, ArrowRight } from 'lucide-react';
+import { formatUGX, formatDate } from '../../utils/formatters';
+import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
 
 const FILTER_OPTIONS = [
   { value: 'ALL', label: 'All' },
@@ -79,34 +81,65 @@ export default function MyJobs() {
         title="No jobs yet"
         message="Log your first waste to get started"
         icon={Briefcase}
+        actionLabel="Log Waste"
+        actionIcon={ArrowRight}
+        onAction={() => navigate('/picker/log-waste')}
       />
     );
   }
 
+  const summary = {
+    total: allJobs.length,
+    pending: allJobs.filter(job => job.status === 'PENDING').length,
+    verified: allJobs.filter(job => job.status === 'VERIFIED').length,
+    paid: allJobs.filter(job => job.status === 'PAID').length,
+    rejected: allJobs.filter(job => job.status === 'REJECTED').length,
+  };
+
   return (
-    <div className="space-y-4">
-      <div>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-[#6B7280]">Job History</p>
+          <h1 className="text-2xl font-bold text-[#111111]" style={{ fontFamily: 'Orbitron' }}>My Waste History</h1>
+          <p className="text-sm text-[#6B7280]">Track every job from log to payment.</p>
+        </div>
         <button
           onClick={() => navigate('/picker/dashboard')}
-          className="text-sm font-semibold text-green-700 hover:text-green-800"
+          className="text-sm font-semibold text-[#238636] hover:text-[#2F9E44]"
         >
           ← Back to Dashboard
         </button>
       </div>
 
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">My Jobs</h1>
-        
-        {/* Filter Buttons */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {[
+          { label: 'Total Jobs', value: summary.total, color: 'green' },
+          { label: 'Pending', value: summary.pending, color: 'amber' },
+          { label: 'Verified', value: summary.verified, color: 'green' },
+          { label: 'Paid', value: summary.paid, color: 'blue' },
+          { label: 'Rejected', value: summary.rejected, color: 'red' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-[#D9D9D9] bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">{item.label}</p>
+            <p className="mt-2 text-2xl font-bold text-[#111111]">{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl border border-[#D9D9D9] bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#111111]">
+          <Filter size={16} className="text-[#238636]" /> Filters
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {FILTER_OPTIONS.map(option => (
             <button
               key={option.value}
               onClick={() => setSelectedFilter(option.value)}
-              className={`px-3 py-1.5 rounded-full font-semibold text-sm whitespace-nowrap transition ${
+              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
                 selectedFilter === option.value
-                  ? 'bg-green-700 text-white'
-                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  ? 'bg-[#238636] text-white'
+                  : 'bg-[#F8F9FA] text-[#111111] hover:bg-[#EAF6EA]'
               }`}
             >
               {option.label}
@@ -115,23 +148,25 @@ export default function MyJobs() {
         </div>
       </div>
 
-      {/* Job Count */}
-      <p className="text-sm text-gray-600">
-        {filteredJobs.length} {selectedFilter === 'ALL' ? 'job' : selectedFilter.toLowerCase()}{' '}
-        {filteredJobs.length !== 1 ? 's' : ''}
+      <p className="text-sm text-[#6B7280]">
+        Showing {filteredJobs.length} {selectedFilter === 'ALL' ? 'jobs' : selectedFilter.toLowerCase()}
       </p>
 
-      {/* Jobs List */}
       {filteredJobs.length > 0 ? (
-        <div>
+        <div className="space-y-3">
           {filteredJobs.map(job => (
             <PickerJobCard key={job.id} job={job} />
           ))}
         </div>
       ) : (
-        <div className="text-center py-8">
-          <p className="text-gray-600">No {selectedFilter.toLowerCase()} jobs</p>
-        </div>
+        <EmptyState
+          title={`No ${selectedFilter.toLowerCase()} jobs`}
+          message="Try another filter or log a new waste job."
+          icon={Briefcase}
+          actionLabel="Log Waste"
+          actionIcon={ArrowRight}
+          onAction={() => navigate('/picker/log-waste')}
+        />
       )}
     </div>
   );
