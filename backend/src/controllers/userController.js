@@ -240,7 +240,7 @@ export const updateUser = async (req, res) => {
     await ensureUsersTableSchema();
 
     const { id } = req.params;
-    const existingResult = await pool.query('SELECT id, role FROM users WHERE id = $1 LIMIT 1', [id]);
+    const existingResult = await pool.query('SELECT id, role, city, collection_point_id FROM users WHERE id = $1 LIMIT 1', [id]);
 
     if (existingResult.rows.length === 0) {
       return sendError(res, 'User not found', 404);
