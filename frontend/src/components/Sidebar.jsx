@@ -23,7 +23,8 @@ const baseMenuItems = [
 export default function Sidebar() {
   const location = useLocation();
   const authUser = getAuthUser();
-  const menuItems = authUser?.role === 'SUPER_ADMIN'
+  const showUsersLink = authUser?.role === 'SUPER_ADMIN';
+  const menuItems = showUsersLink
     ? [...baseMenuItems.slice(0, 2), { path: '/users', label: 'Users', icon: Users }, ...baseMenuItems.slice(2)]
     : baseMenuItems;
 

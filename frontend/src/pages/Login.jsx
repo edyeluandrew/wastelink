@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components';
 import apiClient from '../api/axios';
-import { getAuthToken, getUserRole, setAuthSession } from '../utils/auth';
+import { getAuthToken, getDefaultRouteForRole, getUserRole, setAuthSession } from '../utils/auth';
 import { Lock, Mail, ShieldCheck, LogIn } from 'lucide-react';
 
 export default function Login() {
@@ -13,8 +13,8 @@ export default function Login() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (getAuthToken() && getUserRole() === 'SUPER_ADMIN') {
-      navigate('/', { replace: true });
+    if (getAuthToken()) {
+      navigate(getDefaultRouteForRole(getUserRole()), { replace: true });
     }
   }, [navigate]);
 
@@ -36,13 +36,7 @@ export default function Login() {
 
       if (response.data?.success && response.data.data?.token && response.data.data?.user) {
         setAuthSession(response.data.data.token, response.data.data.user);
-
-        if (response.data.data.user.role === 'SUPER_ADMIN') {
-          navigate('/', { replace: true });
-          return;
-        }
-
-        navigate('/', { replace: true });
+        navigate(getDefaultRouteForRole(response.data.data.user.role), { replace: true });
         return;
       }
 

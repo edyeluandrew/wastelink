@@ -10,6 +10,7 @@ import Divisions from './pages/Divisions'
 import Earnings from './pages/Earnings'
 import Reports from './pages/Reports'
 import Login from './pages/Login'
+import AccessDenied from './pages/AccessDenied'
 import AgentLayout from './agent/components/AgentLayout'
 import SelectCollectionPoint from './agent/pages/SelectCollectionPoint'
 import AgentDashboard from './agent/pages/AgentDashboard'
@@ -26,15 +27,27 @@ import MyJobs from './picker/pages/MyJobs'
 import MyEarnings from './picker/pages/MyEarnings'
 import PickerCollectionPoints from './picker/pages/PickerCollectionPoints'
 import PickerHelp from './picker/pages/PickerHelp'
+import ProtectedRoute from './components/ProtectedRoute'
 
 const router = createBrowserRouter([
   {
-    element: <DashboardLayout />,
+    path: 'login',
+    element: <Login />,
+  },
+  {
+    path: 'access-denied',
+    element: <AccessDenied />,
+  },
+  {
+    element: (
+      <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CITY_ADMIN']} fallbackPath="/login">
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <Overview /> },
       { path: 'overview', element: <Overview /> },
       { path: 'pickers', element: <Pickers /> },
-      { path: 'users', element: <Users /> },
       { path: 'collection-points', element: <CollectionPoints /> },
       { path: 'waste-logs', element: <WasteLogs /> },
       { path: 'divisions', element: <Divisions /> },
@@ -43,19 +56,28 @@ const router = createBrowserRouter([
     ],
   },
   {
+    element: (
+      <ProtectedRoute allowedRoles={['SUPER_ADMIN']} fallbackPath="/login">
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { path: 'users', element: <Users /> },
+    ],
+  },
+  {
     path: 'route-test',
     element: <div style={{padding: '40px', fontSize: '24px', color: '#238636'}}>✅ Route test works!</div>,
   },
   {
-    path: 'login',
-    element: <Login />,
+    path: 'agent/select-point',
+    element: <SelectCollectionPoint />,
   },
   {
     path: 'agent',
-    element: <AgentLayout />,
+    element: <ProtectedRoute allowedRoles={['AGENT']} fallbackPath="/agent/select-point"><AgentLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <AgentDashboard /> },
-      { path: 'select-point', element: <SelectCollectionPoint /> },
       { path: 'dashboard', element: <AgentDashboard /> },
       { path: 'pending', element: <PendingLogs /> },
       { path: 'verify', element: <VerifyWaste /> },
@@ -63,12 +85,18 @@ const router = createBrowserRouter([
     ],
   },
   {
+    path: 'picker/start',
+    element: <PickerStart />,
+  },
+  {
+    path: 'picker/register',
+    element: <PickerRegister />,
+  },
+  {
     path: 'picker',
-    element: <PickerLayout />,
+    element: <ProtectedRoute allowedRoles={['PICKER']} fallbackPath="/picker/start"><PickerLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <PickerRouteRedirect /> },
-      { path: 'start', element: <PickerStart /> },
-      { path: 'register', element: <PickerRegister /> },
       { path: 'dashboard', element: <PickerDashboard /> },
       { path: 'log-waste', element: <LogWaste /> },
       { path: 'jobs', element: <MyJobs /> },

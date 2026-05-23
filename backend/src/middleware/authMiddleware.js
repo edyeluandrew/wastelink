@@ -24,11 +24,40 @@ export const requireAuth = async (req, res, next) => {
       return sendError(res, "Unauthorized", 401);
     }
 
-    req.user = {
-      id: userId,
-      role: payload.role,
-      email: payload.email,
-    };
+    const result = await pool.query(
+      `SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.phone,
+        u.role,
+        u.city,
+        u.division,
+        u.collection_point_id,
+        cp.name AS collection_point_name,
+        u.picker_id,
+        p.name AS picker_name,
+        u.status,
+        u.created_at,
+        u.updated_at
+       FROM users u
+       LEFT JOIN collection_points cp ON u.collection_point_id = cp.id
+       LEFT JOIN pickers p ON u.picker_id = p.id
+       WHERE u.id = $1
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return sendError(res, "Unauthorized", 401);
+    }
+
+    const user = safeUserFromRow(result.rows[0]);
+    if (user.status !== "ACTIVE") {
+      return sendError(res, "Account is inactive", 403);
+    }
+
+    req.user = user;
 
     next();
   } catch (error) {

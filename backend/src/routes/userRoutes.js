@@ -8,15 +8,20 @@ import {
   resetPassword,
   updateUser,
 } from "../controllers/userController.js";
+import { requireAuth, requireRole } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
-router.post("/", createUser);
-router.get("/", getUsers);
-router.get("/:id", getUserById);
-router.patch("/:id", updateUser);
-router.patch("/:id/deactivate", deactivateUser);
-router.patch("/:id/activate", activateUser);
-router.patch("/:id/reset-password", resetPassword);
+const adminRoles = ["SUPER_ADMIN", "CITY_ADMIN"];
+
+router.use(requireAuth);
+
+router.post("/", requireRole(adminRoles), createUser);
+router.get("/", requireRole(adminRoles), getUsers);
+router.get("/:id", requireRole(adminRoles), getUserById);
+router.patch("/:id", requireRole(adminRoles), updateUser);
+router.patch("/:id/deactivate", requireRole(adminRoles), deactivateUser);
+router.patch("/:id/activate", requireRole(adminRoles), activateUser);
+router.patch("/:id/reset-password", requireRole(adminRoles), resetPassword);
 
 export default router;

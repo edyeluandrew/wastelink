@@ -27,3 +27,17 @@ export const clearAuthSession = () => {
 export const isAuthenticated = () => Boolean(getAuthToken());
 
 export const getUserRole = () => getAuthUser()?.role || null;
+
+export const getDefaultRouteForRole = (role) => {
+  switch (role) {
+    case 'SUPER_ADMIN':
+    case 'CITY_ADMIN':
+      return '/';
+    case 'AGENT':
+      return '/agent/dashboard';
+    case 'PICKER':
+      return '/picker/dashboard';
+    default:
+      return '/login';
+  }
+};

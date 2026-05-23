@@ -70,6 +70,18 @@ const getPicker = async (pickerId) => {
   return result.rows[0] || null;
 };
 
+const canCreateRole = (creatorRole, targetRole) => {
+  if (creatorRole === "SUPER_ADMIN") {
+    return ["CITY_ADMIN", "AGENT", "PICKER"].includes(targetRole);
+  }
+
+  if (creatorRole === "CITY_ADMIN") {
+    return ["AGENT", "PICKER"].includes(targetRole);
+  }
+
+  return false;
+};
+
 export const createUser = async (req, res) => {
   try {
     await ensureUsersTableSchema();
@@ -98,6 +110,10 @@ export const createUser = async (req, res) => {
     const normalizedRole = normalizeUserRole(role);
     if (!ALLOWED_USER_ROLES.includes(normalizedRole)) {
       return sendError(res, "Unsupported user role", 400);
+    }
+
+    if (!req.user?.role || !canCreateRole(req.user.role, normalizedRole)) {
+      return sendError(res, "Forbidden", 403);
     }
 
     const normalizedStatus = normalizeUserStatus(status);
