@@ -9,6 +9,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { clearPickerSession } from '../utils/pickerSession';
+import { formatGenderLabel, formatStatus } from '../../utils/formatters';
 
 const navItems = [
   { path: '/picker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -40,7 +41,8 @@ export default function PickerSidebar({ picker }) {
             <p className="text-lg font-semibold text-[#111111]">{picker.name}</p>
             <p className="text-[#6B7280] font-medium">Code: {picker.picker_code}</p>
             <p className="text-[#6B7280]">{picker.division}</p>
-            {picker.main_waste_type && <p className="text-[#6B7280]">{picker.main_waste_type}</p>}
+            {picker.main_waste_type && <p className="text-[#6B7280]">Mostly collects: {formatStatus(picker.main_waste_type)}</p>}
+            {picker.gender && <p className="text-[#6B7280]">{formatGenderLabel(picker.gender)}</p>}
           </div>
         ) : (
           <p className="text-sm text-[#6B7280]">Your picker session will appear here.</p>

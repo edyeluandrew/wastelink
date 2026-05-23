@@ -129,6 +129,22 @@ export const formatStatus = (status) => {
 };
 
 /**
+ * Format gender for display while handling old/unknown values safely
+ * @param {string} gender
+ * @returns {string}
+ */
+export const formatGenderLabel = (gender) => {
+  if (!gender) return 'Unknown';
+
+  const normalized = String(gender).trim().toLowerCase();
+  if (normalized === 'male') return 'Male';
+  if (normalized === 'female') return 'Female';
+  if (normalized === 'prefer_not_to_say') return 'Unknown';
+
+  return String(gender);
+};
+
+/**
  * Alias for formatCurrencyUGX - format currency as Ugandan Shillings
  * @param {number} amount
  * @returns {string}

@@ -9,7 +9,7 @@ import {
   Modal,
   StatusBadge,
 } from '../components';
-import { formatStatus } from '../utils/formatters';
+import { formatStatus, formatGenderLabel } from '../utils/formatters';
 import api from '../api/axios';
 
 const DIVISIONS = [
@@ -20,9 +20,18 @@ const DIVISIONS = [
   'Central',
 ];
 
-const GENDERS = ['FEMALE', 'MALE', 'PREFER_NOT_TO_SAY'];
+const GENDERS = [
+  { value: 'MALE', label: 'Male' },
+  { value: 'FEMALE', label: 'Female' },
+];
 const AGE_GROUPS = ['Below 18', '18-24', '25-35', 'Above 35'];
-const WASTE_TYPES = ['PLASTIC', 'MIXED_RECYCLABLES', 'ORGANIC', 'E_WASTE', 'METAL_CARDBOARD'];
+const WASTE_TYPES = [
+  { value: 'PLASTIC', label: 'Plastic' },
+  { value: 'MIXED_RECYCLABLES', label: 'I collect many types / Mixed recyclables' },
+  { value: 'ORGANIC', label: 'Organic' },
+  { value: 'E_WASTE', label: 'E-Waste' },
+  { value: 'METAL_CARDBOARD', label: 'Metal & Cardboard' },
+];
 
 const initialFormState = {
   name: '',
@@ -75,7 +84,7 @@ export default function Pickers() {
     setForm({
       name: picker.name,
       phone: picker.phone,
-      gender: picker.gender,
+      gender: ['MALE', 'FEMALE'].includes(String(picker.gender || '').toUpperCase()) ? String(picker.gender).toUpperCase() : '',
       age_group: picker.age_group,
       division: picker.division,
       main_waste_type: picker.main_waste_type,
@@ -170,8 +179,8 @@ export default function Pickers() {
           >
             <option value="">All Genders</option>
             {GENDERS.map((gender) => (
-              <option key={gender} value={gender}>
-                {formatStatus(gender)}
+              <option key={gender.value} value={gender.value}>
+                {gender.label}
               </option>
             ))}
           </select>
@@ -205,7 +214,7 @@ export default function Pickers() {
             'Gender',
             'Age Group',
             'Division',
-            'Main Waste Type',
+            'Mostly Collects',
             'Status',
             'Actions',
           ]}
@@ -217,7 +226,7 @@ export default function Pickers() {
               </td>
               <td className="table-cell">{picker.name}</td>
               <td className="table-cell text-sm">{picker.phone}</td>
-              <td className="table-cell text-sm">{formatStatus(picker.gender)}</td>
+              <td className="table-cell text-sm">{formatGenderLabel(picker.gender)}</td>
               <td className="table-cell text-sm">{picker.age_group}</td>
               <td className="table-cell text-sm">{picker.division}</td>
               <td className="table-cell text-sm">{formatStatus(picker.main_waste_type)}</td>
@@ -280,9 +289,10 @@ export default function Pickers() {
                 onChange={(e) => setForm({ ...form, gender: e.target.value })}
                 className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
               >
+                <option value="">Select gender</option>
                 {GENDERS.map((g) => (
-                  <option key={g} value={g}>
-                    {formatStatus(g)}
+                  <option key={g.value} value={g.value}>
+                    {g.label}
                   </option>
                 ))}
               </select>
@@ -325,7 +335,7 @@ export default function Pickers() {
 
           <div>
             <label className="block text-sm font-medium text-wastelink-dark mb-2">
-              Main Waste Type
+              Waste type you mostly collect
             </label>
             <select
               value={form.main_waste_type}
@@ -333,11 +343,12 @@ export default function Pickers() {
               className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
             >
               {WASTE_TYPES.map((wt) => (
-                <option key={wt} value={wt}>
-                  {formatStatus(wt)}
+                <option key={wt.value} value={wt.value}>
+                  {wt.label}
                 </option>
               ))}
             </select>
+              <p className="mt-2 text-xs text-wastelink-muted">You can still log any waste type later.</p>
           </div>
 
           <div className="flex gap-3 pt-4">

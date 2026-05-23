@@ -2,6 +2,13 @@ import pool from "../config/db.js";
 import { generatePickerCode } from "../utils/generateCodes.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 
+const ALLOWED_GENDERS = new Set(["MALE", "FEMALE"]);
+
+const normalizeGender = (gender) => {
+  if (gender === null || gender === undefined) return null;
+  return String(gender).trim().toUpperCase();
+};
+
 // POST /api/pickers - Create a new picker
 export const createPicker = async (req, res, next) => {
   try {
@@ -14,6 +21,11 @@ export const createPicker = async (req, res, next) => {
         "Missing required fields: name, phone, gender, age_group, division",
         400
       );
+    }
+
+    const normalizedGender = normalizeGender(gender);
+    if (!ALLOWED_GENDERS.has(normalizedGender)) {
+      return sendError(res, "Gender must be either MALE or FEMALE", 400);
     }
 
     // Check for duplicate phone
@@ -33,7 +45,7 @@ export const createPicker = async (req, res, next) => {
       `INSERT INTO pickers (picker_code, name, phone, gender, age_group, division, main_waste_type, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE')
        RETURNING id, picker_code, name, phone, gender, age_group, division, main_waste_type, status, created_at`,
-      [pickerCode, name, phone, gender, age_group, division, main_waste_type || null]
+      [pickerCode, name, phone, normalizedGender, age_group, division, main_waste_type || null]
     );
 
     sendSuccess(res, "Picker created successfully", result.rows[0], 201);
@@ -162,8 +174,12 @@ export const updatePicker = async (req, res, next) => {
       values.push(phone);
     }
     if (gender !== undefined) {
+      const normalizedGender = normalizeGender(gender);
+      if (!ALLOWED_GENDERS.has(normalizedGender)) {
+        return sendError(res, "Gender must be either MALE or FEMALE", 400);
+      }
       updates.push(`gender = $${paramIndex++}`);
-      values.push(gender);
+      values.push(normalizedGender);
     }
     if (age_group !== undefined) {
       updates.push(`age_group = $${paramIndex++}`);

@@ -4,10 +4,19 @@ import { LoadingState, Button } from '../../components';
 import apiClient from '../../api/axios';
 import { setPickerSession } from '../utils/pickerSession';
 import { Recycle, ArrowRight } from 'lucide-react';
-const GENDER_OPTIONS = ['FEMALE', 'MALE', 'PREFER_NOT_TO_SAY'];
+const GENDER_OPTIONS = [
+  { value: 'MALE', label: 'Male' },
+  { value: 'FEMALE', label: 'Female' },
+];
 const AGE_GROUP_OPTIONS = ['Below 18', '18-24', '25-35', 'Above 35'];
 const DIVISIONS = ['Kawempe', 'Makindye', 'Nakawa', 'Rubaga', 'Central'];
-const WASTE_TYPES = ['PLASTIC', 'MIXED_RECYCLABLES', 'ORGANIC', 'E_WASTE', 'METAL_CARDBOARD'];
+const WASTE_TYPES = [
+  { value: 'PLASTIC', label: 'Plastic' },
+  { value: 'MIXED_RECYCLABLES', label: 'I collect many types / Mixed recyclables' },
+  { value: 'ORGANIC', label: 'Organic' },
+  { value: 'E_WASTE', label: 'E-Waste' },
+  { value: 'METAL_CARDBOARD', label: 'Metal & Cardboard' },
+];
 
 export default function PickerRegister() {
   const navigate = useNavigate();
@@ -134,7 +143,7 @@ export default function PickerRegister() {
                 disabled={loading}
               >
                 <option value="">Select gender</option>
-                {GENDER_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                {GENDER_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
               </select>
             </div>
 
@@ -167,7 +176,7 @@ export default function PickerRegister() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-[#111111] mb-1">Main Waste Type *</label>
+              <label className="block text-sm font-semibold text-[#111111] mb-1">Waste type you mostly collect *</label>
               <select
                 name="main_waste_type"
                 value={form.main_waste_type}
@@ -176,8 +185,9 @@ export default function PickerRegister() {
                 disabled={loading}
               >
                 <option value="">Select waste type</option>
-                {WASTE_TYPES.map(w => <option key={w} value={w}>{w}</option>)}
+                {WASTE_TYPES.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
               </select>
+              <p className="mt-2 text-xs text-[#6B7280]">You can still log any waste type later.</p>
             </div>
 
             {error && (
