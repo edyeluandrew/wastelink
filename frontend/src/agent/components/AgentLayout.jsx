@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut, LayoutDashboard, Clock3, CheckCircle2, ClipboardList, MapPin } from 'lucide-react';
 import { getAgentCollectionPoint, clearAgentCollectionPoint } from '../utils/agentSession';
 
 export default function AgentLayout() {
@@ -22,10 +22,10 @@ export default function AgentLayout() {
   const isActive = (path) => location.pathname === path;
 
   const navigationItems = [
-    { label: 'Dashboard', path: '/agent/dashboard', icon: '📊' },
-    { label: 'Pending', path: '/agent/pending', icon: '⏳' },
-    { label: 'Verify', path: '/agent/verify', icon: '✓' },
-    { label: 'History', path: '/agent/history', icon: '📋' },
+    { label: 'Dashboard', path: '/agent/dashboard', icon: LayoutDashboard },
+    { label: 'Pending', path: '/agent/pending', icon: Clock3 },
+    { label: 'Verify', path: '/agent/verify', icon: CheckCircle2 },
+    { label: 'History', path: '/agent/history', icon: ClipboardList },
   ];
 
   return (
@@ -45,7 +45,9 @@ export default function AgentLayout() {
 
         {collectionPoint && (
           <div className="p-4 bg-green-50 border-b border-gray-300">
-            <p className="text-xs text-gray-600">Current Location</p>
+            <p className="text-xs text-gray-600 inline-flex items-center gap-1.5">
+              <MapPin size={12} /> Current Location
+            </p>
             <p className="font-semibold text-gray-900">{collectionPoint.name}</p>
             <p className="text-xs text-gray-600">{collectionPoint.division}</p>
             <button
@@ -71,7 +73,9 @@ export default function AgentLayout() {
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <span className="mr-3">{item.icon}</span>
+                <span className="mr-3 inline-flex">
+                  <item.icon size={18} />
+                </span>
               {item.label}
             </button>
           ))}

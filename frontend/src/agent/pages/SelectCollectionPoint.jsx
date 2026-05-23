@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/axios';
 import { setAgentCollectionPoint } from '../utils/agentSession';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
+import { MapPin, Building2, UserRound, Phone, Navigation, ArrowRight, Info } from 'lucide-react';
 
 export default function SelectCollectionPoint() {
   const navigate = useNavigate();
@@ -41,7 +42,8 @@ export default function SelectCollectionPoint() {
       {/* Header */}
       <div className="bg-green-600 text-white py-8 px-4">
         <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold" style={{ fontFamily: 'Orbitron' }}>
+          <h1 className="text-3xl font-bold inline-flex items-center gap-3" style={{ fontFamily: 'Orbitron' }}>
+            <MapPin size={28} />
             WasteLink Agent
           </h1>
           <p className="text-green-100 mt-2">Select Your Collection Point</p>
@@ -51,7 +53,8 @@ export default function SelectCollectionPoint() {
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-6">
+        <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-6 flex gap-3">
+          <Info size={18} className="mt-0.5 shrink-0 text-blue-700" />
           <p className="text-sm text-blue-900">
             <strong>Note:</strong> This is a temporary selection for the MVP demo. When authentication is implemented, your collection point will be automatically linked to your account.
           </p>
@@ -78,45 +81,47 @@ export default function SelectCollectionPoint() {
               >
                 {/* Card Header */}
                 <div className="bg-green-50 border-b border-gray-300 p-4">
-                  <p className="text-xs text-gray-600 font-semibold">LOCATION CODE</p>
+                  <p className="text-xs text-gray-600 font-semibold inline-flex items-center gap-1.5">
+                    <MapPin size={12} /> LOCATION CODE
+                  </p>
                   <p className="text-lg font-bold text-gray-900">{point.point_code || `CP-${point.id}`}</p>
                 </div>
 
                 {/* Card Body */}
                 <div className="p-4 space-y-3">
                   <div>
-                    <p className="text-xs text-gray-600">Name</p>
+                    <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><Building2 size={12} /> Name</p>
                     <p className="font-semibold text-gray-900">{point.name}</p>
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-600">Division</p>
+                    <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><MapPin size={12} /> Division</p>
                     <p className="font-semibold text-gray-900">{point.division || 'N/A'}</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-xs text-gray-600">Agent</p>
+                      <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><UserRound size={12} /> Agent</p>
                       <p className="text-sm font-semibold text-gray-900">{point.agent_name || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-600">Phone</p>
+                      <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><Phone size={12} /> Phone</p>
                       <p className="text-sm font-semibold text-gray-900">{point.agent_phone || 'N/A'}</p>
                     </div>
                   </div>
 
                   {point.gps_lat && point.gps_lng && (
                     <div>
-                      <p className="text-xs text-gray-600">GPS Coordinates</p>
+                      <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><Navigation size={12} /> GPS Coordinates</p>
                       <p className="text-xs text-gray-700">{point.gps_lat.toFixed(4)}, {point.gps_lng.toFixed(4)}</p>
                     </div>
                   )}
 
                   <button
                     onClick={() => handleSelectPoint(point)}
-                    className="w-full mt-4 py-2 px-4 bg-green-600 text-white rounded font-semibold hover:bg-green-700 transition"
+                    className="w-full mt-4 py-2 px-4 bg-green-600 text-white rounded font-semibold hover:bg-green-700 transition inline-flex items-center justify-center gap-2"
                   >
-                    Use This Location
+                    Use This Location <ArrowRight size={16} />
                   </button>
                 </div>
               </div>

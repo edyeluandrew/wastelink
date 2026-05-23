@@ -4,6 +4,7 @@ import apiClient from '../../api/axios';
 import { getAgentCollectionPoint } from '../utils/agentSession';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
+import { RotateCcw, ArrowLeft, CheckCircle2, CircleX, Wallet, ClipboardList } from 'lucide-react';
 
 export default function AgentHistory() {
   const navigate = useNavigate();
@@ -78,34 +79,37 @@ export default function AgentHistory() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-2xl font-bold text-gray-900">Processing History</h2>
+        <h2 className="text-2xl font-bold text-gray-900 inline-flex items-center gap-2">
+          <ClipboardList size={24} /> Processing History
+        </h2>
         <button
           onClick={fetchHistory}
-          className="px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition text-sm font-semibold"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition text-sm font-semibold"
         >
-          🔄 Refresh
+          <RotateCcw size={16} /> Refresh
         </button>
       </div>
 
       {/* Filter Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {['ALL', 'VERIFIED', 'REJECTED', 'PAID'].map((status) => (
+        {[
+          { value: 'ALL', label: 'All', icon: ClipboardList },
+          { value: 'VERIFIED', label: 'Verified', icon: CheckCircle2 },
+          { value: 'REJECTED', label: 'Rejected', icon: CircleX },
+          { value: 'PAID', label: 'Paid', icon: Wallet },
+        ].map((status) => (
           <button
-            key={status}
-            onClick={() => setFilter(status)}
+            key={status.value}
+            onClick={() => setFilter(status.value)}
             className={`px-4 py-2 rounded font-semibold whitespace-nowrap transition ${
-              filter === status
+              filter === status.value
                 ? 'bg-green-600 text-white'
                 : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
             }`}
           >
-            {status === 'ALL'
-              ? 'All'
-              : status === 'VERIFIED'
-                ? 'Verified ✓'
-                : status === 'REJECTED'
-                  ? 'Rejected ✕'
-                  : 'Paid 💰'}
+            <span className="inline-flex items-center gap-2">
+              <status.icon size={14} /> {status.label}
+            </span>
           </button>
         ))}
       </div>
@@ -147,9 +151,9 @@ export default function AgentHistory() {
       <div className="pt-4">
         <button
           onClick={() => navigate('/agent/dashboard')}
-          className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
+          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
         >
-          ← Back to Dashboard
+          <ArrowLeft size={16} /> Back to Dashboard
         </button>
       </div>
     </div>

@@ -6,6 +6,16 @@ import AgentStatCard from '../components/AgentStatCard';
 import { LoadingState, ErrorState } from '../../components';
 import { getEarningAmount } from '../../utils/earningsHelper';
 import { getEstimatedKg, getVerifiedKg } from '../../utils/wasteLogHelpers';
+import {
+  Search,
+  Clock3,
+  CheckCircle2,
+  CircleX,
+  Scale,
+  Wallet,
+  ArrowRight,
+  ClipboardList,
+} from 'lucide-react';
 
 export default function AgentDashboard() {
   const navigate = useNavigate();
@@ -87,13 +97,17 @@ export default function AgentDashboard() {
           onClick={() => navigate('/agent/verify')}
           className="p-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold text-lg"
         >
-          🔍 Verify by Job Code
+          <span className="inline-flex items-center gap-2">
+            <Search size={20} /> Verify by Job Code
+          </span>
         </button>
         <button
           onClick={() => navigate('/agent/pending')}
           className="p-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-semibold text-lg"
         >
-          ⏳ View Pending
+          <span className="inline-flex items-center gap-2">
+            <Clock3 size={20} /> View Pending
+          </span>
         </button>
       </div>
 
@@ -107,31 +121,31 @@ export default function AgentDashboard() {
       {!loading && !error && stats && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <AgentStatCard
-            icon="⏳"
+            icon={Clock3}
             label="Pending Deliveries"
             value={stats.pendingDeliveries}
             color="amber"
           />
           <AgentStatCard
-            icon="✓"
+            icon={CheckCircle2}
             label="Verified Today"
             value={stats.verifiedToday}
             color="green"
           />
           <AgentStatCard
-            icon="✕"
+            icon={CircleX}
             label="Rejected Today"
             value={stats.rejectedToday}
             color="red"
           />
           <AgentStatCard
-            icon="⚖️"
+            icon={Scale}
             label="Total KG Verified"
             value={formatNumber(stats.totalVerifiedKgToday)}
             color="blue"
           />
           <AgentStatCard
-            icon="💰"
+            icon={Wallet}
             label="Earnings Generated"
             value={`${(stats.totalEarningsToday / 1000000).toFixed(1)}M UGX`}
             color="green"
@@ -148,7 +162,7 @@ export default function AgentDashboard() {
               onClick={() => navigate('/agent/history')}
               className="text-sm text-green-600 hover:underline font-semibold"
             >
-              View All →
+              View All <ArrowRight size={14} className="inline-block align-middle" />
             </button>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">

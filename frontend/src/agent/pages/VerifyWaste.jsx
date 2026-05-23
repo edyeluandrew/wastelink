@@ -6,6 +6,7 @@ import JobSearchBox from '../components/JobSearchBox';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState } from '../../components';
 import { getEstimatedKg, getVerifiedKg, hasVerifiedKg } from '../../utils/wasteLogHelpers';
+import { ClipboardCheck, ArrowLeft, AlertCircle } from 'lucide-react';
 
 export default function VerifyWaste() {
   const navigate = useNavigate();
@@ -98,7 +99,9 @@ export default function VerifyWaste() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify Waste by Job Code</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2 inline-flex items-center gap-2">
+          <ClipboardCheck size={24} /> Verify Waste by Job Code
+        </h2>
         <p className="text-sm text-gray-600">Search for a waste log using the Job Code to verify the actual weight received.</p>
       </div>
 
@@ -130,7 +133,7 @@ export default function VerifyWaste() {
       {log && (
         <div className="space-y-4">
           <div className="bg-green-50 border border-green-300 rounded-lg p-4">
-            <p className="text-xs text-green-700 font-semibold">WASTE LOG FOUND</p>
+            <p className="text-xs text-green-700 font-semibold inline-flex items-center gap-1.5"><ClipboardCheck size={12} /> WASTE LOG FOUND</p>
             <p className="text-lg font-bold text-green-900">{log.job_code}</p>
             <p className="text-sm text-green-800 mt-1">
               {log.waste_type || 'N/A'} • {getEstimatedKg(log)} kg
@@ -152,7 +155,8 @@ export default function VerifyWaste() {
 
       {/* Info Message */}
       {!log && !error && !loading && (
-        <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
+        <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 flex gap-3">
+          <AlertCircle size={18} className="mt-0.5 shrink-0 text-blue-700" />
           <p className="text-sm text-blue-900">
             Enter the Job Code from the waste delivery ticket above to search for the waste log. The Job Code looks like: <strong>WL20260520120345</strong>
           </p>
@@ -163,9 +167,9 @@ export default function VerifyWaste() {
       <div>
         <button
           onClick={() => navigate('/agent/dashboard')}
-          className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
+          className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold inline-flex items-center justify-center gap-2"
         >
-          ← Back to Dashboard
+          <ArrowLeft size={16} /> Back to Dashboard
         </button>
       </div>
     </div>

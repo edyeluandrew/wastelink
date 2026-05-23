@@ -4,6 +4,7 @@ import apiClient from '../../api/axios';
 import { getAgentCollectionPoint } from '../utils/agentSession';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
+import { RotateCcw, ArrowLeft, Clock3 } from 'lucide-react';
 
 export default function PendingLogs() {
   const navigate = useNavigate();
@@ -74,12 +75,14 @@ export default function PendingLogs() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Pending Deliveries</h2>
+        <h2 className="text-2xl font-bold text-gray-900 inline-flex items-center gap-2">
+          <Clock3 size={24} /> Pending Deliveries
+        </h2>
         <button
           onClick={fetchPendingLogs}
-          className="px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition text-sm font-semibold"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition text-sm font-semibold"
         >
-          🔄 Refresh
+          <RotateCcw size={16} /> Refresh
         </button>
       </div>
 
@@ -114,9 +117,9 @@ export default function PendingLogs() {
       <div className="pt-4">
         <button
           onClick={() => navigate('/agent/dashboard')}
-          className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
+          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
         >
-          ← Back to Dashboard
+          <ArrowLeft size={16} /> Back to Dashboard
         </button>
       </div>
     </div>

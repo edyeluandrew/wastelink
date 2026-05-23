@@ -18,7 +18,9 @@ export default function AgentStatCard({ icon, label, value, color = 'green' }) {
   return (
     <div className={`p-4 rounded-lg border ${colorClasses[color]} transition hover:shadow-md`}>
       <div className="flex items-center gap-3">
-        <div className={`text-2xl ${textColorClasses[color]}`}>{icon}</div>
+        <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-white/80 ${textColorClasses[color]}`}>
+          {icon ? React.createElement(icon, { size: 22, strokeWidth: 2.2 }) : null}
+        </div>
         <div>
           <p className="text-xs text-gray-600">{label}</p>
           <p className={`text-2xl font-bold ${textColorClasses[color]}`}>{value}</p>
