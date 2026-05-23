@@ -5,6 +5,7 @@ import { getAgentCollectionPoint } from '../utils/agentSession';
 import AgentStatCard from '../components/AgentStatCard';
 import { LoadingState, ErrorState } from '../../components';
 import { getEarningAmount } from '../../utils/earningsHelper';
+import { getEstimatedKg, getVerifiedKg } from '../../utils/wasteLogHelpers';
 
 export default function AgentDashboard() {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export default function AgentDashboard() {
         const rejectedToday = todayLogs.filter((log) => log.status === 'REJECTED');
 
         const totalVerifiedKgToday = verifiedToday.reduce(
-          (sum, log) => sum + (parseFloat(log.verified_kg) || 0),
+          (sum, log) => sum + getVerifiedKg(log),
           0
         );
 
@@ -156,7 +157,7 @@ export default function AgentDashboard() {
                 <div>
                   <p className="font-semibold text-gray-900 text-sm">{log.job_code}</p>
                   <p className="text-xs text-gray-600">
-                    {log.picker_name} • {log.waste_type} • {Number(log.estimated_kg ?? log.estimatedKg ?? 0).toFixed(2)} kg
+                    {log.picker_name} • {log.waste_type} • {getEstimatedKg(log).toFixed(2)} kg
                   </p>
                 </div>
                 <span

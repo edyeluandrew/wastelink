@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { StatusBadge, Button, Modal } from '../../components';
 import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
+import { getEstimatedKg, getVerifiedKg, hasVerifiedKg } from '../../utils/wasteLogHelpers';
 
 export default function AgentWasteLogCard({
   log,
@@ -60,8 +61,8 @@ export default function AgentWasteLogCard({
     return parseFloat(num).toFixed(2);
   };
 
-  const estimatedKg = Number(log?.estimated_kg ?? log?.estimatedKg ?? 0);
-  const verifiedKgValue = Number(log?.verified_kg ?? log?.verifiedKg ?? 0);
+  const estimatedKg = getEstimatedKg(log);
+  const verifiedKgValue = getVerifiedKg(log);
   const earningAmount = getEarningAmount(log);
   const earningStatus = getEarningStatus(log);
 
@@ -106,7 +107,7 @@ export default function AgentWasteLogCard({
               </div>
               <div>
                 <p className="text-xs text-gray-600">Verified Weight</p>
-                <p className="font-semibold text-gray-900">{verifiedKgValue ? formatNumber(verifiedKgValue) + ' kg' : 'Pending'}</p>
+                <p className="font-semibold text-gray-900">{hasVerifiedKg(log) ? formatNumber(verifiedKgValue) + ' kg' : 'Pending'}</p>
               </div>
               {earningAmount > 0 && (
                 <div className="col-span-2">

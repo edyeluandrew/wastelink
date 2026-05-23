@@ -5,6 +5,7 @@ import { getAgentCollectionPoint } from '../utils/agentSession';
 import JobSearchBox from '../components/JobSearchBox';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState } from '../../components';
+import { getEstimatedKg, getVerifiedKg, hasVerifiedKg } from '../../utils/wasteLogHelpers';
 
 export default function VerifyWaste() {
   const navigate = useNavigate();
@@ -30,7 +31,13 @@ export default function VerifyWaste() {
     try {
       const response = await apiClient.get(`/waste-logs/job/${jobCode}`);
       if (response.data.success && response.data.data) {
-        const foundLog = response.data.data;
+        const foundLog = response.data?.data;
+
+        if (import.meta.env.DEV) {
+          console.log('VerifyWaste raw response:', response.data);
+          console.log('VerifyWaste log object:', foundLog);
+          console.log('Extracted estimated kg:', getEstimatedKg(foundLog));
+        }
 
         // Check if this log belongs to the selected collection point
         if (foundLog.collection_point_id !== collectionPoint.id) {
@@ -125,6 +132,12 @@ export default function VerifyWaste() {
           <div className="bg-green-50 border border-green-300 rounded-lg p-4">
             <p className="text-xs text-green-700 font-semibold">WASTE LOG FOUND</p>
             <p className="text-lg font-bold text-green-900">{log.job_code}</p>
+            <p className="text-sm text-green-800 mt-1">
+              {log.waste_type || 'N/A'} • {getEstimatedKg(log)} kg
+            </p>
+            <p className="text-xs text-green-700 mt-1">
+              Verified: {hasVerifiedKg(log) ? `${getVerifiedKg(log)} kg` : 'Pending'}
+            </p>
           </div>
 
           <AgentWasteLogCard
