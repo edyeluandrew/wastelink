@@ -344,8 +344,10 @@ export const updateUser = async (req, res) => {
     }
 
     const finalRole = normalizedRole;
-    const finalCity = city !== undefined ? city : null;
-    const finalCollectionPointId = collection_point_id !== undefined ? collection_point_id : null;
+    const finalCity = city !== undefined ? city : existingUser.city;
+    const finalCollectionPointId = collection_point_id !== undefined
+      ? collection_point_id
+      : existingUser.collection_point_id;
 
     const roleRuleError = validateUserRoleRules({
       role: finalRole,
