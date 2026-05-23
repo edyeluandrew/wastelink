@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import DashboardLayout from './layouts/DashboardLayout'
 import Overview from './pages/Overview'
 import Pickers from './pages/Pickers'
+import Users from './pages/Users'
 import CollectionPoints from './pages/CollectionPoints'
 import WasteLogs from './pages/WasteLogs'
 import Divisions from './pages/Divisions'
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { index: true, element: <Overview /> },
       { path: 'overview', element: <Overview /> },
       { path: 'pickers', element: <Pickers /> },
+      { path: 'users', element: <Users /> },
       { path: 'collection-points', element: <CollectionPoints /> },
       { path: 'waste-logs', element: <WasteLogs /> },
       { path: 'divisions', element: <Divisions /> },

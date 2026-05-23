@@ -3,14 +3,7 @@ import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import { fetchSafeUserById } from "../middleware/authMiddleware.js";
-
-const safeUserFromRow = (row) => ({
-  id: row.id,
-  name: row.name,
-  email: row.email,
-  role: row.role,
-  status: row.status,
-});
+import { safeUserFromRow } from "../utils/userHelpers.js";
 
 export const login = async (req, res) => {
   try {

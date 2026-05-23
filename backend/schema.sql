@@ -7,8 +7,6 @@ CREATE TABLE IF NOT EXISTS users (
   role VARCHAR(30) NOT NULL CHECK (role IN (
     'SUPER_ADMIN',
     'CITY_ADMIN',
-    'ADMIN',
-    'MUNICIPAL_OFFICER',
     'AGENT',
     'PICKER'
   )),

@@ -7,6 +7,7 @@ import wasteLogRoutes from "./routes/wasteLogRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 import { sendSuccess, sendError } from "./utils/apiResponse.js";
 import errorHandler from "./middleware/errorHandler.js";
 
@@ -44,7 +45,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(150) UNIQUE,
   phone VARCHAR(30),
   password_hash TEXT,
-  role VARCHAR(30) NOT NULL CHECK (role IN ('SUPER_ADMIN','CITY_ADMIN','ADMIN','MUNICIPAL_OFFICER','AGENT','PICKER')),
+  role VARCHAR(30) NOT NULL CHECK (role IN ('SUPER_ADMIN','CITY_ADMIN','AGENT','PICKER')),
   status VARCHAR(30) DEFAULT 'ACTIVE',
   city VARCHAR(100),
   division VARCHAR(100),
@@ -150,6 +151,7 @@ app.use("/api/waste-logs", wasteLogRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 
 app.use((req, res, next) => {
   const error = new Error("Route not found");

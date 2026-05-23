@@ -1,14 +1,7 @@
 import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
 import { sendError } from "../utils/apiResponse.js";
-
-const safeUserFromRow = (row) => ({
-  id: row.id,
-  name: row.name,
-  email: row.email,
-  role: row.role,
-  status: row.status,
-});
+import { safeUserFromRow } from "../utils/userHelpers.js";
 
 export const requireAuth = async (req, res, next) => {
   try {
@@ -58,7 +51,25 @@ export const requireRole = (roles) => {
 
 export const fetchSafeUserById = async (userId) => {
   const result = await pool.query(
-    "SELECT id, name, email, role, status FROM users WHERE id = $1",
+    `SELECT
+      u.id,
+      u.name,
+      u.email,
+      u.phone,
+      u.role,
+      u.city,
+      u.division,
+      u.collection_point_id,
+      cp.name AS collection_point_name,
+      u.picker_id,
+      p.name AS picker_name,
+      u.status,
+      u.created_at,
+      u.updated_at
+     FROM users u
+     LEFT JOIN collection_points cp ON u.collection_point_id = cp.id
+     LEFT JOIN pickers p ON u.picker_id = p.id
+     WHERE u.id = $1`,
     [userId]
   );
 

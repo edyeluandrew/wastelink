@@ -8,8 +8,9 @@ import {
   DollarSign,
   FileText,
 } from 'lucide-react';
+import { getAuthUser } from '../utils/auth';
 
-const menuItems = [
+const baseMenuItems = [
   { path: '/', label: 'Overview', icon: BarChart3 },
   { path: '/pickers', label: 'Pickers', icon: Users },
   { path: '/collection-points', label: 'Collection Points', icon: MapPin },
@@ -21,6 +22,10 @@ const menuItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const authUser = getAuthUser();
+  const menuItems = authUser?.role === 'SUPER_ADMIN'
+    ? [...baseMenuItems.slice(0, 2), { path: '/users', label: 'Users', icon: Users }, ...baseMenuItems.slice(2)]
+    : baseMenuItems;
 
   return (
     <div className="w-64 bg-wastelink-surface border-r border-wastelink-border h-screen flex flex-col sticky top-0">

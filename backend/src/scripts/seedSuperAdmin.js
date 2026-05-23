@@ -25,19 +25,24 @@ const ensureUsersTableShape = async () => {
   const roleConstraint = constraintResult.rows.find((row) => row.definition.includes('role'));
 
   if (roleConstraint) {
-    if (!roleConstraint.definition.includes('SUPER_ADMIN') || !roleConstraint.definition.includes('CITY_ADMIN')) {
+    if (
+      !roleConstraint.definition.includes('SUPER_ADMIN') ||
+      !roleConstraint.definition.includes('CITY_ADMIN') ||
+      !roleConstraint.definition.includes('AGENT') ||
+      !roleConstraint.definition.includes('PICKER')
+    ) {
       await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS ${roleConstraint.conname}`);
       await pool.query(`
         ALTER TABLE users
         ADD CONSTRAINT users_role_check
-        CHECK (role IN ('SUPER_ADMIN', 'CITY_ADMIN', 'ADMIN', 'MUNICIPAL_OFFICER', 'AGENT', 'PICKER'))
+        CHECK (role IN ('SUPER_ADMIN', 'CITY_ADMIN', 'AGENT', 'PICKER'))
       `);
     }
   } else {
     await pool.query(`
       ALTER TABLE users
       ADD CONSTRAINT users_role_check
-      CHECK (role IN ('SUPER_ADMIN', 'CITY_ADMIN', 'ADMIN', 'MUNICIPAL_OFFICER', 'AGENT', 'PICKER'))
+      CHECK (role IN ('SUPER_ADMIN', 'CITY_ADMIN', 'AGENT', 'PICKER'))
     `);
   }
 };
