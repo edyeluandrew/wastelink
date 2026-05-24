@@ -8,7 +8,7 @@ import {
   DollarSign,
   FileText,
 } from 'lucide-react';
-import { getAuthUser } from '../utils/auth';
+import { getAuthUser, normalizeRole } from '../utils/auth';
 
 const baseMenuItems = [
   { path: '/', label: 'Overview', icon: BarChart3 },
@@ -23,9 +23,11 @@ const baseMenuItems = [
 export default function Sidebar() {
   const location = useLocation();
   const authUser = getAuthUser();
-  const showUsersLink = authUser?.role === 'SUPER_ADMIN';
+  const role = normalizeRole(authUser?.role);
+  const showUsersLink = role === 'SUPER_ADMIN' || role === 'CITY_ADMIN';
+  const usersLabel = role === 'CITY_ADMIN' ? 'Agents & Pickers' : 'Users';
   const menuItems = showUsersLink
-    ? [...baseMenuItems.slice(0, 2), { path: '/users', label: 'Users', icon: Users }, ...baseMenuItems.slice(2)]
+    ? [...baseMenuItems.slice(0, 2), { path: '/users', label: usersLabel, icon: Users }, ...baseMenuItems.slice(2)]
     : baseMenuItems;
 
   return (

@@ -13,6 +13,53 @@ export const normalizeUserStatus = (status) => {
   return String(status).trim().toUpperCase();
 };
 
+export const canCreateRole = (actorRole, targetRole) => {
+  const normalizedActorRole = normalizeUserRole(actorRole);
+  const normalizedTargetRole = normalizeUserRole(targetRole);
+
+  if (normalizedActorRole === 'SUPER_ADMIN') {
+    return ['CITY_ADMIN', 'AGENT', 'PICKER'].includes(normalizedTargetRole);
+  }
+
+  if (normalizedActorRole === 'CITY_ADMIN') {
+    return ['AGENT', 'PICKER'].includes(normalizedTargetRole);
+  }
+
+  return false;
+};
+
+export const canManageUser = (actorUser, targetUser) => {
+  const actorRole = normalizeUserRole(actorUser?.role);
+  const targetRole = normalizeUserRole(targetUser?.role);
+
+  if (!actorRole || !targetRole) {
+    return false;
+  }
+
+  if (actorRole === 'SUPER_ADMIN') {
+    return true;
+  }
+
+  if (actorRole === 'CITY_ADMIN') {
+    if (!['AGENT', 'PICKER'].includes(targetRole)) {
+      return false;
+    }
+
+    const actorCity = actorUser?.city ? String(actorUser.city).trim() : null;
+    const targetCity = targetUser?.city ? String(targetUser.city).trim() : null;
+
+    if (actorCity && targetCity && actorCity !== targetCity) {
+      return false;
+    }
+
+    return true;
+  }
+
+  return false;
+};
+
+export const canResetPassword = (actorUser, targetUser) => canManageUser(actorUser, targetUser);
+
 export const safeUserFromRow = (row) => ({
   id: row.id,
   name: row.name,
@@ -36,6 +83,19 @@ export const safeUserFromRow = (row) => ({
     : null,
   picker_id: row.picker_id,
   picker_name: row.picker_name || null,
+  picker: row.picker_id
+    ? {
+        id: row.picker_id,
+        picker_code: row.picker_code || null,
+        name: row.picker_name || null,
+        phone: row.picker_phone || null,
+        gender: row.picker_gender || null,
+        age_group: row.picker_age_group || null,
+        division: row.picker_division || null,
+        main_waste_type: row.picker_main_waste_type || null,
+        status: row.picker_status || null,
+      }
+    : null,
   status: row.status,
   created_at: row.created_at,
   updated_at: row.updated_at,
@@ -83,13 +143,17 @@ export const ensureUsersTableSchema = async () => {
   });
 };
 
-export const validateUserRoleRules = ({ role, city, collection_point_id }) => {
+export const validateUserRoleRules = ({ role, city, collection_point_id, picker_id }) => {
   if (role === 'AGENT' && !collection_point_id) {
     return 'AGENT users must be assigned to a collection point';
   }
 
   if (role === 'CITY_ADMIN' && !city) {
     return 'CITY_ADMIN users must have a city';
+  }
+
+  if (role === 'PICKER' && !picker_id) {
+    return 'PICKER users must be linked to a picker profile';
   }
 
   return null;

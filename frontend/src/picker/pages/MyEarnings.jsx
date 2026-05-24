@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadingState, ErrorState, EmptyState, StatusBadge } from '../../components';
 import apiClient from '../../api/axios';
-import { getPickerSession } from '../utils/pickerSession';
+import { getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX, formatDate } from '../../utils/formatters';
 import { Wallet, Scale, CreditCard, Hourglass, TrendingUp, ArrowRight } from 'lucide-react';
 import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
 import { getVerifiedKg } from '../../utils/wasteLogHelpers';
 
+const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
+
 export default function MyEarnings() {
   const navigate = useNavigate();
-  const picker = getPickerSession();
+  const pickerId = getCurrentPickerId();
 
   const [earnings, setEarnings] = useState(null);
   const [jobs, setJobs] = useState([]);
@@ -18,22 +20,22 @@ export default function MyEarnings() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!picker?.id) {
-      navigate('/picker/start');
+    if (!pickerId) {
+      navigate(AUTH_ENFORCED ? '/login' : '/picker/start', { replace: true });
       return;
     }
     
     fetchEarnings();
-  }, [picker?.id, navigate]);
+  }, [pickerId, navigate]);
 
   const fetchEarnings = async () => {
-    if (!picker?.id) return;
+    if (!pickerId) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await apiClient.get(`/waste-logs?picker_id=${picker.id}`);
+      const response = await apiClient.get(`/waste-logs?picker_id=${pickerId}`);
       
       if (response.data?.success) {
         const allJobs = response.data.data || [];

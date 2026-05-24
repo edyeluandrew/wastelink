@@ -1,22 +1,45 @@
-/**
- * Picker Session Management
- * Manages temporary picker session using localStorage.
- * Later, this will be replaced with real authentication.
- */
+import { getAuthUser } from '../../utils/auth';
 
 const PICKER_SESSION_KEY = 'wastelink_picker_session';
 
-/**
- * Set picker session in localStorage
- */
+const buildPickerFromAuthUser = (user) => {
+  const role = String(user?.role || '').toUpperCase();
+  if (!user || role !== 'PICKER') {
+    return null;
+  }
+
+  if (user.picker && user.picker.id) {
+    return user.picker;
+  }
+
+  if (!user.picker_id) {
+    return null;
+  }
+
+  return {
+    id: user.picker_id,
+    picker_code: user.picker_code || user.picker?.picker_code || null,
+    name: user.picker_name || user.name || null,
+    phone: user.picker_phone || user.phone || null,
+    gender: user.picker_gender || user.gender || null,
+    age_group: user.picker_age_group || null,
+    division: user.picker_division || user.division || null,
+    main_waste_type: user.picker_main_waste_type || null,
+    status: user.picker_status || user.status || null,
+  };
+};
+
+export const getAuthenticatedPicker = () => buildPickerFromAuthUser(getAuthUser());
+
+export const hasAuthenticatedPicker = () => Boolean(getAuthenticatedPicker());
+
 export const setPickerSession = (picker) => {
   if (!picker || !picker.id) {
-    console.error('[PickerSession] Invalid picker object');
     return false;
   }
+
   try {
     localStorage.setItem(PICKER_SESSION_KEY, JSON.stringify(picker));
-    console.log('[PickerSession] Session set for picker:', picker.phone);
     return true;
   } catch (err) {
     console.error('[PickerSession] Error setting session:', err);
@@ -24,10 +47,12 @@ export const setPickerSession = (picker) => {
   }
 };
 
-/**
- * Get current picker session from localStorage
- */
 export const getPickerSession = () => {
+  const authenticatedPicker = getAuthenticatedPicker();
+  if (authenticatedPicker) {
+    return authenticatedPicker;
+  }
+
   try {
     const session = localStorage.getItem(PICKER_SESSION_KEY);
     return session ? JSON.parse(session) : null;
@@ -37,13 +62,17 @@ export const getPickerSession = () => {
   }
 };
 
-/**
- * Clear picker session from localStorage
- */
+export const getCurrentPicker = () => getPickerSession();
+
+export const getCurrentPickerId = () => getCurrentPicker()?.id || null;
+
 export const clearPickerSession = () => {
   try {
     localStorage.removeItem(PICKER_SESSION_KEY);
-    console.log('[PickerSession] Session cleared');
+    // remove legacy keys that older code paths may have used
+    localStorage.removeItem('pickerSession');
+    localStorage.removeItem('selectedPicker');
+    localStorage.removeItem('selected_picker');
     return true;
   } catch (err) {
     console.error('[PickerSession] Error clearing session:', err);
@@ -51,18 +80,6 @@ export const clearPickerSession = () => {
   }
 };
 
-/**
- * Check if picker session exists
- */
-export const hasPickerSession = () => {
-  const session = getPickerSession();
-  return session !== null && session.id !== undefined;
-};
+export const hasPickerSession = () => Boolean(getPickerSession()?.id);
 
-/**
- * Get picker ID from session, or null
- */
-export const getPickerId = () => {
-  const session = getPickerSession();
-  return session?.id || null;
-};
+export const getPickerId = () => getCurrentPickerId();

@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LoadingState, ErrorState, Button, Modal } from '../../components';
 import apiClient from '../../api/axios';
-import { getPickerSession } from '../utils/pickerSession';
+import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatKg } from '../../utils/formatters';
 import { Recycle, MapPin, Scale, ClipboardCheck, ArrowRight, LayoutDashboard } from 'lucide-react';
+
+const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
 const WASTE_TYPES = ['PLASTIC', 'MIXED_RECYCLABLES', 'ORGANIC', 'E_WASTE', 'METAL_CARDBOARD'];
 
 export default function LogWaste() {
   const navigate = useNavigate();
   const location = useLocation();
-  const picker = getPickerSession();
+  const picker = getCurrentPicker();
+  const pickerId = getCurrentPickerId();
 
   const [collectionPoints, setCollectionPoints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,13 +31,13 @@ export default function LogWaste() {
   const preselectedCollectionPointId = location.state?.collectionPointId || new URLSearchParams(location.search).get('point') || '';
 
   useEffect(() => {
-    if (!picker?.id) {
-      navigate('/picker/start');
+    if (!pickerId) {
+      navigate(AUTH_ENFORCED ? '/login' : '/picker/start', { replace: true });
       return;
     }
     
     fetchCollectionPoints();
-  }, [picker?.id, navigate]);
+  }, [pickerId, navigate]);
 
   useEffect(() => {
     if (preselectedCollectionPointId) {
@@ -96,7 +99,7 @@ export default function LogWaste() {
 
     try {
       const payload = {
-        picker_id: picker.id,
+        picker_id: pickerId,
         collection_point_id: parseInt(form.collection_point_id),
         waste_type: form.waste_type,
         estimated_kg: parseFloat(form.estimated_kg),

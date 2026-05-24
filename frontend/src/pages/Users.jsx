@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, RotateCcw, Power, PowerOff, KeyRound } from 'lucide-react';
 import {
   Button,
@@ -11,14 +12,14 @@ import {
 } from '../components';
 import api from '../api/axios';
 import { formatDateTime, formatStatus } from '../utils/formatters';
+import { getAuthUser, normalizeRole } from '../utils/auth';
 
-const ROLE_OPTIONS = [
-  { value: '', label: 'All Roles' },
-  { value: 'SUPER_ADMIN', label: 'SUPER_ADMIN' },
-  { value: 'CITY_ADMIN', label: 'CITY_ADMIN' },
-  { value: 'AGENT', label: 'AGENT' },
-  { value: 'PICKER', label: 'PICKER' },
-];
+const ROLE_LABELS = {
+  SUPER_ADMIN: 'Super Admin',
+  CITY_ADMIN: 'City Admin',
+  AGENT: 'Agent',
+  PICKER: 'Picker',
+};
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -39,6 +40,36 @@ const DEFAULT_FORM = {
   status: 'ACTIVE',
 };
 
+const buildRoleFilterOptions = (actorRole) => {
+  if (actorRole === 'CITY_ADMIN') {
+    return [
+      { value: '', label: 'All' },
+      { value: 'AGENT', label: 'Agent' },
+      { value: 'PICKER', label: 'Picker' },
+    ];
+  }
+
+  return [
+    { value: '', label: 'All' },
+    { value: 'SUPER_ADMIN', label: 'Super Admin' },
+    { value: 'CITY_ADMIN', label: 'City Admin' },
+    { value: 'AGENT', label: 'Agent' },
+    { value: 'PICKER', label: 'Picker' },
+  ];
+};
+
+const buildCreateRoleOptions = (actorRole, currentRole = '') => {
+  const options = actorRole === 'CITY_ADMIN'
+    ? ['AGENT', 'PICKER']
+    : ['CITY_ADMIN', 'AGENT', 'PICKER'];
+
+  if (currentRole === 'SUPER_ADMIN' && actorRole === 'SUPER_ADMIN') {
+    return ['SUPER_ADMIN', ...options.filter((role) => role !== 'SUPER_ADMIN')];
+  }
+
+  return options;
+};
+
 const toNullableId = (value) => {
   if (value === '' || value === null || value === undefined) return null;
   const parsed = Number(value);
@@ -46,6 +77,14 @@ const toNullableId = (value) => {
 };
 
 export default function Users() {
+  const navigate = useNavigate();
+  const authUser = getAuthUser();
+  const actorRole = normalizeRole(authUser?.role);
+  const actorCity = authUser?.city ? String(authUser.city).trim() : '';
+  const isSuperAdmin = actorRole === 'SUPER_ADMIN';
+  const isCityAdmin = actorRole === 'CITY_ADMIN';
+  const isAdminUser = isSuperAdmin || isCityAdmin;
+
   const [users, setUsers] = useState([]);
   const [collectionPoints, setCollectionPoints] = useState([]);
   const [pickers, setPickers] = useState([]);
@@ -62,6 +101,15 @@ export default function Users() {
   const [submitting, setSubmitting] = useState(false);
   const [resetSubmitting, setResetSubmitting] = useState(false);
 
+  const roleFilterOptions = useMemo(() => buildRoleFilterOptions(actorRole), [actorRole]);
+  const createRoleOptions = useMemo(() => buildCreateRoleOptions(actorRole, form.role), [actorRole, form.role]);
+
+  useEffect(() => {
+    if (!isAdminUser) {
+      navigate('/access-denied', { replace: true });
+    }
+  }, [isAdminUser, navigate]);
+
   const fetchUsers = async (activeFilters = filters) => {
     try {
       setLoading(true);
@@ -70,7 +118,7 @@ export default function Users() {
       const params = new URLSearchParams();
       if (activeFilters.role) params.set('role', activeFilters.role);
       if (activeFilters.status) params.set('status', activeFilters.status);
-      if (activeFilters.city) params.set('city', activeFilters.city);
+      if (isSuperAdmin && activeFilters.city) params.set('city', activeFilters.city);
 
       const response = await api.get(`/users${params.toString() ? `?${params.toString()}` : ''}`);
       setUsers(response.data.data || []);
@@ -99,29 +147,78 @@ export default function Users() {
 
   useEffect(() => {
     fetchReferenceData();
-    // Module 10C will protect this screen with auth/role checks.
   }, []);
 
   useEffect(() => {
     fetchUsers(filters);
   }, [filters]);
 
+  const visibleUsers = useMemo(() => {
+    if (isSuperAdmin) {
+      return users;
+    }
+
+    return users.filter((user) => {
+      const role = normalizeRole(user.role);
+      if (!['AGENT', 'PICKER'].includes(role)) {
+        return false;
+      }
+
+      if (!actorCity || !user.city) {
+        return true;
+      }
+
+      return String(user.city).trim() === actorCity;
+    });
+  }, [actorCity, isSuperAdmin, users]);
+
   const cityOptions = useMemo(() => {
     const values = new Set();
-    users.forEach((user) => {
+    visibleUsers.forEach((user) => {
       if (user.city) values.add(user.city);
     });
     return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [users]);
+  }, [visibleUsers]);
+
+  const canManageUser = (user) => {
+    if (isSuperAdmin) {
+      return true;
+    }
+
+    const role = normalizeRole(user.role);
+    if (!['AGENT', 'PICKER'].includes(role)) {
+      return false;
+    }
+
+    if (!actorCity || !user.city) {
+      return true;
+    }
+
+    return String(user.city).trim() === actorCity;
+  };
+
+  const openForbidden = () => {
+    setError('You do not have permission to manage that user.');
+  };
 
   const openCreateModal = () => {
     setIsEditing(false);
     setSelectedUserId(null);
-    setForm(DEFAULT_FORM);
+    const defaultRole = actorRole === 'CITY_ADMIN' ? 'AGENT' : 'CITY_ADMIN';
+    setForm({
+      ...DEFAULT_FORM,
+      role: defaultRole,
+      city: actorCity || '',
+    });
     setModalOpen(true);
   };
 
   const openEditModal = (user) => {
+    if (!canManageUser(user)) {
+      openForbidden();
+      return;
+    }
+
     setIsEditing(true);
     setSelectedUserId(user.id);
     setForm({
@@ -168,6 +265,12 @@ export default function Users() {
       return;
     }
 
+    const allowedRoles = buildCreateRoleOptions(actorRole, isEditing ? form.role : '');
+    if (!allowedRoles.includes(form.role)) {
+      setError('Forbidden');
+      return;
+    }
+
     if (!isEditing && !form.password) {
       setError('Password is required');
       return;
@@ -188,7 +291,17 @@ export default function Users() {
       return;
     }
 
-    if (form.role === 'PICKER' && form.picker_id) {
+    if (form.role === 'PICKER') {
+      if (!form.picker_id) {
+        setError('PICKER users must be linked to a picker profile');
+        return;
+      }
+
+      if (!form.phone.trim()) {
+        setError('PICKER users must provide a phone number');
+        return;
+      }
+
       const pickerExists = pickers.some((picker) => String(picker.id) === String(form.picker_id));
       if (!pickerExists) {
         setError('Selected picker profile was not found');
@@ -205,7 +318,7 @@ export default function Users() {
         email: form.email.trim() || undefined,
         phone: form.phone.trim() || undefined,
         role: form.role,
-        city: form.city.trim() || null,
+        city: form.city.trim() || (isCityAdmin ? actorCity || null : null),
         division: form.division.trim() || null,
         collection_point_id: toNullableId(form.collection_point_id),
         picker_id: toNullableId(form.picker_id),
@@ -229,6 +342,11 @@ export default function Users() {
   };
 
   const handleDeactivateToggle = async (user) => {
+    if (!canManageUser(user)) {
+      openForbidden();
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError(null);
@@ -243,6 +361,11 @@ export default function Users() {
   };
 
   const openResetModal = (user) => {
+    if (!canManageUser(user)) {
+      openForbidden();
+      return;
+    }
+
     setSelectedUserId(user.id);
     setResetForm({ password: '', confirmPassword: '' });
     setResetModalOpen(true);
@@ -275,12 +398,10 @@ export default function Users() {
     }
   };
 
-  const filteredUsers = users;
-
   const isAgent = form.role === 'AGENT';
   const isPicker = form.role === 'PICKER';
-  const isCityAdmin = form.role === 'CITY_ADMIN';
-  const isSuperAdmin = form.role === 'SUPER_ADMIN';
+  const isFormCityAdmin = form.role === 'CITY_ADMIN';
+  const isFormSuperAdmin = form.role === 'SUPER_ADMIN';
 
   if (loading || referenceLoading) {
     return <LoadingState message="Loading users..." />;
@@ -295,7 +416,11 @@ export default function Users() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold text-wastelink-dark">Users & Agents</h2>
-          <p className="text-sm text-wastelink-muted mt-1">Manage Super Admin, City Admin, Agent, and Picker accounts.</p>
+          <p className="text-sm text-wastelink-muted mt-1">
+            {isCityAdmin
+              ? 'Manage Agents and Pickers for your city.'
+              : 'Manage Super Admin, City Admin, Agent, and Picker accounts.'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={refreshUsers} variant="secondary" className="inline-flex items-center gap-2">
@@ -315,7 +440,7 @@ export default function Users() {
             onChange={(e) => setFilters((prev) => ({ ...prev, role: e.target.value }))}
             className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
           >
-            {ROLE_OPTIONS.map((option) => (
+            {roleFilterOptions.map((option) => (
               <option key={option.value || 'all'} value={option.value}>{option.label}</option>
             ))}
           </select>
@@ -334,22 +459,24 @@ export default function Users() {
           </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-wastelink-dark mb-2">City</label>
-          <select
-            value={filters.city}
-            onChange={(e) => setFilters((prev) => ({ ...prev, city: e.target.value }))}
-            className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
-          >
-            <option value="">All Cities</option>
-            {cityOptions.map((city) => (
-              <option key={city} value={city}>{city}</option>
-            ))}
-          </select>
-        </div>
+        {isSuperAdmin && (
+          <div>
+            <label className="block text-sm font-medium text-wastelink-dark mb-2">City</label>
+            <select
+              value={filters.city}
+              onChange={(e) => setFilters((prev) => ({ ...prev, city: e.target.value }))}
+              className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+            >
+              <option value="">All Cities</option>
+              {cityOptions.map((city) => (
+                <option key={city} value={city}>{city}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {filteredUsers.length === 0 ? (
+      {visibleUsers.length === 0 ? (
         <EmptyState message="No users found" subtext="Create the first account to get started" />
       ) : (
         <DataTable
@@ -367,7 +494,7 @@ export default function Users() {
             'Actions',
           ]}
         >
-          {filteredUsers.map((user) => (
+          {visibleUsers.map((user) => (
             <tr key={user.id} className="border-b border-wastelink-border hover:bg-gray-50">
               <td className="table-cell font-medium text-wastelink-dark">{user.name}</td>
               <td className="table-cell text-sm">{user.email || '-'}</td>
@@ -380,30 +507,34 @@ export default function Users() {
               <td className="table-cell"><StatusBadge status={user.status} /></td>
               <td className="table-cell text-sm">{formatDateTime(user.created_at)}</td>
               <td className="table-cell">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => openEditModal(user)}
-                    className="rounded-lg border border-wastelink-border p-2 text-wastelink-primary hover:bg-wastelink-success"
-                    title="Edit"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    onClick={() => openResetModal(user)}
-                    className="rounded-lg border border-wastelink-border p-2 text-wastelink-primary hover:bg-wastelink-success"
-                    title="Reset password"
-                  >
-                    <KeyRound size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDeactivateToggle(user)}
-                    className={`rounded-lg border p-2 ${user.status === 'ACTIVE' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
-                    title={user.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                    disabled={submitting}
-                  >
-                    {user.status === 'ACTIVE' ? <PowerOff size={16} /> : <Power size={16} />}
-                  </button>
-                </div>
+                {canManageUser(user) ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openEditModal(user)}
+                      className="rounded-lg border border-wastelink-border p-2 text-wastelink-primary hover:bg-wastelink-success"
+                      title="Edit"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => openResetModal(user)}
+                      className="rounded-lg border border-wastelink-border p-2 text-wastelink-primary hover:bg-wastelink-success"
+                      title="Reset password"
+                    >
+                      <KeyRound size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDeactivateToggle(user)}
+                      className={`rounded-lg border p-2 ${user.status === 'ACTIVE' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
+                      title={user.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                      disabled={submitting}
+                    >
+                      {user.status === 'ACTIVE' ? <PowerOff size={16} /> : <Power size={16} />}
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-wastelink-muted">Restricted</span>
+                )}
               </td>
             </tr>
           ))}
@@ -434,10 +565,9 @@ export default function Users() {
                 onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
                 className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
               >
-                <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-                <option value="CITY_ADMIN">CITY_ADMIN</option>
-                <option value="AGENT">AGENT</option>
-                <option value="PICKER">PICKER</option>
+                {createRoleOptions.map((role) => (
+                  <option key={role} value={role}>{ROLE_LABELS[role] || role}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -478,12 +608,13 @@ export default function Users() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-wastelink-dark mb-2">City {isCityAdmin ? '*' : ''}</label>
+              <label className="block text-sm font-medium text-wastelink-dark mb-2">City {isFormCityAdmin ? '*' : ''}</label>
               <input
                 value={form.city}
                 onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
                 className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
                 placeholder="Kampala"
+                readOnly={isCityAdmin}
               />
             </div>
             <div>
@@ -538,7 +669,7 @@ export default function Users() {
             </div>
           )}
 
-          {isSuperAdmin && (
+          {isFormSuperAdmin && (
             <p className="text-xs text-wastelink-muted">Super Admin does not require a city, collection point, or picker link.</p>
           )}
 

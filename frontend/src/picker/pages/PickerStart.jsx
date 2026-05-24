@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadingState, ErrorState, Button } from '../../components';
 import apiClient from '../../api/axios';
-import { setPickerSession } from '../utils/pickerSession';
+import { hasPickerSession, setPickerSession } from '../utils/pickerSession';
+import { isAuthenticatedPicker } from '../../utils/auth';
 import { Recycle, ArrowRight } from 'lucide-react';
+
+const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
 export default function PickerStart() {
   const navigate = useNavigate();
@@ -13,6 +16,11 @@ export default function PickerStart() {
 
   const handleContinue = async (e) => {
     e.preventDefault();
+
+    if (isAuthenticatedPicker() || (!AUTH_ENFORCED && hasPickerSession())) {
+      navigate('/picker/dashboard', { replace: true });
+      return;
+    }
     
     if (!phone.trim()) {
       setError('Phone number is required');
@@ -30,7 +38,8 @@ export default function PickerStart() {
         const allPickers = response.data.data || [];
         
         // Find picker with matching phone
-        const foundPicker = allPickers.find(p => p.phone === phone);
+        const normalizedPhone = phone.replace(/\s+/g, '');
+        const foundPicker = allPickers.find(p => String(p.phone || '').replace(/\s+/g, '') === normalizedPhone);
         
         if (foundPicker) {
           // Picker found - save session and navigate to dashboard

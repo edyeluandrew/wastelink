@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadingState, Button } from '../../components';
 import apiClient from '../../api/axios';
-import { setPickerSession } from '../utils/pickerSession';
+import { clearPickerSession, setPickerSession } from '../utils/pickerSession';
+import { getAuthToken, setAuthSession } from '../../utils/auth';
 import { Recycle, ArrowRight } from 'lucide-react';
 const GENDER_OPTIONS = [
   { value: 'MALE', label: 'Male' },
@@ -22,6 +23,7 @@ export default function PickerRegister() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const authEnforced = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
   const [form, setForm] = useState({
     name: '',
@@ -30,6 +32,8 @@ export default function PickerRegister() {
     age_group: '',
     division: '',
     main_waste_type: '',
+    password: '',
+    confirm_password: '',
   });
 
   const handleChange = (e) => {
@@ -38,12 +42,22 @@ export default function PickerRegister() {
   };
 
   const validateForm = () => {
-    const required = ['name', 'phone', 'gender', 'age_group', 'division', 'main_waste_type'];
+    const required = ['name', 'phone', 'gender', 'age_group', 'division', 'main_waste_type', 'password', 'confirm_password'];
     for (const field of required) {
       if (!form[field]?.trim()) {
         setError(`${field.replace(/_/g, ' ')} is required`);
         return false;
       }
+    }
+
+    if (form.password.length < 4) {
+      setError('Password or PIN must be at least 4 characters');
+      return false;
+    }
+
+    if (form.password !== form.confirm_password) {
+      setError('Password/PIN confirmation does not match');
+      return false;
     }
     return true;
   };
@@ -60,8 +74,48 @@ export default function PickerRegister() {
       const response = await apiClient.post('/pickers', form);
 
       if (response.data?.success && response.data.data) {
-        setPickerSession(response.data.data);
-        navigate('/picker/dashboard');
+        const createdPicker = response.data.data;
+
+        const hasAdminAuth = Boolean(getAuthToken());
+
+        if (hasAdminAuth) {
+          try {
+            await apiClient.post('/users', {
+              name: createdPicker.name,
+              phone: createdPicker.phone,
+              password: form.password,
+              role: 'PICKER',
+              picker_id: createdPicker.id,
+              status: 'ACTIVE',
+            });
+
+            const loginResponse = await apiClient.post('/auth/login', {
+              identifier: createdPicker.phone,
+              password: form.password,
+            });
+
+            if (loginResponse.data?.success && loginResponse.data.data?.token && loginResponse.data.data?.user) {
+              setAuthSession(loginResponse.data.data.token, loginResponse.data.data.user);
+              clearPickerSession();
+              navigate('/picker/dashboard', { replace: true });
+              return;
+            }
+          } catch (linkError) {
+            console.error('[PickerRegister] Linked user creation failed:', linkError);
+          }
+        }
+
+        if (!authEnforced) {
+          setPickerSession(createdPicker);
+          navigate('/picker/dashboard', { replace: true });
+          return;
+        }
+
+        clearPickerSession();
+        navigate('/login', {
+          replace: true,
+          state: { message: 'Registration complete. Please login.' },
+        });
       } else {
         setError(response.data?.message || 'Registration failed');
       }
@@ -190,6 +244,32 @@ export default function PickerRegister() {
               <p className="mt-2 text-xs text-[#6B7280]">You can still log any waste type later.</p>
             </div>
 
+            <div>
+              <label className="block text-sm font-semibold text-[#111111] mb-1">Password or PIN *</label>
+              <input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Choose a password or PIN"
+                className="w-full rounded-2xl border border-[#D9D9D9] px-4 py-3 text-sm focus:border-[#238636] focus:outline-none"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#111111] mb-1">Confirm Password or PIN *</label>
+              <input
+                type="password"
+                name="confirm_password"
+                value={form.confirm_password}
+                onChange={handleChange}
+                placeholder="Re-enter password or PIN"
+                className="w-full rounded-2xl border border-[#D9D9D9] px-4 py-3 text-sm focus:border-[#238636] focus:outline-none"
+                disabled={loading}
+              />
+            </div>
+
             {error && (
               <div className="rounded-2xl border border-red-300 bg-red-50 p-3">
                 <p className="text-sm text-red-700">{error}</p>
@@ -201,7 +281,7 @@ export default function PickerRegister() {
               disabled={loading}
               className="flex w-full items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2F9E44]"
             >
-              Register <ArrowRight size={16} />
+              Register & Continue <ArrowRight size={16} />
             </Button>
 
             <p className="text-center text-xs text-[#6B7280]">

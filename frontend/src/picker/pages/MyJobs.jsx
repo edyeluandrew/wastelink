@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { LoadingState, ErrorState, EmptyState, StatusBadge } from '../../components';
 import PickerJobCard from '../components/PickerJobCard';
 import apiClient from '../../api/axios';
-import { getPickerSession } from '../utils/pickerSession';
+import { getCurrentPickerId } from '../utils/pickerSession';
 import { Briefcase, Filter, ArrowRight } from 'lucide-react';
 import { formatUGX, formatDate } from '../../utils/formatters';
 import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
+
+const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
 const FILTER_OPTIONS = [
   { value: 'ALL', label: 'All' },
@@ -18,7 +20,7 @@ const FILTER_OPTIONS = [
 
 export default function MyJobs() {
   const navigate = useNavigate();
-  const picker = getPickerSession();
+  const pickerId = getCurrentPickerId();
 
   const [allJobs, setAllJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
@@ -27,13 +29,13 @@ export default function MyJobs() {
   const [selectedFilter, setSelectedFilter] = useState('ALL');
 
   useEffect(() => {
-    if (!picker?.id) {
-      navigate('/picker/start');
+    if (!pickerId) {
+      navigate(AUTH_ENFORCED ? '/login' : '/picker/start', { replace: true });
       return;
     }
     
     fetchJobs();
-  }, [picker?.id, navigate]);
+  }, [pickerId, navigate]);
 
   useEffect(() => {
     // Apply filter
@@ -45,13 +47,13 @@ export default function MyJobs() {
   }, [selectedFilter, allJobs]);
 
   const fetchJobs = async () => {
-    if (!picker?.id) return;
+    if (!pickerId) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await apiClient.get(`/waste-logs?picker_id=${picker.id}`);
+      const response = await apiClient.get(`/waste-logs?picker_id=${pickerId}`);
       
       if (response.data?.success) {
         const jobs = response.data.data || [];

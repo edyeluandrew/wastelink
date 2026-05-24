@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../components';
 import apiClient from '../api/axios';
 import { getAuthToken, getDefaultRouteForRole, getUserRole, setAuthSession } from '../utils/auth';
@@ -7,6 +7,7 @@ import { Lock, Mail, ShieldCheck, LogIn } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -78,6 +79,11 @@ export default function Login() {
 
           <div className="p-8 md:p-10">
             <div className="mb-8">
+              {location.state?.message && (
+                <div className="mb-4 rounded-2xl border border-[#BDE5BF] bg-[#EAF6EA] px-4 py-3 text-sm font-medium text-[#238636]">
+                  {location.state.message}
+                </div>
+              )}
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#238636]">Login</p>
               <h2 className="mt-2 text-3xl font-bold text-[#111111]" style={{ fontFamily: 'Orbitron' }}>
                 Super Admin Sign In

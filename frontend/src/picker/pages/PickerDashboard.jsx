@@ -1,38 +1,41 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadingState, ErrorState, Button } from '../../components';
 import PickerStatCard from '../components/PickerStatCard';
 import PickerJobCard from '../components/PickerJobCard';
 import apiClient from '../../api/axios';
-import { getPickerSession } from '../utils/pickerSession';
+import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX } from '../../utils/formatters';
 import { Wind, FileText, Wallet } from 'lucide-react';
 
+const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
+
 export default function PickerDashboard() {
   const navigate = useNavigate();
-  const picker = getPickerSession();
+  const picker = getCurrentPicker();
+  const pickerId = getCurrentPickerId();
 
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!picker?.id) {
-      navigate('/picker/start');
+    if (!pickerId) {
+      navigate(AUTH_ENFORCED ? '/login' : '/picker/start', { replace: true });
       return;
     }
     
     fetchDashboardData();
-  }, [picker?.id, navigate]);
+  }, [pickerId, navigate]);
 
   const fetchDashboardData = async () => {
-    if (!picker?.id) return;
+    if (!pickerId) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await apiClient.get(`/waste-logs?picker_id=${picker.id}`);
+      const response = await apiClient.get(`/waste-logs?picker_id=${pickerId}`);
       
       if (response.data?.success) {
         const allLogs = response.data.data || [];
@@ -86,16 +89,16 @@ export default function PickerDashboard() {
           Code: <span className="font-mono font-semibold">{picker.picker_code}</span>
         </p>
         <p className="text-xs text-green-700">
-          {picker.division} • {picker.main_waste_type}
+          {picker.division} â€¢ {picker.main_waste_type}
         </p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
-        <PickerStatCard icon="⏳" label="Pending" value={pending} color="amber" />
-        <PickerStatCard icon="✅" label="Verified" value={verified} color="green" />
-        <PickerStatCard icon="💳" label="Paid" value={paid} color="blue" />
-        <PickerStatCard icon="⚖️" label="Total Kg" value={totalKg} color="green" />
+        <PickerStatCard icon="â³" label="Pending" value={pending} color="amber" />
+        <PickerStatCard icon="âœ…" label="Verified" value={verified} color="green" />
+        <PickerStatCard icon="ðŸ’³" label="Paid" value={paid} color="blue" />
+        <PickerStatCard icon="âš–ï¸" label="Total Kg" value={totalKg} color="green" />
       </div>
 
       {/* Earnings Cards */}
@@ -139,7 +142,7 @@ export default function PickerDashboard() {
               onClick={() => navigate('/picker/jobs')}
               className="text-sm text-green-700 font-semibold hover:underline"
             >
-              View all →
+              View all â†’
             </button>
           </div>
           <div>
@@ -165,3 +168,6 @@ export default function PickerDashboard() {
     </div>
   );
 }
+
+
+

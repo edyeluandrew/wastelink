@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { getAuthToken, getAuthUser } from '../utils/auth';
+import { getAuthToken, getAuthUser, isAuthenticatedRole } from '../utils/auth';
 import { hasPickerSession } from '../picker/utils/pickerSession';
 import { isAgentSessionActive } from '../agent/utils/agentSession';
 
@@ -25,6 +25,7 @@ export default function ProtectedRoute({ allowedRoles, children, fallbackPath = 
   const location = useLocation();
   const token = getAuthToken();
   const user = getAuthUser();
+  const pickerAuthAllowed = isAuthenticatedRole('PICKER');
 
   if (!token || !user) {
     if (AUTH_ENFORCED || !hasLegacySession(allowedRoles)) {
@@ -36,6 +37,10 @@ export default function ProtectedRoute({ allowedRoles, children, fallbackPath = 
 
   if (Array.isArray(allowedRoles) && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     return <Navigate to="/access-denied" replace state={{ from: location.pathname, role: user.role }} />;
+  }
+
+  if (AUTH_ENFORCED && Array.isArray(allowedRoles) && allowedRoles.includes('PICKER') && !pickerAuthAllowed) {
+    return <Navigate to={fallbackPath} replace state={{ from: location.pathname }} />;
   }
 
   return children || <Outlet />;

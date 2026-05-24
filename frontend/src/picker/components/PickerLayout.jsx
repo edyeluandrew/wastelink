@@ -2,10 +2,10 @@ import { Outlet } from 'react-router-dom';
 import PickerTopbar from './PickerTopbar';
 import PickerBottomNav from './PickerBottomNav';
 import PickerSidebar from './PickerSidebar';
-import { getPickerSession } from '../utils/pickerSession';
+import { getCurrentPicker } from '../utils/pickerSession';
 
 export default function PickerLayout() {
-  const picker = getPickerSession();
+  const picker = getCurrentPicker();
   const hasSession = Boolean(picker?.id);
 
   return (

@@ -7,7 +7,12 @@ import { sendSuccess, sendError } from "../utils/apiResponse.js";
 // POST /api/waste-logs - Create a new waste log
 export const createWasteLog = async (req, res, next) => {
   try {
-    const { picker_id, collection_point_id, waste_type, estimated_kg, notes } = req.body;
+    let { picker_id, collection_point_id, waste_type, estimated_kg, notes } = req.body;
+
+    // If an authenticated PICKER is creating the log, force picker_id to their linked picker
+    if (req.user?.role === 'PICKER') {
+      picker_id = req.user.picker_id;
+    }
 
     // Validate required fields
     if (!picker_id || !collection_point_id || !waste_type || estimated_kg === undefined) {
@@ -82,7 +87,16 @@ export const createWasteLog = async (req, res, next) => {
 // GET /api/waste-logs - List all waste logs with optional filters
 export const getWasteLogs = async (req, res, next) => {
   try {
-    const { status, waste_type, division, picker_id, collection_point_id } = req.query;
+    let { status, waste_type, division, picker_id, collection_point_id } = req.query;
+
+    // If authenticated as a PICKER, enforce picker_id scoping
+    if (req.user?.role === 'PICKER') {
+      // If a picker_id was provided but doesn't match the auth user's picker_id, forbid
+      if (picker_id && String(picker_id) !== String(req.user.picker_id)) {
+        return sendError(res, 'Forbidden: cannot query other picker data', 403);
+      }
+      picker_id = req.user.picker_id;
+    }
 
     let query = `
       SELECT 
@@ -369,6 +383,11 @@ export const verifyWasteLog = async (req, res, next) => {
         return sendError(res, `Waste log cannot be verified. Current status: ${wasteLog.status}`, 400);
       }
 
+      if (req.user?.role === 'PICKER') {
+        await client.query('ROLLBACK');
+        return sendError(res, 'Pickers are not allowed to verify waste logs', 403);
+      }
+
       if (
         req.user?.role === "AGENT" &&
         String(req.user.collection_point_id || "") !== String(wasteLog.collection_point_id || "")
@@ -468,6 +487,10 @@ export const rejectWasteLog = async (req, res, next) => {
       return sendError(res, `Waste log cannot be rejected. Current status: ${wasteLog.status}`, 400);
     }
 
+    if (req.user?.role === 'PICKER') {
+      return sendError(res, 'Pickers are not allowed to reject waste logs', 403);
+    }
+
     if (
       req.user?.role === "AGENT" &&
       String(req.user.collection_point_id || "") !== String(wasteLog.collection_point_id || "")
@@ -512,6 +535,10 @@ export const markWasteLogPaid = async (req, res, next) => {
 
     try {
       // Check if waste log exists and is VERIFIED
+      if (req.user?.role === 'PICKER') {
+        await client.query('ROLLBACK');
+        return sendError(res, 'Pickers are not allowed to mark waste logs as paid', 403);
+      }
       const wasteLogResult = await client.query(
         "SELECT id, status, picker_id FROM waste_logs WHERE id = $1 FOR UPDATE",
         [id]

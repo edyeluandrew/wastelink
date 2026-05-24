@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Recycle,
@@ -8,6 +8,8 @@ import {
   HelpCircle,
   LogOut,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { clearAllSessions, isAuthenticatedPicker } from '../../utils/auth';
 import { clearPickerSession } from '../utils/pickerSession';
 import { formatGenderLabel, formatStatus } from '../../utils/formatters';
 
@@ -21,11 +23,19 @@ const navItems = [
 ];
 
 export default function PickerSidebar({ picker }) {
+  const authenticatedPicker = isAuthenticatedPicker();
   const navigate = useNavigate();
 
   const handleSwitchPicker = () => {
+    if (authenticatedPicker) {
+      clearAllSessions();
+      navigate('/login', { replace: true });
+
+      return;
+    }
+
     clearPickerSession();
-    navigate('/picker/start');
+    navigate('/picker/start', { replace: true });
   };
 
   return (
@@ -40,6 +50,7 @@ export default function PickerSidebar({ picker }) {
           <div className="space-y-2 text-sm">
             <p className="text-lg font-semibold text-[#111111]">{picker.name}</p>
             <p className="text-[#6B7280] font-medium">Code: {picker.picker_code}</p>
+            <p className="text-[#6B7280]">Phone: {picker.phone}</p>
             <p className="text-[#6B7280]">{picker.division}</p>
             {picker.main_waste_type && <p className="text-[#6B7280]">Mostly collects: {formatStatus(picker.main_waste_type)}</p>}
             {picker.gender && <p className="text-[#6B7280]">{formatGenderLabel(picker.gender)}</p>}
@@ -74,7 +85,7 @@ export default function PickerSidebar({ picker }) {
           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#D9D9D9] bg-white px-4 py-3 text-sm font-semibold text-[#111111] transition hover:border-[#238636] hover:text-[#238636]"
         >
           <LogOut size={18} />
-          Switch Picker / Logout
+          {authenticatedPicker ? 'Logout' : 'Switch Picker'}
         </button>
       </div>
     </aside>

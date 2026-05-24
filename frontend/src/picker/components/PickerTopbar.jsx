@@ -1,39 +1,54 @@
+﻿import { Recycle, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Link as LinkIcon } from 'lucide-react';
+import { clearAllSessions, isAuthenticatedPicker } from '../../utils/auth';
 import { clearPickerSession } from '../utils/pickerSession';
 
 export default function PickerTopbar({ picker }) {
+  const authenticatedPicker = isAuthenticatedPicker();
   const navigate = useNavigate();
 
   const handleSwitchPicker = () => {
+    if (authenticatedPicker) {
+      clearAllSessions();
+      navigate('/login', { replace: true });
+      return;
+    }
+
     clearPickerSession();
-    navigate('/picker/start');
+    navigate('/picker/start', { replace: true });
   };
 
   return (
-    <div className="bg-white border-b border-gray-300 sticky top-0 z-40">
-      <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <LinkIcon className="w-5 h-5 text-green-700" />
-          <h1 className="text-xl font-bold text-green-700" style={{ fontFamily: 'Orbitron' }}>
-            WasteLink
-          </h1>
-          <span className="text-sm text-gray-600">Picker</span>
+    <div className="sticky top-0 z-40 border-b border-[#D9D9D9] bg-white/95 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EAF6EA] text-[#238636]">
+            <Recycle size={22} />
+          </div>
+          <div>
+            <h1 className="text-base font-bold text-[#238636] md:text-lg" style={{ fontFamily: 'Orbitron' }}>
+              WasteLink Picker
+            </h1>
+            <p className="text-xs text-[#6B7280]">Green collection dashboard</p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {picker && (
-            <div className="text-right">
-              <p className="text-sm font-semibold text-gray-900">{picker.name}</p>
-              <p className="text-xs text-gray-600">{picker.phone}</p>
+        <div className="flex items-center gap-2 md:gap-3">
+          {picker?.id && (
+            <div className="hidden text-right md:block">
+              <p className="text-sm font-semibold text-[#111111]">{picker.name}</p>
+              <p className="text-xs text-[#6B7280]">{picker.picker_code} · {picker.phone}</p>
+              <p className="text-xs text-[#6B7280]">{picker.division}</p>
             </div>
           )}
-          
+
           <button
             onClick={handleSwitchPicker}
-            className="text-xs px-3 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
+            className="inline-flex items-center gap-2 rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] px-3 py-2 text-xs font-semibold text-[#111111] transition hover:border-[#238636] hover:text-[#238636] md:px-4"
           >
-            Switch
+            <RotateCcw size={14} />
+            <span className="hidden sm:inline">{authenticatedPicker ? 'Logout' : 'Switch Picker'}</span>
+            <span className="sm:hidden">{authenticatedPicker ? 'Logout' : 'Switch'}</span>
           </button>
         </div>
       </div>

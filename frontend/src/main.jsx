@@ -57,7 +57,7 @@ const router = createBrowserRouter([
   },
   {
     element: (
-      <ProtectedRoute allowedRoles={['SUPER_ADMIN']} fallbackPath="/login">
+      <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CITY_ADMIN']} fallbackPath="/login">
         <DashboardLayout />
       </ProtectedRoute>
     ),
@@ -94,7 +94,7 @@ const router = createBrowserRouter([
   },
   {
     path: 'picker',
-    element: <ProtectedRoute allowedRoles={['PICKER']} fallbackPath="/picker/start"><PickerLayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['PICKER']} fallbackPath="/login"><PickerLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <PickerRouteRedirect /> },
       { path: 'dashboard', element: <PickerDashboard /> },

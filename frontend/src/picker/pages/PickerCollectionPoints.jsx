@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
 import CollectionPointCard from '../components/CollectionPointCard';
 import apiClient from '../../api/axios';
-import { getPickerSession } from '../utils/pickerSession';
+import { getCurrentPicker } from '../utils/pickerSession';
 import { Search, MapPin, Filter, ArrowRight } from 'lucide-react';
+
+const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
 export default function PickerCollectionPoints() {
   const navigate = useNavigate();
-  const picker = getPickerSession();
+  const picker = getCurrentPicker();
 
   const [points, setPoints] = useState([]);
   const [filteredPoints, setFilteredPoints] = useState([]);
@@ -20,7 +22,7 @@ export default function PickerCollectionPoints() {
 
   useEffect(() => {
     if (!picker?.id) {
-      navigate('/picker/start');
+      navigate(AUTH_ENFORCED ? '/login' : '/picker/start', { replace: true });
       return;
     }
     
