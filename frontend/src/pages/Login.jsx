@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../components';
 import apiClient from '../api/axios';
 import { getAuthToken, getDefaultRouteForRole, getUserRole, setAuthSession } from '../utils/auth';
-import { Lock, Mail, ShieldCheck, LogIn } from 'lucide-react';
+import { Lock, UserPlus } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showRegister, setShowRegister] = useState(false);
+  const [tab, setTab] = useState('login');
 
   useEffect(() => {
     if (getAuthToken()) {
@@ -52,112 +51,168 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#EAF6EA_0%,#F8F9FA_45%,#FFFFFF_100%)] px-4 py-10">
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-5xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-[2rem] border border-[#BDE5BF] bg-white shadow-[0_20px_80px_rgba(17,17,17,0.08)] md:grid-cols-[1.05fr_0.95fr]">
-          <div className="flex flex-col justify-between bg-[linear-gradient(135deg,#238636_0%,#2F9E44_100%)] p-8 text-white md:p-10">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-sm font-semibold backdrop-blur">
-                <ShieldCheck size={16} /> Super Admin Access
-              </div>
-              <h1 className="mt-6 text-4xl font-bold tracking-tight md:text-5xl" style={{ fontFamily: 'Orbitron' }}>
-                WasteLink Uganda
-              </h1>
-              <p className="mt-4 max-w-md text-sm leading-6 text-white/85 md:text-base">
-                Sign in to access WasteLink. Your dashboard opens based on your role.
-              </p>
-            </div>
+    <div className="flex h-screen bg-white">
+      {/* Left Panel - Hidden on mobile */}
+      <div className="hidden md:flex md:w-1/2 flex-col justify-center items-start px-12 bg-gradient-to-b from-[#f0f9ff] to-white">
+        <div className="max-w-md">
+          <h1 className="text-4xl font-bold text-[#238636] mb-4">WasteLink Uganda</h1>
+          <p className="text-base text-[#6B7280] mb-8">
+            Sign in to access your workspace
+          </p>
+          <p className="text-sm text-[#6B7280] mb-8 leading-relaxed">
+            Your dashboard opens based on your role. Admins manage system settings and reports. Agents verify waste collections. Pickers log and track earnings.
+          </p>
+          <div className="space-y-2 text-xs text-[#6B7280]">
+            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Role-based access</p>
+            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Secure JWT sessions</p>
+            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Verified waste workflows</p>
+          </div>
+        </div>
+      </div>
 
-            <div className="mt-10 grid gap-3 text-sm text-white/90">
-              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
-                Role-Based Access
-              </div>
-              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
-                Secure JWT session for authenticated users
-              </div>
-            </div>
+      {/* Right Panel */}
+      <div className="w-full md:w-1/2 flex items-center justify-center px-8">
+        <div className="w-full max-w-md">
+          {/* Tab Navigation */}
+          <div className="mb-8 flex border-b border-[#e5e7eb]">
+            <button
+              onClick={() => { setTab('login'); setError(''); }}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                tab === 'login'
+                  ? 'border-b-2 border-[#238636] text-[#238636]'
+                  : 'text-[#6B7280] hover:text-[#1f2937]'
+              }`}
+            >
+              <Lock size={18} />
+              Login
+            </button>
+            <button
+              onClick={() => { setTab('register'); setError(''); }}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                tab === 'register'
+                  ? 'border-b-2 border-[#238636] text-[#238636]'
+                  : 'text-[#6B7280] hover:text-[#1f2937]'
+              }`}
+            >
+              <UserPlus size={18} />
+              Register as Picker
+            </button>
           </div>
 
-          <div className="p-8 md:p-10">
-            <div className="mb-8">
-              {location.state?.message && (
-                <div className="mb-4 rounded-2xl border border-[#BDE5BF] bg-[#EAF6EA] px-4 py-3 text-sm font-medium text-[#238636]">
-                  {location.state.message}
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <button className={`px-3 py-2 rounded-full ${!showRegister ? 'bg-[#238636] text-white' : 'bg-transparent text-[#6B7280]'}`} onClick={() => setShowRegister(false)}>Login</button>
-                <button className={`px-3 py-2 rounded-full ${showRegister ? 'bg-[#238636] text-white' : 'bg-transparent text-[#6B7280]'}`} onClick={() => setShowRegister(true)}>Register as Picker</button>
+          {/* Login Tab */}
+          {tab === 'login' && (
+            <>
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-[#1f2937] mb-2">Sign in to WasteLink</h2>
+                <p className="text-sm text-[#6B7280]">
+                  Enter your credentials to access your dashboard
+                </p>
               </div>
 
-              {!showRegister ? (
-                <>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#238636]">Login</p>
-                  <h2 className="mt-2 text-3xl font-bold text-[#111111]" style={{ fontFamily: 'Orbitron' }}>
-                    Sign in to WasteLink
-                  </h2>
-                  <p className="mt-2 text-sm text-[#6B7280]">Use your registered email or phone number and password/PIN.</p>
-                </>
-              ) : (
-                <>
-                  <h2 className="mt-2 text-2xl font-bold text-[#111111]">Register as a Picker</h2>
-                  <p className="mt-2 text-sm text-[#6B7280]">Picker registration is for waste pickers only. Admins and agents receive accounts from the system administrator or city admin.</p>
-                </>
-              )}
-            </div>
-            {!showRegister ? (
               <form onSubmit={handleSubmit} className="space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#111111]">Email or phone</span>
-                <div className="flex items-center gap-3 rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] px-4 py-3 focus-within:border-[#238636]">
-                  <Mail size={18} className="shrink-0 text-[#6B7280]" />
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-2">
+                    Email or Phone
+                  </label>
                   <input
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="superadmin@example.com or 0770000000"
-                    className="w-full bg-transparent text-sm outline-none"
-                    autoComplete="username"
+                    className="w-full px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:border-[#238636] transition-colors"
+                    placeholder="admin@wastelink.com or +256701234567"
+                    required
                     disabled={loading}
                   />
                 </div>
-              </label>
 
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-[#111111]">Password</span>
-                <div className="flex items-center gap-3 rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] px-4 py-3 focus-within:border-[#238636]">
-                  <Lock size={18} className="shrink-0 text-[#6B7280]" />
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-2">
+                    Password or PIN
+                  </label>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:border-[#238636] transition-colors"
                     placeholder="••••••••"
-                    className="w-full bg-transparent text-sm outline-none"
-                    autoComplete="current-password"
+                    required
                     disabled={loading}
                   />
                 </div>
-              </label>
 
-              {error && (
-                <div className="rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
-              <Button
-                type="submit"
-                disabled={loading}
-                className="inline-flex w-full items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2F9E44]"
-              >
-                <LogIn size={16} /> {loading ? 'Signing in...' : 'Login'}
-              </Button>
-            </form>
-            ) : (
-              <div className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
-                <p className="text-sm text-[#111111] mb-4">Picker registration is public and intended for waste pickers only.</p>
-                <Button onClick={() => navigate('/picker/register')} className="w-full bg-[#238636] text-white">Create Picker Account</Button>
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-[#238636] text-white font-medium py-2 rounded-lg hover:bg-[#1a6b2d] disabled:opacity-50 transition-colors"
+                >
+                  {loading ? 'Signing in...' : 'Sign in'}
+                </Button>
+              </form>
+
+              <div className="mt-8 pt-8 border-t border-[#e5e7eb]">
+                <p className="text-xs text-[#6B7280] text-center">
+                  Admins and agents: contact your system administrator to create your account.
+                </p>
               </div>
-            )}
+            </>
+          )}
+
+          {/* Register as Picker Tab */}
+          {tab === 'register' && (
+            <>
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-[#1f2937] mb-2">Register as a Picker</h2>
+                <p className="text-sm text-[#6B7280]">
+                  Self-register as a waste picker to start logging waste and earning
+                </p>
+              </div>
+
+              <div className="bg-[#f9fafb] border border-[#e5e7eb] rounded-lg p-6 space-y-4">
+                <p className="text-sm text-[#1f2937] leading-relaxed">
+                  Picker registration is for waste pickers only. If you are a collection point agent or administrator, contact your system administrator or city admin to receive an account.
+                </p>
+                <ul className="space-y-2 text-sm text-[#6B7280]">
+                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Log waste collections with verification</li>
+                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Earn verified payments</li>
+                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Track your earnings and history</li>
+                </ul>
+                <Button
+                  onClick={() => navigate('/picker/register')}
+                  className="w-full bg-[#238636] text-white font-medium py-2 rounded-lg hover:bg-[#1a6b2d] transition-colors"
+                >
+                  Create Picker Account
+                </Button>
+              </div>
+
+              <div className="mt-8 pt-8 border-t border-[#e5e7eb]">
+                <p className="text-xs text-[#6B7280] text-center">
+                  Already registered? Go back to{' '}
+                  <button
+                    onClick={() => { setTab('login'); setError(''); }}
+                    className="text-[#238636] font-medium hover:underline"
+                  >
+                    login
+                  </button>
+                  .
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* Back to Home Link */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => navigate('/')}
+              className="text-sm text-[#238636] hover:underline font-medium"
+            >
+              Back to Home
+            </button>
           </div>
         </div>
       </div>
