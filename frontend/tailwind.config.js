@@ -19,6 +19,7 @@ export default {
         },
       },
       fontFamily: {
+        sans: ["Orbitron", "sans-serif"],
         orbitron: ["Orbitron", "sans-serif"],
         inter: ["Inter", "sans-serif"],
       },
