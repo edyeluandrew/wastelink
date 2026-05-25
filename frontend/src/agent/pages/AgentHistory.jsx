@@ -4,7 +4,7 @@ import apiClient from '../../api/axios';
 import { getAgentCollectionPoint, resolveAgentSession } from '../utils/agentSession';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
-import { RotateCcw, ArrowLeft, CheckCircle2, CircleX, Wallet, ClipboardList } from 'lucide-react';
+import { RotateCcw, CheckCircle2, CircleX, Wallet, ClipboardList } from 'lucide-react';
 
 export default function AgentHistory() {
   const navigate = useNavigate();
@@ -174,7 +174,7 @@ export default function AgentHistory() {
           onClick={() => navigate('/agent/dashboard')}
           className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
         >
-          <ArrowLeft size={16} /> Back to Dashboard
+          Back to Dashboard
         </button>
       </div>
     </div>

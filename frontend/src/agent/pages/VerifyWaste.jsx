@@ -6,7 +6,7 @@ import JobSearchBox from '../components/JobSearchBox';
 import AgentWasteLogCard from '../components/AgentWasteLogCard';
 import { LoadingState, ErrorState } from '../../components';
 import { getEstimatedKg, getVerifiedKg, hasVerifiedKg } from '../../utils/wasteLogHelpers';
-import { ClipboardCheck, ArrowLeft, AlertCircle } from 'lucide-react';
+import { ClipboardCheck, AlertCircle } from 'lucide-react';
 
 export default function VerifyWaste() {
   const navigate = useNavigate();
@@ -205,7 +205,7 @@ export default function VerifyWaste() {
           onClick={() => navigate('/agent/dashboard')}
           className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold inline-flex items-center justify-center gap-2"
         >
-          <ArrowLeft size={16} /> Back to Dashboard
+          Back to Dashboard
         </button>
       </div>
     </div>
