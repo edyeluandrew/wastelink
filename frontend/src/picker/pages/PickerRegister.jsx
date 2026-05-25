@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Recycle } from 'lucide-react';
+import { Recycle } from 'lucide-react';
 import apiClient from '../../api/axios';
 import { Button, LoadingState } from '../../components';
 import { setAuthSession } from '../../utils/auth';
@@ -288,7 +288,7 @@ export default function PickerRegister() {
             )}
 
             <Button type="submit" disabled={loading} className="flex w-full items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2F9E44]">
-              Register & Continue <ArrowRight size={16} />
+              Register & Continue
             </Button>
 
             <p className="text-center text-xs text-[#6B7280]">

@@ -4,7 +4,7 @@ import { LoadingState, ErrorState, EmptyState } from '../../components';
 import CollectionPointCard from '../components/CollectionPointCard';
 import apiClient from '../../api/axios';
 import { getCurrentPicker } from '../utils/pickerSession';
-import { Search, MapPin, Filter, ArrowRight } from 'lucide-react';
+import { Search, MapPin, Filter } from 'lucide-react';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
@@ -189,7 +189,7 @@ export default function PickerCollectionPoints() {
           message="Try another division or search term."
           icon={MapPin}
           actionLabel="Log Waste"
-          actionIcon={ArrowRight}
+          actionIcon={null}
           onAction={() => navigate('/picker/log-waste')}
         />
       )}

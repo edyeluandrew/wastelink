@@ -4,7 +4,7 @@ import { LoadingState, ErrorState, Button } from '../../components';
 import apiClient from '../../api/axios';
 import { hasPickerSession, setPickerSession } from '../utils/pickerSession';
 import { isAuthenticatedPicker } from '../../utils/auth';
-import { Recycle, ArrowRight } from 'lucide-react';
+import { Recycle } from 'lucide-react';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
@@ -108,7 +108,7 @@ export default function PickerStart() {
               disabled={loading || !phone.trim()}
               className="flex w-full items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2F9E44]"
             >
-              Continue <ArrowRight size={16} />
+              Continue
             </Button>
           </form>
         </div>

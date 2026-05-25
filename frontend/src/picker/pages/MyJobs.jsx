@@ -4,7 +4,7 @@ import { LoadingState, ErrorState, EmptyState, StatusBadge } from '../../compone
 import PickerJobCard from '../components/PickerJobCard';
 import apiClient from '../../api/axios';
 import { getCurrentPickerId } from '../utils/pickerSession';
-import { Briefcase, Filter, ArrowRight } from 'lucide-react';
+import { Briefcase, Filter } from 'lucide-react';
 import { formatUGX, formatDate } from '../../utils/formatters';
 import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
 
@@ -84,7 +84,6 @@ export default function MyJobs() {
         message="Log your first waste to get started"
         icon={Briefcase}
         actionLabel="Log Waste"
-        actionIcon={ArrowRight}
         onAction={() => navigate('/picker/log-waste')}
       />
     );
@@ -166,7 +165,6 @@ export default function MyJobs() {
           message="Try another filter or log a new waste job."
           icon={Briefcase}
           actionLabel="Log Waste"
-          actionIcon={ArrowRight}
           onAction={() => navigate('/picker/log-waste')}
         />
       )}

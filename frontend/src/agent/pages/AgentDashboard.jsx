@@ -13,7 +13,6 @@ import {
   CircleX,
   Scale,
   Wallet,
-  ArrowRight,
   ClipboardList,
 } from 'lucide-react';
 
@@ -190,7 +189,7 @@ export default function AgentDashboard() {
               onClick={() => navigate('/agent/history')}
               className="text-sm text-green-600 hover:underline font-semibold"
             >
-              View All <ArrowRight size={14} className="inline-block align-middle" />
+              View All
             </button>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">

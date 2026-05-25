@@ -4,7 +4,7 @@ import { LoadingState, ErrorState, Button, Modal } from '../../components';
 import apiClient from '../../api/axios';
 import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatKg } from '../../utils/formatters';
-import { Recycle, MapPin, Scale, ClipboardCheck, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { Recycle, MapPin, Scale, ClipboardCheck, LayoutDashboard } from 'lucide-react';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
@@ -173,7 +173,7 @@ export default function LogWaste() {
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           <Button onClick={() => navigate('/picker/jobs')} className="inline-flex items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2F9E44]">
-            View My Jobs <ArrowRight size={16} />
+            View My Jobs
           </Button>
           <Button onClick={() => navigate('/picker/dashboard')} variant="secondary" className="inline-flex items-center justify-center gap-2 border border-[#D9D9D9] bg-white text-[#111111] hover:border-[#238636]">
             <LayoutDashboard size={16} /> Dashboard

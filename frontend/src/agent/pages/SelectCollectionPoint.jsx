@@ -4,7 +4,7 @@ import apiClient from '../../api/axios';
 import { setAgentCollectionPoint } from '../utils/agentSession';
 import { getAuthUser } from '../../utils/auth';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
-import { MapPin, Building2, UserRound, Phone, Navigation, ArrowRight, Info } from 'lucide-react';
+import { MapPin, Building2, UserRound, Phone, Navigation, Info } from 'lucide-react';
 
 export default function SelectCollectionPoint() {
   const navigate = useNavigate();
@@ -81,7 +81,7 @@ export default function SelectCollectionPoint() {
                   onClick={() => navigate('/agent/dashboard')}
                   className="mt-2 inline-flex items-center justify-center gap-2 rounded bg-green-600 px-4 py-2 font-semibold text-white transition hover:bg-green-700"
                 >
-                  Go to Agent Dashboard <ArrowRight size={16} />
+                  Go to Agent Dashboard
                 </button>
               </div>
             ) : (
@@ -153,7 +153,7 @@ export default function SelectCollectionPoint() {
                     onClick={() => handleSelectPoint(point)}
                     className="w-full mt-4 py-2 px-4 bg-green-600 text-white rounded font-semibold hover:bg-green-700 transition inline-flex items-center justify-center gap-2"
                   >
-                    Use This Location <ArrowRight size={16} />
+                    Use This Location
                   </button>
                 </div>
               </div>

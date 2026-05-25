@@ -4,7 +4,7 @@ import { LoadingState, ErrorState, EmptyState, StatusBadge } from '../../compone
 import apiClient from '../../api/axios';
 import { getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX, formatDate } from '../../utils/formatters';
-import { Wallet, Scale, CreditCard, Hourglass, TrendingUp, ArrowRight } from 'lucide-react';
+import { Wallet, Scale, CreditCard, Hourglass, TrendingUp } from 'lucide-react';
 import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
 import { getVerifiedKg } from '../../utils/wasteLogHelpers';
 
