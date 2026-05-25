@@ -68,7 +68,7 @@ export const getDefaultRouteForRole = (role) => {
   switch (role) {
     case 'SUPER_ADMIN':
     case 'CITY_ADMIN':
-      return '/';
+      return '/overview';
     case 'AGENT':
       return '/agent/dashboard';
     case 'PICKER':

@@ -126,13 +126,20 @@ export default function PickerRegister() {
 
   return (
     <div className="mx-auto max-w-2xl py-8">
-      <div className="mb-4">
+      <div className="mb-4 flex gap-4">
         <button
           type="button"
-          onClick={() => navigate('/picker/start')}
+          onClick={() => navigate('/')}
           className="text-sm font-semibold text-[#238636] hover:text-[#2F9E44]"
         >
-          ← Back to Start
+          ← Back to Home
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/login')}
+          className="text-sm font-semibold text-[#238636] hover:text-[#2F9E44]"
+        >
+          ← Back to Login
         </button>
       </div>
 

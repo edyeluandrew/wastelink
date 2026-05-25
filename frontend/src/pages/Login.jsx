@@ -12,6 +12,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     if (getAuthToken()) {
@@ -63,16 +64,16 @@ export default function Login() {
                 WasteLink Uganda
               </h1>
               <p className="mt-4 max-w-md text-sm leading-6 text-white/85 md:text-base">
-                Sign in to manage the platform as Super Admin. This module keeps the existing admin, agent, and picker flows untouched.
+                Sign in to access WasteLink. Your dashboard opens based on your role.
               </p>
             </div>
 
             <div className="mt-10 grid gap-3 text-sm text-white/90">
               <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
-                Super Admin login only
+                Role-Based Access
               </div>
               <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
-                JWT session stored locally for the admin dashboard
+                Secure JWT session for authenticated users
               </div>
             </div>
           </div>
@@ -84,16 +85,28 @@ export default function Login() {
                   {location.state.message}
                 </div>
               )}
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#238636]">Login</p>
-              <h2 className="mt-2 text-3xl font-bold text-[#111111]" style={{ fontFamily: 'Orbitron' }}>
-                Super Admin Sign In
-              </h2>
-              <p className="mt-2 text-sm text-[#6B7280]">
-                Use the email and password configured in your backend `.env`.
-              </p>
-            </div>
+              <div className="flex items-center gap-3">
+                <button className={`px-3 py-2 rounded-full ${!showRegister ? 'bg-[#238636] text-white' : 'bg-transparent text-[#6B7280]'}`} onClick={() => setShowRegister(false)}>Login</button>
+                <button className={`px-3 py-2 rounded-full ${showRegister ? 'bg-[#238636] text-white' : 'bg-transparent text-[#6B7280]'}`} onClick={() => setShowRegister(true)}>Register as Picker</button>
+              </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+              {!showRegister ? (
+                <>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#238636]">Login</p>
+                  <h2 className="mt-2 text-3xl font-bold text-[#111111]" style={{ fontFamily: 'Orbitron' }}>
+                    Sign in to WasteLink
+                  </h2>
+                  <p className="mt-2 text-sm text-[#6B7280]">Use your registered email or phone number and password/PIN.</p>
+                </>
+              ) : (
+                <>
+                  <h2 className="mt-2 text-2xl font-bold text-[#111111]">Register as a Picker</h2>
+                  <p className="mt-2 text-sm text-[#6B7280]">Picker registration is for waste pickers only. Admins and agents receive accounts from the system administrator or city admin.</p>
+                </>
+              )}
+            </div>
+            {!showRegister ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-[#111111]">Email or phone</span>
                 <div className="flex items-center gap-3 rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] px-4 py-3 focus-within:border-[#238636]">
@@ -131,7 +144,6 @@ export default function Login() {
                   {error}
                 </div>
               )}
-
               <Button
                 type="submit"
                 disabled={loading}
@@ -140,6 +152,12 @@ export default function Login() {
                 <LogIn size={16} /> {loading ? 'Signing in...' : 'Login'}
               </Button>
             </form>
+            ) : (
+              <div className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
+                <p className="text-sm text-[#111111] mb-4">Picker registration is public and intended for waste pickers only.</p>
+                <Button onClick={() => navigate('/picker/register')} className="w-full bg-[#238636] text-white">Create Picker Account</Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
