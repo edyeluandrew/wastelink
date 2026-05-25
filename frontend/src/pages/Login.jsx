@@ -57,15 +57,15 @@ export default function Login() {
         <div className="max-w-md">
           <h1 className="text-4xl font-bold text-[#238636] mb-4">WasteLink Uganda</h1>
           <p className="text-base text-[#6B7280] mb-8">
-            Sign in to access your workspace
+            Digital waste management made simple
           </p>
           <p className="text-sm text-[#6B7280] mb-8 leading-relaxed">
-            Your dashboard opens based on your role. Admins manage system settings and reports. Agents verify waste collections. Pickers log and track earnings.
+            Track waste collections, manage verifications, and grow your earnings all in one place.
           </p>
           <div className="space-y-2 text-xs text-[#6B7280]">
-            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Role-based access</p>
-            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Secure JWT sessions</p>
-            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Verified waste workflows</p>
+            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Fast and secure login</p>
+            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Track your progress</p>
+            <p className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Transparent records</p>
           </div>
         </div>
       </div>
@@ -95,7 +95,7 @@ export default function Login() {
               }`}
             >
               <UserPlus size={18} />
-              Register as Picker
+              Register
             </button>
           </div>
 
@@ -103,9 +103,9 @@ export default function Login() {
           {tab === 'login' && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-[#1f2937] mb-2">Sign in to WasteLink</h2>
+                <h2 className="text-2xl font-bold text-[#1f2937] mb-2">Welcome back</h2>
                 <p className="text-sm text-[#6B7280]">
-                  Enter your credentials to access your dashboard
+                  Sign in with your credentials
                 </p>
               </div>
 
@@ -119,7 +119,7 @@ export default function Login() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     className="w-full px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:border-[#238636] transition-colors"
-                    placeholder="admin@wastelink.com or +256701234567"
+                    placeholder="user@gmail.com or +256701234567"
                     required
                     disabled={loading}
                   />
@@ -157,7 +157,7 @@ export default function Login() {
 
               <div className="mt-8 pt-8 border-t border-[#e5e7eb]">
                 <p className="text-xs text-[#6B7280] text-center">
-                  Admins and agents: contact your system administrator to create your account.
+                  Need an account? Contact your administrator.
                 </p>
               </div>
             </>
@@ -167,20 +167,20 @@ export default function Login() {
           {tab === 'register' && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-[#1f2937] mb-2">Register as a Picker</h2>
+                <h2 className="text-2xl font-bold text-[#1f2937] mb-2">Get started</h2>
                 <p className="text-sm text-[#6B7280]">
-                  Self-register as a waste picker to start logging waste and earning
+                  Create your account to start logging waste
                 </p>
               </div>
 
               <div className="bg-[#f9fafb] border border-[#e5e7eb] rounded-lg p-6 space-y-4">
                 <p className="text-sm text-[#1f2937] leading-relaxed">
-                  Picker registration is for waste pickers only. If you are a collection point agent or administrator, contact your system administrator or city admin to receive an account.
+                  Sign up to track your waste collections and earnings in real time.
                 </p>
                 <ul className="space-y-2 text-sm text-[#6B7280]">
-                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Log waste collections with verification</li>
-                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Earn verified payments</li>
-                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Track your earnings and history</li>
+                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Log waste collections</li>
+                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Earn fair payments</li>
+                  <li className="flex items-center gap-2"><span className="text-[#238636]">✓</span> Track your progress</li>
                 </ul>
                 <Button
                   onClick={() => navigate('/picker/register')}
