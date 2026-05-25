@@ -55,7 +55,10 @@ export default function Login() {
       {/* Left Panel - Hidden on mobile */}
       <div className="hidden md:flex md:w-1/2 flex-col justify-center items-start px-12 bg-gradient-to-b from-[#f0f9ff] to-white">
         <div className="max-w-md">
-          <h1 className="text-4xl font-bold text-[#238636] mb-4">WasteLink Uganda</h1>
+          <div className="flex items-center gap-3 mb-6">
+            <img src="/brand/wastelink-icon.png" alt="WasteLink" className="h-12 w-12 object-contain" />
+            <h1 className="text-4xl font-bold text-[#238636]">WasteLink Uganda</h1>
+          </div>
           <p className="text-base text-[#6B7280] mb-8">
             Digital waste management made simple
           </p>

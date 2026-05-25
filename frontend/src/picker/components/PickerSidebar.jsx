@@ -41,9 +41,12 @@ export default function PickerSidebar({ picker }) {
   return (
     <aside className="hidden md:flex md:w-72 md:flex-col md:sticky md:top-0 md:h-screen bg-[#FFFFFF] border-r border-[#D9D9D9]">
       <div className="p-6 border-b border-[#D9D9D9]">
-        <div className="inline-flex items-center gap-2 rounded-2xl bg-[#EAF6EA] px-3 py-2 text-[#238636] font-semibold mb-4">
-          <Recycle size={18} />
-          <span style={{ fontFamily: 'Orbitron' }}>WasteLink Picker</span>
+        <div className="flex items-center gap-2 mb-4">
+          <img src="/brand/wastelink-icon.png" alt="WasteLink" className="h-8 w-8 object-contain" />
+          <div className="inline-flex items-center gap-2 rounded-2xl bg-[#EAF6EA] px-3 py-2 text-[#238636] font-semibold">
+            <Recycle size={18} />
+            <span style={{ fontFamily: 'Orbitron' }}>WasteLink Picker</span>
+          </div>
         </div>
 
         {picker ? (

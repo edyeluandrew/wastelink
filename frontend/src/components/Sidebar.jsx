@@ -33,11 +33,14 @@ export default function Sidebar() {
   return (
     <div className="w-64 bg-wastelink-surface border-r border-wastelink-border h-screen flex flex-col sticky top-0">
       {/* Brand */}
-      <div className="p-6 border-b border-wastelink-border">
-        <h1 className="font-orbitron text-xl font-bold text-wastelink-primary">
-          WasteLink Uganda
-        </h1>
-        <p className="text-xs text-wastelink-muted mt-1">Kampala Pilot</p>
+      <div className="p-6 border-b border-wastelink-border flex items-center gap-3">
+        <img src="/brand/wastelink-icon.png" alt="WasteLink" className="h-8 w-8 object-contain" />
+        <div>
+          <h1 className="font-orbitron text-xl font-bold text-wastelink-primary">
+            WasteLink Uganda
+          </h1>
+          <p className="text-xs text-wastelink-muted mt-1">Kampala Pilot</p>
+        </div>
       </div>
 
       {/* Menu */}

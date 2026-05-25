@@ -45,11 +45,14 @@ export default function AgentLayout() {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        <div className="p-6 border-b border-gray-300">
-          <h1 className="text-xl font-bold text-green-600" style={{ fontFamily: 'Orbitron' }}>
-            WasteLink Agent
-          </h1>
-          <p className="text-xs text-gray-500 mt-2">Collection Point Verification</p>
+        <div className="p-6 border-b border-gray-300 flex items-center gap-3">
+          <img src="/brand/wastelink-icon.png" alt="WasteLink" className="h-8 w-8 object-contain" />
+          <div>
+            <h1 className="text-xl font-bold text-green-600" style={{ fontFamily: 'Orbitron' }}>
+              WasteLink Agent
+            </h1>
+            <p className="text-xs text-gray-500 mt-1">Collection Point Verification</p>
+          </div>
         </div>
 
         {collectionPoint && (
