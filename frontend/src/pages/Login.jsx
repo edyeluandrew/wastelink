@@ -157,7 +157,7 @@ export default function Login() {
 
               <div className="mt-8 pt-8 border-t border-[#e5e7eb]">
                 <p className="text-xs text-[#6B7280] text-center">
-                  Need an account? Contact your administrator.
+                  WasteLink helps waste pickers, agents, and administrators track waste collections, verify weights, and ensure fair earnings. Join the platform to be part of a cleaner Uganda.
                 </p>
               </div>
             </>
