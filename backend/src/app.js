@@ -8,6 +8,7 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import ussdRoutes from "./routes/ussdRoutes.js";
 import { sendSuccess, sendError } from "./utils/apiResponse.js";
 import errorHandler from "./middleware/errorHandler.js";
 
@@ -15,6 +16,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.get("/api/health", (req, res) => {
   sendSuccess(res, "WasteLink API is running", {
@@ -152,6 +154,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/ussd", ussdRoutes);
 
 app.use((req, res, next) => {
   const error = new Error("Route not found");
