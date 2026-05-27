@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Smartphone, Send, RotateCcw, Phone, Menu } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
 export default function UssdSimulator() {
   const [sessionId] = useState(`sim-${Date.now()}`);
   const [phoneNumber, setPhoneNumber] = useState('+256700000001');
@@ -26,7 +28,7 @@ export default function UssdSimulator() {
     setHistory([]);
 
     try {
-      const response = await fetch('http://localhost:5000/api/ussd', {
+      const response = await fetch(`${API_BASE_URL}/ussd`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -64,7 +66,7 @@ export default function UssdSimulator() {
     const nextText = currentText ? `${currentText}*${userInput}` : userInput;
 
     try {
-      const response = await fetch('http://localhost:5000/api/ussd', {
+      const response = await fetch(`${API_BASE_URL}/ussd`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -107,7 +109,7 @@ export default function UssdSimulator() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/ussd', {
+      const response = await fetch(`${API_BASE_URL}/ussd`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -337,3 +339,4 @@ export default function UssdSimulator() {
     </div>
   );
 }
+
