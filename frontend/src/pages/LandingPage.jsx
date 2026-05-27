@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, MapPin, CheckCircle, BarChart2 } from 'lucide-react'
+import { Users, MapPin, CheckCircle, BarChart2, Smartphone } from 'lucide-react'
 import { Button } from '../components'
 import { getAuthToken, getAuthUser, getDefaultRouteForRole } from '../utils/auth'
 
@@ -91,8 +91,19 @@ export default function LandingPage() {
             </ul>
           </section>
         </main>
-      </div>
-    </div>
-  )
-}
+
+        <section className="mt-12 pt-8 border-t">
+          <div className="rounded-lg bg-gradient-to-br from-[#238636]/5 to-[#2F9E44]/5 p-8 text-center">
+            <div className="flex justify-center mb-4">
+              <Smartphone className="w-8 h-8 text-[#238636]" />
+            </div>
+            <h3 className="text-2xl font-bold text-[#238636] mb-3">USSD Feature Phone Access</h3>
+            <p className="text-base text-wastelink-muted max-w-2xl mx-auto mb-6">
+              WasteLink supports feature phones via USSD, enabling pickers without smartphones to register, log waste, and check earnings via text-based menus.
+            </p>
+            <Button onClick={() => navigate('/ussd-simulator')} className="bg-[#238636] text-white">
+              Try USSD Simulator
+            </Button>
+          </div>
+        </section>
 

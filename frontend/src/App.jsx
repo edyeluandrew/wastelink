@@ -7,6 +7,7 @@ import WasteLogs from './pages/WasteLogs';
 import Divisions from './pages/Divisions';
 import Earnings from './pages/Earnings';
 import Reports from './pages/Reports';
+import UssdSimulator from './pages/UssdSimulator';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/divisions" element={<DashboardLayout><Divisions /></DashboardLayout>} />
         <Route path="/earnings" element={<DashboardLayout><Earnings /></DashboardLayout>} />
         <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
+        <Route path="/ussd-simulator" element={<UssdSimulator />} />
       </Routes>
     </Router>
   );
