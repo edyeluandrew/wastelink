@@ -4,7 +4,7 @@ import apiClient from '../../api/axios';
 import { setAgentCollectionPoint } from '../utils/agentSession';
 import { getAuthUser } from '../../utils/auth';
 import { LoadingState, ErrorState, EmptyState } from '../../components';
-import { MapPin, Building2, UserRound, Phone, Navigation, Info } from 'lucide-react';
+import { MapPin, Building2, UserRound, Phone, Navigation, Info, CheckCircle2 } from 'lucide-react';
 
 export default function SelectCollectionPoint() {
   const navigate = useNavigate();
@@ -47,40 +47,43 @@ export default function SelectCollectionPoint() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-gray-100">
-      {/* Header */}
-      <div className="bg-green-600 text-white py-8 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold inline-flex items-center gap-3" style={{ fontFamily: 'Orbitron' }}>
-            <MapPin size={28} />
-            WasteLink Agent
-          </h1>
-          <p className="text-green-100 mt-2">Select Your Collection Point</p>
+    <div className="min-h-screen bg-[#F8F9FA]">
+      <div className="bg-[linear-gradient(135deg,#238636_0%,#2F9E44_100%)] px-4 py-8 text-white">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex items-center gap-3">
+            <img src="/brand/wastelink-icon.png" alt="WasteLink" className="h-10 w-10 rounded-xl bg-white/20 p-1" />
+            <div>
+              <h1 className="text-2xl font-bold md:text-3xl" style={{ fontFamily: 'Orbitron' }}>
+                WasteLink Agent
+              </h1>
+              <p className="mt-1 text-sm text-green-100">Select your collection point</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-6 flex gap-3">
+      <div className="mx-auto max-w-6xl px-4 py-6 md:py-8">
+        <div className="mb-6 flex gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
           <Info size={18} className="mt-0.5 shrink-0 text-blue-700" />
           <p className="text-sm text-blue-900">
-            <strong>Note:</strong> When an agent is signed in, the assigned collection point is linked by the admin and cannot be changed here.
+            When an agent is signed in, the assigned collection point is linked by admin and cannot be changed here.
           </p>
         </div>
 
         {isAuthenticatedAgent && (
-          <div className="mb-6 rounded-lg border border-green-300 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-green-700">Assigned Collection Point</p>
+          <div className="mb-6 rounded-3xl border border-[#BDE5BF] bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#238636]">Assigned Collection Point</p>
             {assignedPoint ? (
               <div className="mt-3 space-y-2">
-                <p className="text-lg font-bold text-gray-900">{assignedPoint.name}</p>
-                <p className="text-sm text-gray-600">{assignedPoint.point_code || `CP-${assignedPoint.id}`}</p>
-                <p className="text-sm text-gray-600">{assignedPoint.division || 'N/A'}</p>
+                <p className="text-xl font-bold text-[#111111]">{assignedPoint.name}</p>
+                <p className="text-sm text-[#6B7280]">{assignedPoint.point_code || `CP-${assignedPoint.id}`}</p>
+                <p className="text-sm text-[#6B7280]">{assignedPoint.division || 'N/A'}</p>
                 <button
+                  type="button"
                   onClick={() => navigate('/agent/dashboard')}
-                  className="mt-2 inline-flex items-center justify-center gap-2 rounded bg-green-600 px-4 py-2 font-semibold text-white transition hover:bg-green-700"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#238636] px-4 py-3 font-semibold text-white transition hover:bg-[#2F9E44] sm:w-auto"
                 >
+                  <CheckCircle2 size={18} />
                   Go to Agent Dashboard
                 </button>
               </div>
@@ -92,66 +95,61 @@ export default function SelectCollectionPoint() {
           </div>
         )}
 
-        {/* Loading State */}
         {loading && <LoadingState message="Loading collection points..." />}
 
-        {/* Error State */}
         {error && <ErrorState error={error} onRetry={fetchCollectionPoints} />}
 
-        {/* Empty State */}
-        {!loading && !error && points.length === 0 && (
+        {!isAuthenticatedAgent && !loading && !error && points.length === 0 && (
           <EmptyState message="No active collection points available" />
         )}
 
-        {/* Points Grid */}
         {!isAuthenticatedAgent && !loading && !error && points.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {points.map((point) => (
               <div
                 key={point.id}
-                className="bg-white rounded-lg shadow-md border border-gray-300 overflow-hidden hover:shadow-lg transition transform hover:scale-105"
+                className="overflow-hidden rounded-3xl border border-[#D9D9D9] bg-white shadow-sm transition hover:shadow-md"
               >
-                {/* Card Header */}
-                <div className="bg-green-50 border-b border-gray-300 p-4">
-                  <p className="text-xs text-gray-600 font-semibold inline-flex items-center gap-1.5">
-                    <MapPin size={12} /> LOCATION CODE
+                <div className="border-b border-[#D9D9D9] bg-[#EAF6EA] p-4">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#238636]">
+                    <MapPin size={12} /> Location Code
                   </p>
-                  <p className="text-lg font-bold text-gray-900">{point.point_code || `CP-${point.id}`}</p>
+                  <p className="text-lg font-bold text-[#111111]">{point.point_code || `CP-${point.id}`}</p>
                 </div>
 
-                {/* Card Body */}
-                <div className="p-4 space-y-3">
+                <div className="space-y-3 p-4">
                   <div>
-                    <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><Building2 size={12} /> Name</p>
-                    <p className="font-semibold text-gray-900">{point.name}</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-[#6B7280]"><Building2 size={12} /> Name</p>
+                    <p className="font-semibold text-[#111111]">{point.name}</p>
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><MapPin size={12} /> Division</p>
-                    <p className="font-semibold text-gray-900">{point.division || 'N/A'}</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs text-[#6B7280]"><MapPin size={12} /> Division</p>
+                    <p className="font-semibold text-[#111111]">{point.division || 'N/A'}</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><UserRound size={12} /> Agent</p>
-                      <p className="text-sm font-semibold text-gray-900">{point.agent_name || 'N/A'}</p>
+                      <p className="inline-flex items-center gap-1.5 text-xs text-[#6B7280]"><UserRound size={12} /> Agent</p>
+                      <p className="text-sm font-semibold text-[#111111]">{point.agent_name || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><Phone size={12} /> Phone</p>
-                      <p className="text-sm font-semibold text-gray-900">{point.agent_phone || 'N/A'}</p>
+                      <p className="inline-flex items-center gap-1.5 text-xs text-[#6B7280]"><Phone size={12} /> Phone</p>
+                      <p className="text-sm font-semibold text-[#111111]">{point.agent_phone || 'N/A'}</p>
                     </div>
                   </div>
 
                   {point.gps_lat && point.gps_lng && (
                     <div>
-                      <p className="text-xs text-gray-600 inline-flex items-center gap-1.5"><Navigation size={12} /> GPS Coordinates</p>
-                      <p className="text-xs text-gray-700">{point.gps_lat.toFixed(4)}, {point.gps_lng.toFixed(4)}</p>
+                      <p className="inline-flex items-center gap-1.5 text-xs text-[#6B7280]"><Navigation size={12} /> GPS</p>
+                      <p className="text-xs text-[#6B7280]">{point.gps_lat.toFixed(4)}, {point.gps_lng.toFixed(4)}</p>
                     </div>
                   )}
 
                   <button
+                    type="button"
                     onClick={() => handleSelectPoint(point)}
-                    className="w-full mt-4 py-2 px-4 bg-green-600 text-white rounded font-semibold hover:bg-green-700 transition inline-flex items-center justify-center gap-2"
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#238636] px-4 py-3 font-semibold text-white transition hover:bg-[#2F9E44]"
                   >
                     Use This Location
                   </button>
@@ -161,14 +159,13 @@ export default function SelectCollectionPoint() {
           </div>
         )}
 
-        {/* Footer */}
         {!isAuthenticatedAgent && (
           <div className="mt-8 text-center">
-          <p className="text-xs text-gray-600">
-            <a href="/" className="text-green-600 hover:underline">
-              Back to Admin Dashboard
-            </a>
-          </p>
+            <p className="text-xs text-[#6B7280]">
+              <a href="/" className="font-semibold text-[#238636] hover:underline">
+                Back to Admin Dashboard
+              </a>
+            </p>
           </div>
         )}
       </div>

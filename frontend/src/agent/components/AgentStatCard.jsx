@@ -1,29 +1,40 @@
 import React from 'react';
 
-export default function AgentStatCard({ icon, label, value, color = 'green' }) {
-  const colorClasses = {
-    green: 'bg-green-50 border-green-300',
-    amber: 'bg-amber-50 border-amber-300',
-    blue: 'bg-blue-50 border-blue-300',
-    red: 'bg-red-50 border-red-300',
-  };
+const colorClasses = {
+  green: {
+    card: 'border-[#BDE5BF] bg-[linear-gradient(135deg,#EAF6EA_0%,#FFFFFF_80%)]',
+    icon: 'text-[#238636] bg-white/80',
+    value: 'text-[#238636]',
+  },
+  amber: {
+    card: 'border-[#FFD966] bg-[linear-gradient(135deg,#FFF9E6_0%,#FFFFFF_80%)]',
+    icon: 'text-[#B45309] bg-white/80',
+    value: 'text-[#B45309]',
+  },
+  blue: {
+    card: 'border-[#BFDBFE] bg-[linear-gradient(135deg,#EFF6FF_0%,#FFFFFF_80%)]',
+    icon: 'text-[#2563EB] bg-white/80',
+    value: 'text-[#2563EB]',
+  },
+  red: {
+    card: 'border-[#FECACA] bg-[linear-gradient(135deg,#FEF2F2_0%,#FFFFFF_80%)]',
+    icon: 'text-[#DC2626] bg-white/80',
+    value: 'text-[#DC2626]',
+  },
+};
 
-  const textColorClasses = {
-    green: 'text-green-700',
-    amber: 'text-amber-700',
-    blue: 'text-blue-700',
-    red: 'text-red-700',
-  };
+export default function AgentStatCard({ icon, label, value, color = 'green' }) {
+  const palette = colorClasses[color] || colorClasses.green;
 
   return (
-    <div className={`p-4 rounded-lg border ${colorClasses[color]} transition hover:shadow-md`}>
+    <div className={`rounded-3xl border p-4 shadow-sm transition hover:shadow-md ${palette.card}`}>
       <div className="flex items-center gap-3">
-        <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-white/80 ${textColorClasses[color]}`}>
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${palette.icon}`}>
           {icon ? React.createElement(icon, { size: 22, strokeWidth: 2.2 }) : null}
         </div>
-        <div>
-          <p className="text-xs text-gray-600">{label}</p>
-          <p className={`text-2xl font-bold ${textColorClasses[color]}`}>{value}</p>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#6B7280]">{label}</p>
+          <p className={`truncate text-xl font-bold md:text-2xl ${palette.value}`}>{value}</p>
         </div>
       </div>
     </div>

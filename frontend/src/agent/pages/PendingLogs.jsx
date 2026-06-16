@@ -8,11 +8,12 @@ import { RotateCcw, Clock3 } from 'lucide-react';
 
 export default function PendingLogs() {
   const navigate = useNavigate();
-  const collectionPoint = getAgentCollectionPoint();
+  const [collectionPointId, setCollectionPointId] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -21,9 +22,7 @@ export default function PendingLogs() {
       try {
         const session = await resolveAgentSession();
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         const activeCollectionPoint = session.collectionPoint || getAgentCollectionPoint();
 
@@ -32,6 +31,7 @@ export default function PendingLogs() {
           return;
         }
 
+        setCollectionPointId(activeCollectionPoint.id);
         await fetchPendingLogs(activeCollectionPoint.id);
       } catch (err) {
         if (!cancelled) {
@@ -48,12 +48,14 @@ export default function PendingLogs() {
     };
   }, [navigate]);
 
-  const fetchPendingLogs = async (collectionPointId) => {
+  const fetchPendingLogs = async (pointId = collectionPointId) => {
+    if (!pointId) return;
+
     setLoading(true);
     setError(null);
     try {
       const response = await apiClient.get(
-        `/waste-logs?status=PENDING&collection_point_id=${collectionPointId}`
+        `/waste-logs?status=PENDING&collection_point_id=${pointId}`
       );
       if (response.data.success) {
         setLogs(response.data.data || []);
@@ -66,17 +68,22 @@ export default function PendingLogs() {
     }
   };
 
+  const showToast = (message) => {
+    setToast(message);
+    setTimeout(() => setToast(''), 3000);
+  };
+
   const handleVerify = async (logId, data) => {
     setRefreshing(true);
     try {
       const response = await apiClient.patch(`/waste-logs/${logId}/verify`, data);
       if (response.data.success) {
-        setLogs(logs.filter((log) => log.id !== logId));
-        alert('Waste log verified successfully!');
+        setLogs((current) => current.filter((log) => log.id !== logId));
+        showToast('Waste log verified successfully');
       }
     } catch (err) {
       console.error('Error verifying log:', err);
-      alert(err.response?.data?.message || 'Failed to verify waste log');
+      setError(err.response?.data?.message || 'Failed to verify waste log');
     } finally {
       setRefreshing(false);
     }
@@ -87,12 +94,12 @@ export default function PendingLogs() {
     try {
       const response = await apiClient.patch(`/waste-logs/${logId}/reject`, data);
       if (response.data.success) {
-        setLogs(logs.filter((log) => log.id !== logId));
-        alert('Waste log rejected successfully!');
+        setLogs((current) => current.filter((log) => log.id !== logId));
+        showToast('Waste log rejected');
       }
     } catch (err) {
       console.error('Error rejecting log:', err);
-      alert(err.response?.data?.message || 'Failed to reject waste log');
+      setError(err.response?.data?.message || 'Failed to reject waste log');
     } finally {
       setRefreshing(false);
     }
@@ -100,13 +107,23 @@ export default function PendingLogs() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 inline-flex items-center gap-2">
-          <Clock3 size={24} /> Pending Deliveries
-        </h2>
+      {toast && (
+        <div className="rounded-2xl border border-[#BDE5BF] bg-[#EAF6EA] p-4 text-sm font-semibold text-[#238636]">
+          {toast}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="inline-flex items-center gap-2 text-2xl font-bold text-[#111111]">
+            <Clock3 size={24} /> Pending Deliveries
+          </h2>
+          <p className="mt-1 text-sm text-[#6B7280]">Verify incoming waste at your collection point</p>
+        </div>
         <button
-          onClick={fetchPendingLogs}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition text-sm font-semibold"
+          type="button"
+          onClick={() => fetchPendingLogs()}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#D9D9D9] bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition hover:border-[#238636] hover:text-[#238636]"
         >
           <RotateCcw size={16} /> Refresh
         </button>
@@ -114,7 +131,7 @@ export default function PendingLogs() {
 
       {loading && <LoadingState message="Loading pending logs..." />}
 
-      {error && <ErrorState error={error} onRetry={fetchPendingLogs} />}
+      {error && <ErrorState error={error} onRetry={() => fetchPendingLogs()} />}
 
       {!loading && !error && logs.length === 0 && (
         <EmptyState message="No pending deliveries for this collection point" />
@@ -122,7 +139,7 @@ export default function PendingLogs() {
 
       {!loading && !error && logs.length > 0 && (
         <div>
-          <p className="text-sm text-gray-600 mb-3">
+          <p className="mb-3 text-sm text-[#6B7280]">
             {logs.length} {logs.length === 1 ? 'delivery' : 'deliveries'} waiting for verification
           </p>
           <div className="space-y-3">
@@ -130,7 +147,7 @@ export default function PendingLogs() {
               <AgentWasteLogCard
                 key={log.id}
                 log={log}
-                showActions={true}
+                showActions
                 onVerify={handleVerify}
                 onReject={handleReject}
                 isProcessing={refreshing}
@@ -139,15 +156,6 @@ export default function PendingLogs() {
           </div>
         </div>
       )}
-
-      <div className="pt-4">
-        <button
-          onClick={() => navigate('/agent/dashboard')}
-          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
-        >
-          Back to Dashboard
-        </button>
-      </div>
     </div>
   );
 }

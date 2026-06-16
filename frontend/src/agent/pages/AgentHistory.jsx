@@ -8,53 +8,35 @@ import { RotateCcw, CheckCircle2, CircleX, Wallet, ClipboardList } from 'lucide-
 
 export default function AgentHistory() {
   const navigate = useNavigate();
+  const [collectionPointId, setCollectionPointId] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('ALL');
 
-  // Memoized fetch function to avoid unnecessary re-renders
-  const fetchHistory = useCallback(async (collectionPointId) => {
-    console.log('[AgentHistory] fetchHistory started');
+  const fetchHistory = useCallback(async (pointId) => {
+    if (!pointId) return;
+
     setLoading(true);
     setError(null);
 
     try {
-      const url = `/waste-logs?collection_point_id=${collectionPointId}`;
-      console.log('[AgentHistory] Fetching from API URL:', url);
-
-      const response = await apiClient.get(url);
-      console.log('[AgentHistory] API response received:', response.data);
+      const response = await apiClient.get(`/waste-logs?collection_point_id=${pointId}`);
 
       if (response.data?.success) {
-        const allLogs = response.data.data || [];
-        console.log('[AgentHistory] Total logs received:', allLogs.length);
-
-        // Filter out pending logs
-        const processedLogs = allLogs.filter((log) => log.status !== 'PENDING');
-        console.log('[AgentHistory] Non-pending logs (processed):', processedLogs.length);
-
+        const processedLogs = (response.data.data || []).filter((log) => log.status !== 'PENDING');
         setLogs(processedLogs);
-        console.log('[AgentHistory] Logs state updated successfully');
       } else {
-        console.warn('[AgentHistory] Response success flag was false or missing');
         setError('Invalid response from server');
       }
     } catch (err) {
-      console.error('[AgentHistory] Fetch error:', {
-        message: err.message,
-        status: err.response?.status,
-        responseData: err.response?.data,
-        url: err.config?.url,
-      });
+      console.error('[AgentHistory] Fetch error:', err);
       setError(err.response?.data?.message || 'Failed to load history');
     } finally {
-      console.log('[AgentHistory] Setting loading to false');
       setLoading(false);
     }
   }, []);
 
-  // Fetch on mount only
   useEffect(() => {
     let cancelled = false;
 
@@ -62,18 +44,15 @@ export default function AgentHistory() {
       try {
         const session = await resolveAgentSession();
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         const activeCollectionPoint = session.collectionPoint || getAgentCollectionPoint();
         if (!activeCollectionPoint?.id) {
-          console.warn('[AgentHistory] No collection point selected, redirecting');
           navigate('/agent/select-point', { replace: true });
           return;
         }
 
-        console.log('[AgentHistory] Component mounted, calling fetchHistory');
+        setCollectionPointId(activeCollectionPoint.id);
         await fetchHistory(activeCollectionPoint.id);
       } catch (err) {
         if (!cancelled) {
@@ -90,29 +69,28 @@ export default function AgentHistory() {
     };
   }, [fetchHistory, navigate]);
 
-  const getFilteredLogs = () => {
-    if (filter === 'ALL') return logs;
-    return logs.filter((log) => log.status === filter);
-  };
-
-  const filteredLogs = getFilteredLogs();
+  const filteredLogs =
+    filter === 'ALL' ? logs : logs.filter((log) => log.status === filter);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-2xl font-bold text-gray-900 inline-flex items-center gap-2">
-          <ClipboardList size={24} /> Processing History
-        </h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="inline-flex items-center gap-2 text-2xl font-bold text-[#111111]">
+            <ClipboardList size={24} /> Processing History
+          </h2>
+          <p className="mt-1 text-sm text-[#6B7280]">Verified, rejected, and paid deliveries</p>
+        </div>
         <button
-          onClick={fetchHistory}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition text-sm font-semibold"
+          type="button"
+          onClick={() => fetchHistory(collectionPointId)}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#D9D9D9] bg-white px-4 py-2.5 text-sm font-semibold text-[#111111] transition hover:border-[#238636] hover:text-[#238636]"
         >
           <RotateCcw size={16} /> Refresh
         </button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
         {[
           { value: 'ALL', label: 'All', icon: ClipboardList },
           { value: 'VERIFIED', label: 'Verified', icon: CheckCircle2 },
@@ -121,11 +99,12 @@ export default function AgentHistory() {
         ].map((status) => (
           <button
             key={status.value}
+            type="button"
             onClick={() => setFilter(status.value)}
-            className={`px-4 py-2 rounded font-semibold whitespace-nowrap transition ${
+            className={`whitespace-nowrap rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
               filter === status.value
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                ? 'bg-[#238636] text-white'
+                : 'bg-white text-[#111111] ring-1 ring-[#D9D9D9] hover:ring-[#238636]'
             }`}
           >
             <span className="inline-flex items-center gap-2">
@@ -137,7 +116,7 @@ export default function AgentHistory() {
 
       {loading && <LoadingState message="Loading history..." />}
 
-      {error && <ErrorState error={error} onRetry={fetchHistory} />}
+      {error && <ErrorState error={error} onRetry={() => fetchHistory(collectionPointId)} />}
 
       {!loading && !error && filteredLogs.length === 0 && (
         <EmptyState
@@ -151,7 +130,7 @@ export default function AgentHistory() {
 
       {!loading && !error && filteredLogs.length > 0 && (
         <div>
-          <p className="text-sm text-gray-600 mb-3">
+          <p className="mb-3 text-sm text-[#6B7280]">
             {filteredLogs.length} {filteredLogs.length === 1 ? 'log' : 'logs'}
           </p>
           <div className="space-y-3">
@@ -167,16 +146,6 @@ export default function AgentHistory() {
           </div>
         </div>
       )}
-
-      {/* Back Button */}
-      <div className="pt-4">
-        <button
-          onClick={() => navigate('/agent/dashboard')}
-          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition font-semibold"
-        >
-          Back to Dashboard
-        </button>
-      </div>
     </div>
   );
 }

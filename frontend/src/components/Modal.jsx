@@ -17,21 +17,21 @@ export default function Modal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className={`bg-wastelink-surface border border-wastelink-border rounded-2xl shadow-lg ${sizeClasses[size]} w-full mx-4`}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl border border-wastelink-border bg-wastelink-surface shadow-lg sm:rounded-2xl ${sizeClasses[size]}`}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-wastelink-border">
-          <h2 className="text-lg font-semibold text-wastelink-dark">{title}</h2>
+        <div className="flex shrink-0 items-center justify-between border-b border-wastelink-border p-4 sm:p-6">
+          <h2 className="pr-4 text-lg font-semibold text-wastelink-dark">{title}</h2>
           <button
             onClick={onClose}
-            className="text-wastelink-muted hover:text-wastelink-dark transition-colors"
+            className="rounded-xl p-1 text-wastelink-muted transition-colors hover:bg-gray-100 hover:text-wastelink-dark"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="overflow-y-auto p-4 sm:p-6">
           {children}
         </div>
       </div>
