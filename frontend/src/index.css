@@ -76,6 +76,10 @@ html, body, #root {
   overflow-x: hidden;
 }
 
+.admin-shell {
+  overflow-x: hidden;
+}
+
 .agent-bottom-nav {
   position: fixed;
   bottom: 0;

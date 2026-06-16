@@ -67,29 +67,32 @@ export default function Overview() {
   if (error) return <ErrorState error={error} onRetry={fetchData} />;
 
   return (
-    <div className="space-y-8">
-      {/* Key Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="space-y-5 md:space-y-8">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 md:gap-4">
         <StatCard
           title="Total Pickers"
+          shortTitle="Pickers"
           value={formatNumber(stats?.total_pickers || 0)}
           subtitle={`${stats?.active_pickers || 0} active`}
           icon={Users}
         />
         <StatCard
           title="Active Collection Points"
+          shortTitle="Points"
           value={formatNumber(stats?.active_collection_points || 0)}
           subtitle={`${stats?.total_collection_points || 0} total`}
           icon={MapPin}
         />
         <StatCard
           title="Total Verified Waste"
+          shortTitle="Waste"
           value={formatKg(stats?.total_verified_kg || 0)}
           subtitle={`${formatNumber(stats?.total_verified_jobs || 0)} verified jobs`}
           icon={TrendingUp}
         />
         <StatCard
           title="Total Earnings"
+          shortTitle="Earnings"
           value={formatCurrencyUGX(stats?.total_earnings || 0)}
           subtitle={`${formatCurrencyUGX(stats?.paid_earnings || 0)} paid`}
           icon={Zap}
