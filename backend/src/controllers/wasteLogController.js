@@ -415,7 +415,7 @@ export const verifyWasteLog = async (req, res, next) => {
       const updateResult = await client.query(
         `UPDATE waste_logs 
          SET verified_kg = $1, status = 'VERIFIED', verified_at = NOW(), updated_at = NOW(),
-             notes = CASE WHEN $2 IS NOT NULL AND TRIM($2) != '' THEN $2 ELSE notes END
+             notes = CASE WHEN $2::text IS NOT NULL AND TRIM($2::text) != '' THEN $2::text ELSE notes END
          WHERE id = $3
          RETURNING id, job_code, waste_type, estimated_kg, verified_kg, picker_id`,
         [verified_kg, notes || null, id]
