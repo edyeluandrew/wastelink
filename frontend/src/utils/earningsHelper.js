@@ -81,16 +81,16 @@ export const hasEarning = (log) => {
   return getEarningAmount(log) > 0 || getEarningStatus(log) !== 'NONE';
 };
 
-export const getEarningId = (log) => {
-  if (!log) return null;
-  
-  if (log.earning?.id !== undefined && log.earning?.id !== null) {
-    return log.earning.id;
-  }
-  
-  if (log.earning_id !== undefined && log.earning_id !== null) {
-    return log.earning_id;
-  }
-  
-  return null;
+export const getRemainingEarningAmount = (log) => {
+  if (getEarningStatus(log) === 'PAID') return 0;
+  if (!log || !['VERIFIED', 'PAID'].includes(String(log.status || '').toUpperCase())) return 0;
+  return getEarningAmount(log);
 };
+
+export const sumRemainingEarnings = (logs = []) =>
+  logs.reduce((sum, log) => sum + getRemainingEarningAmount(log), 0);
+
+export const sumSuccessfulWithdrawals = (withdrawals = []) =>
+  withdrawals
+    .filter((item) => String(item?.status || '').toUpperCase() === 'SUCCESS')
+    .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);

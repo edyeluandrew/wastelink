@@ -6,6 +6,7 @@ import PickerJobCard from '../components/PickerJobCard';
 import apiClient from '../../api/axios';
 import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX } from '../../utils/formatters';
+import { sumRemainingEarnings } from '../../utils/earningsHelper';
 import { Wind, FileText, Wallet } from 'lucide-react';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
@@ -76,12 +77,7 @@ export default function PickerDashboard() {
   const verified = logs.filter(l => l.status === 'VERIFIED').length;
   const paid = logs.filter(l => l.status === 'PAID').length;
   const totalKg = logs.reduce((sum, l) => sum + (l.verified_kg || 0), 0);
-  const totalEarnings = logs.reduce((sum, l) => {
-    if (l.status === 'PAID' || l.status === 'VERIFIED') {
-      return sum + (l.earning?.amount || 0);
-    }
-    return sum;
-  }, 0);
+  const totalEarnings = sumRemainingEarnings(logs);
   const pendingEarnings = logs.reduce((sum, l) => {
     if (l.status === 'VERIFIED' && l.earning?.status !== 'PAID') {
       return sum + (l.earning?.amount || 0);
@@ -125,7 +121,7 @@ export default function PickerDashboard() {
       {/* Earnings Cards */}
       <div className="space-y-3">
         <div className="bg-green-100 border border-green-300 rounded-lg p-4">
-          <p className="text-xs text-green-700 font-medium mb-1">Total Earnings</p>
+          <p className="text-xs text-green-700 font-medium mb-1">Remaining Balance</p>
           <p className="text-2xl font-bold text-green-900">{formatUGX(totalEarnings)}</p>
         </div>
 

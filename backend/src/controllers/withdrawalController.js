@@ -83,7 +83,7 @@ export const requestWithdrawal = async (req, res) => {
   try {
     if (!requirePicker(req, res)) return;
 
-    const { provider, phone } = req.body || {};
+    const { provider, phone, amount } = req.body || {};
 
     if (!provider || !phone) {
       return sendError(res, 'provider and phone are required', 400);
@@ -93,6 +93,7 @@ export const requestWithdrawal = async (req, res) => {
       pickerId: req.user.picker_id,
       provider,
       phone,
+      amount,
       changedBy: req.user.id,
     });
 

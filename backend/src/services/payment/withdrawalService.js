@@ -119,10 +119,41 @@ export const getWithdrawalBalance = async (pickerId) => {
   }
 };
 
+/** Pick earnings oldest-first until requested amount is allocated (supports partial last earning). */
+export const allocateEarningsForAmount = (eligible, requestedAmount) => {
+  const target = parseInt(requestedAmount, 10);
+  let remaining = target;
+  const allocations = [];
+
+  for (const earning of eligible) {
+    if (remaining <= 0) break;
+
+    const earningAmount = parseInt(earning.amount, 10);
+    const withdrawAmount = Math.min(earningAmount, remaining);
+
+    allocations.push({
+      ...earning,
+      withdraw_amount: withdrawAmount,
+      is_partial: withdrawAmount < earningAmount,
+    });
+
+    remaining -= withdrawAmount;
+  }
+
+  if (remaining > 0) {
+    return null;
+  }
+
+  return allocations;
+};
+
 const markEarningPaidForWithdrawal = async (
   client,
-  { earning, pickerId, provider, phone, paymentReference, changedBy, isSimulated }
+  { earning, withdrawAmount, pickerId, provider, phone, paymentReference, changedBy, isSimulated }
 ) => {
+  const fullAmount = parseInt(earning.amount, 10);
+  const payoutAmount = parseInt(withdrawAmount ?? earning.amount, 10);
+  const isPartial = payoutAmount < fullAmount;
   let currentStatus = earning.status;
 
   if (currentStatus === PAYMENT_STATUS.PENDING) {
@@ -135,12 +166,49 @@ const markEarningPaidForWithdrawal = async (
       wasteLogId: earning.waste_log_id,
       fromStatus: PAYMENT_STATUS.PENDING,
       toStatus: PAYMENT_STATUS.APPROVED,
-      amount: earning.amount,
+      amount: fullAmount,
       changedBy,
       notes: 'Auto-approved for demo mobile money withdrawal',
       isSimulated: true,
     });
     currentStatus = PAYMENT_STATUS.APPROVED;
+  }
+
+  if (isPartial) {
+    await client.query(`UPDATE earnings SET amount = $1 WHERE id = $2`, [
+      fullAmount - payoutAmount,
+      earning.id,
+    ]);
+
+    await recordPaymentStatusChange(client, {
+      earningId: earning.id,
+      wasteLogId: earning.waste_log_id,
+      fromStatus: currentStatus,
+      toStatus: PAYMENT_STATUS.APPROVED,
+      amount: payoutAmount,
+      changedBy,
+      paymentReference,
+      notes: `Partial demo ${provider} withdrawal — ${fullAmount - payoutAmount} UGX remaining`,
+      isSimulated: isSimulated,
+    });
+
+    try {
+      await upsertPayoutTransaction(client, {
+        earningId: earning.id,
+        wasteLogId: earning.waste_log_id,
+        pickerId,
+        provider: `${provider}_SIM`,
+        phone,
+        amount: payoutAmount,
+        providerTransactionId: `${paymentReference}-PARTIAL`,
+        status: 'SUCCESS',
+        paidAt: new Date(),
+      });
+    } catch (payoutError) {
+      if (payoutError?.code !== '42P01') throw payoutError;
+    }
+
+    return;
   }
 
   if (currentStatus === PAYMENT_STATUS.APPROVED) {
@@ -153,7 +221,7 @@ const markEarningPaidForWithdrawal = async (
       wasteLogId: earning.waste_log_id,
       fromStatus: PAYMENT_STATUS.APPROVED,
       toStatus: PAYMENT_STATUS.PAYOUT_INITIATED,
-      amount: earning.amount,
+      amount: fullAmount,
       changedBy,
       paymentReference,
       notes: `Mobile money withdrawal initiated via ${provider}`,
@@ -180,7 +248,7 @@ const markEarningPaidForWithdrawal = async (
     wasteLogId: earning.waste_log_id,
     fromStatus: currentStatus,
     toStatus: PAYMENT_STATUS.PAID,
-    amount: earning.amount,
+    amount: fullAmount,
     changedBy,
     paymentReference,
     notes: `Demo ${provider} mobile money withdrawal completed`,
@@ -194,7 +262,7 @@ const markEarningPaidForWithdrawal = async (
       pickerId,
       provider: `${provider}_SIM`,
       phone,
-      amount: earning.amount,
+      amount: fullAmount,
       providerTransactionId: paymentReference,
       status: 'SUCCESS',
       paidAt,
@@ -208,6 +276,7 @@ export const createPickerWithdrawal = async ({
   pickerId,
   provider,
   phone,
+  amount = null,
   changedBy = null,
 }) => {
   const normalizedProvider = String(provider || '').toUpperCase();
@@ -237,14 +306,14 @@ export const createPickerWithdrawal = async ({
 
   let client = await pool.connect();
   let withdrawal;
-  let eligible = [];
+  let allocations = [];
   let totalAmount = 0;
 
   try {
     await client.query('BEGIN');
     await ensureWithdrawalTables(client);
 
-    eligible = await getEligibleEarningsForWithdrawal(client, pickerId, { forUpdate: true });
+    const eligible = await getEligibleEarningsForWithdrawal(client, pickerId, { forUpdate: true });
 
     if (eligible.length === 0) {
       const error = new Error(
@@ -256,7 +325,33 @@ export const createPickerWithdrawal = async ({
       throw error;
     }
 
-    totalAmount = eligible.reduce((sum, row) => sum + parseInt(row.amount, 10), 0);
+    const maxAvailable = eligible.reduce((sum, row) => sum + parseInt(row.amount, 10), 0);
+    const requestedAmount =
+      amount === null || amount === undefined || amount === ''
+        ? maxAvailable
+        : parseInt(amount, 10);
+
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      const error = new Error('Enter a valid withdrawal amount greater than 0');
+      error.status = 400;
+      throw error;
+    }
+
+    if (requestedAmount > maxAvailable) {
+      const error = new Error(`Amount exceeds available balance of ${maxAvailable} UGX`);
+      error.status = 400;
+      throw error;
+    }
+
+    allocations = allocateEarningsForAmount(eligible, requestedAmount);
+
+    if (!allocations || allocations.length === 0) {
+      const error = new Error('Unable to allocate that amount from your earnings. Try a lower amount.');
+      error.status = 400;
+      throw error;
+    }
+
+    totalAmount = allocations.reduce((sum, row) => sum + row.withdraw_amount, 0);
 
     const withdrawalInsert = await client.query(
       `INSERT INTO withdrawal_requests (
@@ -268,17 +363,17 @@ export const createPickerWithdrawal = async ({
         normalizedProvider,
         normalizedPhone,
         totalAmount,
-        'Demo mobile money withdrawal — no real funds transferred',
+        `Demo mobile money withdrawal${totalAmount < maxAvailable ? ' (partial)' : ''} — no real funds transferred`,
       ]
     );
 
     withdrawal = withdrawalInsert.rows[0];
 
-    for (const earning of eligible) {
+    for (const allocation of allocations) {
       await client.query(
         `INSERT INTO withdrawal_request_earnings (withdrawal_request_id, earning_id, waste_log_id, amount)
          VALUES ($1, $2, $3, $4)`,
-        [withdrawal.id, earning.id, earning.waste_log_id, earning.amount]
+        [withdrawal.id, allocation.id, allocation.waste_log_id, allocation.withdraw_amount]
       );
     }
 
@@ -303,13 +398,14 @@ export const createPickerWithdrawal = async ({
   try {
     await tx.query('BEGIN');
 
-    for (const earning of eligible) {
+    for (const allocation of allocations) {
       await markEarningPaidForWithdrawal(tx, {
-        earning,
+        earning: allocation,
+        withdrawAmount: allocation.withdraw_amount,
         pickerId,
         provider: normalizedProvider,
         phone: normalizedPhone,
-        paymentReference: `${simulationResult.provider_transaction_id}-E${earning.id}`,
+        paymentReference: `${simulationResult.provider_transaction_id}-E${allocation.id}`,
         changedBy,
         isSimulated: true,
       });
@@ -340,7 +436,7 @@ export const createPickerWithdrawal = async ({
       simulation: simulationResult,
       items: items.rows,
       total_amount: totalAmount,
-      jobs_count: eligible.length,
+      jobs_count: allocations.length,
     };
   } catch (error) {
     await tx.query('ROLLBACK').catch(() => {});

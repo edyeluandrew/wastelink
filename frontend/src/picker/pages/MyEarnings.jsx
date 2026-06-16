@@ -5,13 +5,14 @@ import apiClient from '../../api/axios';
 import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX, formatDate, formatDateTime } from '../../utils/formatters';
 import { Wallet, Scale, CreditCard, Hourglass, TrendingUp, Smartphone, ShieldAlert } from 'lucide-react';
-import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
+import { getEarningAmount, getEarningStatus, sumRemainingEarnings, sumSuccessfulWithdrawals } from '../../utils/earningsHelper';
+import MobileMoneyProviderIcon from '../components/MobileMoneyProviderIcon';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
 const PROVIDERS = [
-  { id: 'MTN', label: 'MTN Mobile Money', hint: '077, 078, 076, 039', color: '#FFCC00', text: '#111111' },
-  { id: 'AIRTEL', label: 'Airtel Money', hint: '070, 075, 074, 020', color: '#E40000', text: '#FFFFFF' },
+  { id: 'MTN', label: 'MTN Mobile Money', hint: '077, 078, 076, 039' },
+  { id: 'AIRTEL', label: 'Airtel Money', hint: '070, 075, 074, 020' },
 ];
 
 export default function MyEarnings() {
@@ -31,6 +32,7 @@ export default function MyEarnings() {
   const [withdrawSuccess, setWithdrawSuccess] = useState(null);
   const [provider, setProvider] = useState('MTN');
   const [phone, setPhone] = useState(picker?.phone || '');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
 
   useEffect(() => {
     if (!pickerId) {
@@ -57,10 +59,9 @@ export default function MyEarnings() {
       if (logsRes.data?.success) {
         const allJobs = logsRes.data.data || [];
         const verified = allJobs.filter(j => j.status === 'VERIFIED' || j.status === 'PAID');
-        const totalEarnings = verified.reduce((sum, j) => sum + getEarningAmount(j), 0);
-        const paidEarnings = allJobs
-          .filter(j => getEarningStatus(j) === 'PAID')
-          .reduce((sum, j) => sum + getEarningAmount(j), 0);
+        const withdrawalList = withdrawalsRes.data?.success ? (withdrawalsRes.data.data || []) : [];
+        const totalEarnings = sumRemainingEarnings(allJobs);
+        const paidEarnings = sumSuccessfulWithdrawals(withdrawalList);
         const pendingEarnings = allJobs
           .filter(j => ['PENDING', 'APPROVED', 'PAYOUT_INITIATED'].includes(getEarningStatus(j)))
           .reduce((sum, j) => sum + getEarningAmount(j), 0);
@@ -104,6 +105,17 @@ export default function MyEarnings() {
       return;
     }
 
+    const parsedAmount = parseInt(String(withdrawAmount).replace(/[^\d]/g, ''), 10);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setWithdrawError('Enter a valid withdrawal amount');
+      return;
+    }
+
+    if (parsedAmount > availableToWithdraw) {
+      setWithdrawError(`Amount cannot exceed ${formatUGX(availableToWithdraw)}`);
+      return;
+    }
+
     setWithdrawing(true);
     setWithdrawError(null);
 
@@ -111,6 +123,7 @@ export default function MyEarnings() {
       const response = await apiClient.post('/withdrawals', {
         provider,
         phone: phone.trim(),
+        amount: parsedAmount,
       });
 
       if (response.data?.success) {
@@ -142,6 +155,15 @@ export default function MyEarnings() {
   const averageEarning = earnings.totalKg > 0 ? earnings.total / (jobs.length || 1) : 0;
   const availableToWithdraw = balance?.available_to_withdraw || 0;
   const canWithdraw = availableToWithdraw > 0;
+  const parsedWithdrawAmount = parseInt(String(withdrawAmount).replace(/[^\d]/g, ''), 10) || 0;
+  const isValidWithdrawAmount =
+    parsedWithdrawAmount > 0 && parsedWithdrawAmount <= availableToWithdraw;
+
+  const openWithdrawModal = () => {
+    setWithdrawError(null);
+    setWithdrawAmount(String(availableToWithdraw));
+    setWithdrawOpen(true);
+  };
 
   return (
     <div className="space-y-5">
@@ -174,10 +196,7 @@ export default function MyEarnings() {
             </p>
           </div>
           <Button
-            onClick={() => {
-              setWithdrawError(null);
-              setWithdrawOpen(true);
-            }}
+            onClick={openWithdrawModal}
             disabled={!canWithdraw}
             className="w-full bg-[#111111] text-white hover:bg-[#238636] md:w-auto"
           >
@@ -200,7 +219,10 @@ export default function MyEarnings() {
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl bg-white p-3">
               <p className="text-xs text-[#6B7280]">Provider</p>
-              <p className="font-semibold">{withdrawSuccess.withdrawal?.provider_label}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <MobileMoneyProviderIcon provider={withdrawSuccess.withdrawal?.provider} size="sm" />
+                <p className="font-semibold">{withdrawSuccess.withdrawal?.provider_label}</p>
+              </div>
             </div>
             <div className="rounded-2xl bg-white p-3">
               <p className="text-xs text-[#6B7280]">Amount</p>
@@ -223,9 +245,9 @@ export default function MyEarnings() {
       <div className="rounded-3xl border border-[#BDE5BF] bg-[linear-gradient(135deg,#EAF6EA_0%,#FFFFFF_70%)] p-5 shadow-sm">
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Total Earnings</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Remaining Balance</p>
             <p className="mt-2 text-3xl font-bold text-[#111111]">{formatUGX(earnings.total)}</p>
-            <p className="mt-1 text-sm text-[#6B7280]">{earnings.paidJobs + earnings.unpaidJobs} verified jobs</p>
+            <p className="mt-1 text-sm text-[#6B7280]">Earnings not yet withdrawn</p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Paid / Withdrawn</p>
@@ -267,10 +289,13 @@ export default function MyEarnings() {
             {withdrawals.map((item) => (
               <div key={item.id} className="rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-bold text-[#111111]">{item.provider === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}</p>
-                    <p className="text-sm text-[#6B7280]">{item.phone} · {item.jobs_count} job(s)</p>
-                    <p className="mt-1 font-mono text-xs text-[#6B7280]">{item.payment_reference}</p>
+                  <div className="flex items-start gap-3">
+                    <MobileMoneyProviderIcon provider={item.provider} size="sm" />
+                    <div>
+                      <p className="font-bold text-[#111111]">{item.provider === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}</p>
+                      <p className="text-sm text-[#6B7280]">{item.phone} · {item.jobs_count} job(s)</p>
+                      <p className="mt-1 font-mono text-xs text-[#6B7280]">{item.payment_reference}</p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-[#238636]">{formatUGX(item.amount)}</p>
@@ -354,8 +379,32 @@ export default function MyEarnings() {
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-gray-900 mb-2">Amount to withdraw</p>
-            <p className="text-2xl font-bold text-[#238636]">{formatUGX(availableToWithdraw)}</p>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-gray-900">Amount to withdraw (UGX)</p>
+              <button
+                type="button"
+                onClick={() => setWithdrawAmount(String(availableToWithdraw))}
+                className="text-xs font-semibold text-[#238636] hover:underline"
+                disabled={withdrawing}
+              >
+                Withdraw all
+              </button>
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={withdrawAmount}
+              onChange={(e) => setWithdrawAmount(e.target.value.replace(/[^\d]/g, ''))}
+              placeholder="Enter amount"
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-lg font-bold text-[#111111] focus:border-[#238636] focus:outline-none"
+              disabled={withdrawing}
+            />
+            <p className="mt-2 text-sm text-gray-500">
+              Available: <span className="font-semibold text-[#238636]">{formatUGX(availableToWithdraw)}</span>
+              {parsedWithdrawAmount > 0 && parsedWithdrawAmount < availableToWithdraw && (
+                <span className="ml-2 text-amber-700">· Partial withdrawal</span>
+              )}
+            </p>
           </div>
 
           <div>
@@ -370,10 +419,8 @@ export default function MyEarnings() {
                     provider === item.id ? 'border-[#238636] ring-2 ring-[#238636]/20' : 'border-gray-200'
                   }`}
                 >
-                  <p className="font-bold text-sm" style={{ color: provider === item.id ? item.color : '#111' }}>
-                    {item.label}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">{item.hint}</p>
+                  <MobileMoneyProviderIcon provider={item.id} size="sm" showLabel />
+                  <p className="text-xs text-gray-500 mt-2">{item.hint}</p>
                 </button>
               ))}
             </div>
@@ -398,10 +445,12 @@ export default function MyEarnings() {
           <div className="flex gap-2">
             <Button
               onClick={handleWithdraw}
-              disabled={withdrawing || !canWithdraw}
+              disabled={withdrawing || !canWithdraw || !isValidWithdrawAmount}
               className="flex-1 bg-[#238636] text-white hover:bg-[#2F9E44]"
             >
-              {withdrawing ? 'Processing...' : `Send to ${provider === 'MTN' ? 'MTN MoMo' : 'Airtel Money'}`}
+              {withdrawing
+                ? 'Processing...'
+                : `Send ${parsedWithdrawAmount > 0 ? formatUGX(parsedWithdrawAmount) : ''} to ${provider === 'MTN' ? 'MTN MoMo' : 'Airtel Money'}`}
             </Button>
             <Button
               onClick={() => setWithdrawOpen(false)}
