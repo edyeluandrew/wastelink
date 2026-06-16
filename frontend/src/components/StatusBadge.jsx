@@ -7,7 +7,7 @@ export default function StatusBadge({ status }) {
   
   let badgeClass = 'badge-gray';
   
-  if (['active', 'verified', 'paid', 'approved'].includes(statusLower)) {
+  if (['active', 'verified', 'paid', 'approved', 'success'].includes(statusLower)) {
     badgeClass = statusLower === 'paid' ? 'badge-blue' : 'badge-green';
   } else if (statusLower === 'pending') {
     badgeClass = 'badge-amber';

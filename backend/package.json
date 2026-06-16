@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate:module13": "node migrate-module13.mjs",
+    "migrate:withdrawals": "node migrate-withdrawals.mjs",
     "smoke:module13": "node src/scripts/smokeModule13.mjs"
   },
   "dependencies": {

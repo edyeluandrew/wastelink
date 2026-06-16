@@ -9,6 +9,7 @@ import reportRoutes from "./routes/reportRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import ussdRoutes from "./routes/ussdRoutes.js";
+import withdrawalRoutes from "./routes/withdrawalRoutes.js";
 import { sendSuccess, sendError } from "./utils/apiResponse.js";
 import errorHandler from "./middleware/errorHandler.js";
 
@@ -140,6 +141,31 @@ CREATE TABLE IF NOT EXISTS payout_transactions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   paid_at TIMESTAMPTZ
 );
+
+CREATE TABLE IF NOT EXISTS withdrawal_requests (
+  id SERIAL PRIMARY KEY,
+  picker_id INT NOT NULL REFERENCES pickers(id),
+  provider VARCHAR(20) NOT NULL CHECK (provider IN ('MTN','AIRTEL')),
+  phone VARCHAR(30) NOT NULL,
+  amount INT NOT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'UGX',
+  status VARCHAR(20) NOT NULL CHECK (status IN ('PROCESSING','SUCCESS','FAILED','CANCELLED')),
+  payment_reference VARCHAR(120),
+  is_simulated BOOLEAN NOT NULL DEFAULT TRUE,
+  failure_reason TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS withdrawal_request_earnings (
+  id SERIAL PRIMARY KEY,
+  withdrawal_request_id INT NOT NULL REFERENCES withdrawal_requests(id) ON DELETE CASCADE,
+  earning_id INT NOT NULL REFERENCES earnings(id),
+  waste_log_id INT NOT NULL REFERENCES waste_logs(id),
+  amount INT NOT NULL,
+  UNIQUE(withdrawal_request_id, earning_id)
+);
     `;
 
     const statements = schema
@@ -170,6 +196,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/ussd", ussdRoutes);
+app.use("/api/withdrawals", withdrawalRoutes);
 
 app.use((req, res, next) => {
   const error = new Error("Route not found");
