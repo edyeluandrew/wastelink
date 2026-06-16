@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Menu, LogOut, LayoutDashboard, Clock3, CheckCircle2, ClipboardList, MapPin } from 'lucide-react';
 import { getAgentCollectionPoint, clearAgentCollectionPoint } from '../utils/agentSession';
-import { clearAuthSession, getAuthUser } from '../../utils/auth';
+import { logout, getAuthUser } from '../../utils/auth';
 
 export default function AgentLayout() {
   const navigate = useNavigate();
@@ -23,9 +23,8 @@ export default function AgentLayout() {
   };
 
   const handleLogout = () => {
-    clearAuthSession();
     clearAgentCollectionPoint();
-    navigate('/login');
+    logout(navigate, { redirectTo: '/login' });
   };
 
   const isActive = (path) => location.pathname === path;

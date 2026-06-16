@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { getAuthToken, getAuthUser, isAuthenticatedRole } from '../utils/auth';
 import { hasPickerSession } from '../picker/utils/pickerSession';
 import { isAgentSessionActive } from '../agent/utils/agentSession';
@@ -26,6 +27,18 @@ export default function ProtectedRoute({ allowedRoles, children, fallbackPath = 
   const token = getAuthToken();
   const user = getAuthUser();
   const pickerAuthAllowed = isAuthenticatedRole('PICKER');
+
+  // Re-check auth when user returns via browser back after logout
+  useEffect(() => {
+    const handlePageShow = (event) => {
+      if (event.persisted && !getAuthToken()) {
+        window.location.replace(fallbackPath);
+      }
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [fallbackPath]);
 
   if (!token || !user) {
     if (AUTH_ENFORCED || !hasLegacySession(allowedRoles)) {

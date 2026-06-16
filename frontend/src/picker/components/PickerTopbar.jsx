@@ -1,6 +1,6 @@
 ﻿import { Recycle, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { clearAllSessions, isAuthenticatedPicker } from '../../utils/auth';
+import { logout, isAuthenticatedPicker } from '../../utils/auth';
 import { clearPickerSession } from '../utils/pickerSession';
 
 export default function PickerTopbar({ picker }) {
@@ -9,8 +9,7 @@ export default function PickerTopbar({ picker }) {
 
   const handleSwitchPicker = () => {
     if (authenticatedPicker) {
-      clearAllSessions();
-      navigate('/login', { replace: true });
+      logout(navigate, { redirectTo: '/login' });
       return;
     }
 

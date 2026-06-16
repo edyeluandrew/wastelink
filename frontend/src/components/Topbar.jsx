@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, ShieldCheck } from 'lucide-react';
-import { clearAuthSession, getAuthUser, isAuthenticated } from '../utils/auth';
+import { logout, getAuthUser, isAuthenticated } from '../utils/auth';
 
 export default function Topbar() {
   const location = useLocation();
@@ -29,10 +29,7 @@ export default function Topbar() {
               </div>
             )}
             <button
-              onClick={() => {
-                clearAuthSession();
-                navigate('/login');
-              }}
+              onClick={() => logout(navigate, { redirectTo: '/login' })}
               className="inline-flex items-center gap-2 rounded-full border border-wastelink-border bg-white px-4 py-2 text-sm font-semibold text-wastelink-dark transition hover:border-[#238636] hover:text-[#238636]"
             >
               <LogOut size={16} /> Logout

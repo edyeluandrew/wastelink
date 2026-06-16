@@ -1,5 +1,10 @@
 import pool from "../config/db.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import {
+  sqlVerifiedKgSum,
+  sqlEstimatedKgSum,
+  sqlPendingEstimatedKgSum,
+} from "../utils/reportQueries.js";
 
 // Helper: Parse month parameter (YYYY-MM format)
 const parseMonth = (monthParam) => {
@@ -73,8 +78,9 @@ export const getMonthlyReport = async (req, res, next) => {
         COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
         COUNT(CASE WHEN wl.status = 'REJECTED' THEN 1 END) as rejected_logs,
         COUNT(CASE WHEN wl.status = 'PAID' THEN 1 END) as paid_logs,
-        COALESCE(SUM(wl.estimated_kg), 0) as total_estimated_kg,
-        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg
+        COALESCE(SUM(CASE WHEN wl.status != 'REJECTED' THEN wl.estimated_kg ELSE 0 END), 0) as total_estimated_kg,
+        ${sqlVerifiedKgSum('wl')} as total_verified_kg,
+        ${sqlPendingEstimatedKgSum('wl')} as pending_unverified_kg
       FROM waste_logs wl
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
     `, [startDate, endDate]);
@@ -87,6 +93,7 @@ export const getMonthlyReport = async (req, res, next) => {
       paid_logs,
       total_estimated_kg,
       total_verified_kg,
+      pending_unverified_kg,
     } = wasteLogsResult.rows[0];
 
     // Get earnings for the month
@@ -219,6 +226,7 @@ export const getMonthlyReport = async (req, res, next) => {
       paid_logs: parseInt(paid_logs),
       total_estimated_kg: parseFloat(total_estimated_kg),
       total_verified_kg: parseFloat(total_verified_kg),
+      pending_unverified_kg: parseFloat(pending_unverified_kg),
       total_earnings: parseInt(total_earnings),
       pending_earnings: parseInt(pending_earnings),
       paid_earnings: parseInt(paid_earnings),
@@ -418,22 +426,34 @@ export const getUndpPilotReport = async (req, res, next) => {
     const women_percentage = calcPercentage(women_pickers, registered_pickers);
     const youth_percentage = calcPercentage(youth_pickers, registered_pickers);
 
-    // Get environmental impact for the period
+    // Get environmental impact for the period (estimated vs verified vs pending)
     const environmentalResult = await pool.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_waste_kg
+        ${sqlEstimatedKgSum('wl')} as total_estimated_kg,
+        ${sqlVerifiedKgSum('wl')} as verified_waste_kg,
+        ${sqlPendingEstimatedKgSum('wl')} as pending_unverified_kg,
+        COUNT(CASE WHEN wl.status = 'REJECTED' THEN 1 END) as rejected_logs,
+        COALESCE(SUM(CASE WHEN wl.status = 'REJECTED' THEN COALESCE(wl.estimated_kg, 0) ELSE 0 END), 0) as rejected_estimated_kg
       FROM waste_logs wl
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
     `, [startDate, endDate]);
 
-    const { verified_waste_kg } = environmentalResult.rows[0];
+    const {
+      total_estimated_kg,
+      verified_waste_kg,
+      pending_unverified_kg,
+      rejected_logs: environmental_rejected_logs,
+      rejected_estimated_kg,
+    } = environmentalResult.rows[0];
     const verified_waste_tonnes = parseFloat((verified_waste_kg / 1000).toFixed(3));
 
     // Get waste type breakdown for the period
     const wasteTypeBreakdownResult = await pool.query(`
       SELECT
         wl.waste_type,
-        COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_kg
+        COALESCE(SUM(CASE WHEN wl.status != 'REJECTED' THEN wl.estimated_kg ELSE 0 END), 0) as estimated_kg,
+        ${sqlVerifiedKgSum('wl')} as verified_kg,
+        COALESCE(SUM(CASE WHEN wl.status = 'PENDING' THEN wl.estimated_kg ELSE 0 END), 0) as pending_kg
       FROM waste_logs wl
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       GROUP BY wl.waste_type
@@ -442,7 +462,9 @@ export const getUndpPilotReport = async (req, res, next) => {
 
     const waste_type_breakdown = wasteTypeBreakdownResult.rows.map(row => ({
       waste_type: row.waste_type,
+      estimated_kg: parseFloat(row.estimated_kg),
       verified_kg: parseFloat(row.verified_kg),
+      pending_kg: parseFloat(row.pending_kg),
     }));
 
     // Get livelihood impact for the period
@@ -593,7 +615,11 @@ export const getUndpPilotReport = async (req, res, next) => {
         youth_percentage,
       },
       environmental_impact: {
+        total_estimated_kg: parseFloat(total_estimated_kg),
         verified_waste_kg: parseFloat(verified_waste_kg),
+        pending_unverified_kg: parseFloat(pending_unverified_kg),
+        rejected_logs: parseInt(environmental_rejected_logs),
+        rejected_estimated_kg: parseFloat(rejected_estimated_kg),
         verified_waste_tonnes,
         waste_type_breakdown,
       },

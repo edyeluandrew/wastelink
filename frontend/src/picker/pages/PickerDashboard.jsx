@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LoadingState, ErrorState, Button } from '../../components';
 import PickerStatCard from '../components/PickerStatCard';
 import PickerJobCard from '../components/PickerJobCard';
@@ -12,12 +12,26 @@ const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
 export default function PickerDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const picker = getCurrentPicker();
   const pickerId = getCurrentPickerId();
 
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(location.state?.toast || null);
+
+  useEffect(() => {
+    if (location.state?.toast) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state?.toast, navigate]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!pickerId) {
@@ -75,11 +89,18 @@ export default function PickerDashboard() {
     return sum;
   }, 0);
 
-  // Recent jobs
-  const recentJobs = logs.slice(-5).reverse();
+  // Recent jobs — newest first
+  const recentJobs = [...logs]
+    .sort((a, b) => new Date(b.logged_at || b.created_at) - new Date(a.logged_at || a.created_at))
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm font-semibold text-green-900">
+          {toast}
+        </div>
+      )}
       {/* Welcome Card */}
       <div className="bg-green-100 border border-green-300 rounded-lg p-5">
         <p className="text-lg font-bold text-green-900 mb-1">

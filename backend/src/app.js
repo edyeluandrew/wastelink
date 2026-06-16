@@ -104,9 +104,24 @@ CREATE TABLE IF NOT EXISTS earnings (
   waste_log_id INT NOT NULL REFERENCES waste_logs(id),
   rate_per_kg INT NOT NULL,
   amount INT NOT NULL,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING','APPROVED','PAID','FAILED')),
+  status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING','APPROVED','PAYOUT_INITIATED','PAID','FAILED')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   paid_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS payment_status_history (
+  id SERIAL PRIMARY KEY,
+  earning_id INT NOT NULL REFERENCES earnings(id),
+  waste_log_id INT NOT NULL REFERENCES waste_logs(id),
+  from_status VARCHAR(30),
+  to_status VARCHAR(30) NOT NULL,
+  payment_reference VARCHAR(120),
+  amount INT,
+  changed_by INT,
+  notes TEXT,
+  is_simulated BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS payout_transactions (

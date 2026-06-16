@@ -9,7 +9,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { clearAllSessions, isAuthenticatedPicker } from '../../utils/auth';
+import { logout, isAuthenticatedPicker } from '../../utils/auth';
 import { clearPickerSession } from '../utils/pickerSession';
 import { formatGenderLabel, formatStatus } from '../../utils/formatters';
 
@@ -28,9 +28,7 @@ export default function PickerSidebar({ picker }) {
 
   const handleSwitchPicker = () => {
     if (authenticatedPicker) {
-      clearAllSessions();
-      navigate('/login', { replace: true });
-
+      logout(navigate, { redirectTo: '/login' });
       return;
     }
 

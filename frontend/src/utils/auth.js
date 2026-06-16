@@ -60,6 +60,15 @@ export const clearAllSessions = () => {
     return false;
   }
 };
+export const logout = (navigate, { redirectTo = '/login' } = {}) => {
+  clearAllSessions();
+  if (typeof navigate === 'function') {
+    navigate(redirectTo, { replace: true });
+  } else if (typeof window !== 'undefined') {
+    window.location.replace(redirectTo);
+  }
+};
+
 export const isAuthenticated = () => Boolean(getAuthToken());
 
 export const getUserRole = () => getAuthUser()?.role || null;

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { clearAuthSession } from '../utils/auth';
+import { clearAllSessions } from '../utils/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -28,9 +28,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       if (error.response.status === 401) {
-        clearAuthSession();
+        clearAllSessions();
         if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          window.location.assign('/login');
+          window.location.replace('/login');
         }
       }
       // Server responded with error status

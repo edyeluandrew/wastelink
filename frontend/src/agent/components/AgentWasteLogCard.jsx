@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { StatusBadge, Button, Modal } from '../../components';
 import { getEarningAmount, getEarningStatus } from '../../utils/earningsHelper';
+import { formatDateTime } from '../../utils/formatters';
 import { getEstimatedKg, getVerifiedKg, hasVerifiedKg } from '../../utils/wasteLogHelpers';
 
 export default function AgentWasteLogCard({
@@ -80,9 +81,11 @@ export default function AgentWasteLogCard({
                 <StatusBadge status={log.status} />
               </div>
               <p className="text-xs text-gray-600 mt-1">
-                {log.picker_name || 'Unknown Picker'} • {log.waste_type || 'N/A'} • {formatNumber(estimatedKg)} kg
+                {log.picker_name || 'Unknown Picker'} • {log.waste_type || 'N/A'} • Est. {formatNumber(estimatedKg)} kg
               </p>
-              <p className="text-xs text-gray-500 mt-1">{formatDate(log.created_at)}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {log.collection_point_name || 'Unknown location'} • {formatDate(log.logged_at || log.created_at)}
+              </p>
             </div>
             <div className="text-gray-600">
               {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -94,7 +97,11 @@ export default function AgentWasteLogCard({
           <div className="p-4 border-t border-gray-300 bg-gray-50">
             <div className="grid grid-cols-2 gap-3 text-sm mb-4">
               <div>
-                <p className="text-xs text-gray-600">Picker Contact</p>
+                <p className="text-xs text-gray-600">Picker Name</p>
+                <p className="font-semibold text-gray-900">{log.picker_name || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-600">Picker Phone</p>
                 <p className="font-semibold text-gray-900">{log.picker_phone || 'N/A'}</p>
               </div>
               <div>
@@ -102,12 +109,27 @@ export default function AgentWasteLogCard({
                 <p className="font-semibold text-gray-900">{log.waste_type || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-600">Logged Weight</p>
+                <p className="text-xs text-gray-600">Status</p>
+                <p className="font-semibold text-gray-900">{log.status || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-600">Estimated Weight (Picker)</p>
                 <p className="font-semibold text-gray-900">{formatNumber(estimatedKg)} kg</p>
               </div>
               <div>
-                <p className="text-xs text-gray-600">Verified Weight</p>
+                <p className="text-xs text-gray-600">Verified Weight (Agent)</p>
                 <p className="font-semibold text-gray-900">{hasVerifiedKg(log) ? formatNumber(verifiedKgValue) + ' kg' : 'Pending'}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-xs text-gray-600">Collection Point</p>
+                <p className="font-semibold text-gray-900">
+                  {log.collection_point_name || 'N/A'}
+                  {log.division ? ` (${log.division})` : ''}
+                </p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-xs text-gray-600">Submitted</p>
+                <p className="font-semibold text-gray-900">{formatDateTime(log.logged_at || log.created_at)}</p>
               </div>
               {earningAmount > 0 && (
                 <div className="col-span-2">
@@ -153,9 +175,10 @@ export default function AgentWasteLogCard({
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-1">
-              Logged Weight
+              Estimated Weight (Picker)
             </label>
             <p className="text-2xl font-bold text-gray-700">{formatNumber(estimatedKg)} kg</p>
+            <p className="text-xs text-gray-500 mt-1">Do not change — enter actual verified weight below.</p>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-1">

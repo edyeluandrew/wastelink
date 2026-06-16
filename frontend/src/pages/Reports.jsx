@@ -249,6 +249,10 @@ export default function Reports() {
                 value={formatKg(monthlyReport.total_verified_kg)}
               />
               <StatCard
+                title="Pending / Unverified KG"
+                value={formatKg(monthlyReport.pending_unverified_kg || 0)}
+              />
+              <StatCard
                 title="Total Earnings"
                 value={formatCurrencyUGX(monthlyReport.total_earnings)}
               />
@@ -409,23 +413,41 @@ export default function Reports() {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <StatCard
-                  title="Verified Waste (KG)"
+                  title="Total Estimated (Logged)"
+                  value={formatKg(undpReport.environmental_impact.total_estimated_kg)}
+                />
+                <StatCard
+                  title="Total Verified (Agent)"
                   value={formatKg(undpReport.environmental_impact.verified_waste_kg)}
+                />
+                <StatCard
+                  title="Pending / Unverified"
+                  value={formatKg(undpReport.environmental_impact.pending_unverified_kg)}
                 />
                 <StatCard
                   title="Verified Waste (Tonnes)"
                   value={formatTonnes(undpReport.environmental_impact.verified_waste_tonnes)}
+                />
+                <StatCard
+                  title="Rejected Logs"
+                  value={formatNumber(undpReport.environmental_impact.rejected_logs || undpReport.operations?.rejected_logs || 0)}
+                />
+                <StatCard
+                  title="Rejected Est. KG"
+                  value={formatKg(undpReport.environmental_impact.rejected_estimated_kg || 0)}
                 />
               </div>
 
               {undpReport.environmental_impact.waste_type_breakdown?.length > 0 && (
                 <div className="card">
                   <h5 className="font-medium text-wastelink-dark mb-3">Waste Types</h5>
-                  <DataTable columns={['Waste Type', 'Verified KG']}>
+                  <DataTable columns={['Waste Type', 'Estimated KG', 'Verified KG', 'Pending KG']}>
                     {undpReport.environmental_impact.waste_type_breakdown.map((item, idx) => (
                       <tr key={idx} className="border-b border-wastelink-border">
                         <td className="table-cell">{formatStatus(item.waste_type)}</td>
+                        <td className="table-cell">{formatKg(item.estimated_kg || 0)}</td>
                         <td className="table-cell">{formatKg(item.verified_kg)}</td>
+                        <td className="table-cell">{formatKg(item.pending_kg || 0)}</td>
                       </tr>
                     ))}
                   </DataTable>

@@ -1,7 +1,11 @@
 import pool from "../config/db.js";
 import { generateWasteJobCode } from "../utils/generateCodes.js";
 import { calculateEarnings } from "../utils/calculateEarnings.js";
-import { recordManualPayoutTransaction } from "../services/payment/paymentService.js";
+import {
+  transitionEarningPayment,
+  getPaymentStatusHistory,
+} from "../services/payment/earningPaymentService.js";
+import { PAYMENT_STATUS } from "../utils/paymentStatus.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 
 // POST /api/waste-logs - Create a new waste log
@@ -407,12 +411,13 @@ export const verifyWasteLog = async (req, res, next) => {
         return sendError(res, "Earnings already exist for this waste log", 400);
       }
 
-      // Update waste log
+      // Update waste log — preserve estimated_kg and existing notes
       const updateResult = await client.query(
         `UPDATE waste_logs 
-         SET verified_kg = $1, status = 'VERIFIED', verified_at = NOW(), updated_at = NOW(), notes = $2
+         SET verified_kg = $1, status = 'VERIFIED', verified_at = NOW(), updated_at = NOW(),
+             notes = CASE WHEN $2 IS NOT NULL AND TRIM($2) != '' THEN $2 ELSE notes END
          WHERE id = $3
-         RETURNING id, job_code, waste_type, verified_kg, picker_id`,
+         RETURNING id, job_code, waste_type, estimated_kg, verified_kg, picker_id`,
         [verified_kg, notes || null, id]
       );
 
@@ -441,6 +446,7 @@ export const verifyWasteLog = async (req, res, next) => {
         id: updatedWasteLog.id,
         job_code: updatedWasteLog.job_code,
         waste_type: updatedWasteLog.waste_type,
+        estimated_kg: parseFloat(updatedWasteLog.estimated_kg),
         verified_kg: parseFloat(updatedWasteLog.verified_kg),
         status: "VERIFIED",
         earning: {
@@ -524,122 +530,181 @@ export const rejectWasteLog = async (req, res, next) => {
   }
 };
 
-// PATCH /api/waste-logs/:id/mark-paid - Mark waste log as paid
-export const markWasteLogPaid = async (req, res, next) => {
+// Helper: load waste log + earning for payout actions
+const loadVerifiedLogWithEarning = async (client, wasteLogId) => {
+  const wasteLogResult = await client.query(
+    `SELECT wl.id, wl.status, wl.picker_id, wl.job_code, wl.verified_kg
+     FROM waste_logs wl WHERE wl.id = $1 FOR UPDATE`,
+    [wasteLogId]
+  );
+
+  if (wasteLogResult.rows.length === 0) {
+    return { error: { status: 404, message: "Waste log not found" } };
+  }
+
+  const wasteLog = wasteLogResult.rows[0];
+
+  if (!['VERIFIED', 'PAID'].includes(wasteLog.status)) {
+    return {
+      error: {
+        status: 400,
+        message: `Payout actions require a verified waste log. Current status: ${wasteLog.status}`,
+      },
+    };
+  }
+
+  const earningResult = await client.query(
+    `SELECT id, status, amount, picker_id, waste_log_id, paid_at
+     FROM earnings WHERE waste_log_id = $1 FOR UPDATE`,
+    [wasteLogId]
+  );
+
+  if (earningResult.rows.length === 0) {
+    return { error: { status: 404, message: "No earnings found for this waste log" } };
+  }
+
+  return { wasteLog, earning: earningResult.rows[0] };
+};
+
+const handlePayoutTransition = async (req, res, toStatus, { simulate = false, notes = null } = {}) => {
   let client;
   try {
     const { id } = req.params;
+    const { payment_reference, phone } = req.body || {};
+
+    if (req.user?.role === 'PICKER') {
+      return sendError(res, 'Pickers are not allowed to manage payouts', 403);
+    }
 
     client = await pool.connect();
     await client.query("BEGIN");
 
     try {
-      // Check if waste log exists and is VERIFIED
-      if (req.user?.role === 'PICKER') {
-        await client.query('ROLLBACK');
-        return sendError(res, 'Pickers are not allowed to mark waste logs as paid', 403);
-      }
-      const wasteLogResult = await client.query(
-        "SELECT id, status, picker_id FROM waste_logs WHERE id = $1 FOR UPDATE",
-        [id]
-      );
-
-      if (wasteLogResult.rows.length === 0) {
+      const loaded = await loadVerifiedLogWithEarning(client, id);
+      if (loaded.error) {
         await client.query("ROLLBACK");
-        return sendError(res, "Waste log not found", 404);
+        return sendError(res, loaded.error.message, loaded.error.status);
       }
 
-      const wasteLog = wasteLogResult.rows[0];
+      const { wasteLog, earning } = loaded;
 
-      if (wasteLog.status !== "VERIFIED") {
+      if (earning.status === PAYMENT_STATUS.PAID) {
         await client.query("ROLLBACK");
-        return sendError(res, `Waste log cannot be marked as paid. Current status: ${wasteLog.status}`, 400);
+        return sendError(res, "This earning has already been paid", 400);
       }
 
-      // Check if earnings exist
-      const earningResult = await client.query(
-        "SELECT id, status FROM earnings WHERE waste_log_id = $1 FOR UPDATE",
-        [id]
-      );
-
-      if (earningResult.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return sendError(res, "No earnings found for this waste log", 404);
-      }
-
-      const earning = earningResult.rows[0];
-
-      // Update earning status
-      const updatedEarningResult = await client.query(
-        `UPDATE earnings 
-         SET status = 'PAID', paid_at = NOW()
-         WHERE id = $1
-         RETURNING id, rate_per_kg, amount, status, paid_at`,
-        [earning.id]
-      );
-
-      const updatedEarning = updatedEarningResult.rows[0];
-
-      // Update waste log status
-      const updatedWasteLogResult = await client.query(
-        `UPDATE waste_logs 
-         SET status = 'PAID', updated_at = NOW()
-         WHERE id = $1
-         RETURNING id, job_code, status, verified_kg`,
-        [id]
-      );
-
-      const updatedWasteLog = updatedWasteLogResult.rows[0];
-
-      let payoutTransaction = null;
-      try {
-        payoutTransaction = await recordManualPayoutTransaction(client, {
-          earningId: updatedEarning.id,
-          wasteLogId: updatedWasteLog.id,
-          pickerId: wasteLog.picker_id,
-          amount: updatedEarning.amount,
-          phone: null,
-          currency: 'UGX',
-        });
-      } catch (payoutError) {
-        // Keep manual mark-paid operational even if payout_transactions is not migrated yet.
-        if (payoutError?.code === '42P01') {
-          console.warn('[Payout Transaction Warning] payout_transactions table missing; continuing mark-paid without payout row');
-        } else {
-          throw payoutError;
-        }
-      }
+      const result = await transitionEarningPayment(client, {
+        earningId: earning.id,
+        wasteLogId: wasteLog.id,
+        pickerId: wasteLog.picker_id,
+        toStatus,
+        changedBy: req.user?.id || null,
+        notes,
+        paymentReference: payment_reference || null,
+        phone: phone || null,
+        simulate,
+      });
 
       await client.query("COMMIT");
 
-      sendSuccess(res, "Waste log marked as paid successfully", {
-        id: updatedWasteLog.id,
-        job_code: updatedWasteLog.job_code,
-        status: updatedWasteLog.status,
-        verified_kg: parseFloat(updatedWasteLog.verified_kg),
+      const history = await getPaymentStatusHistory(client, earning.id);
+
+      sendSuccess(res, `Payment status updated to ${toStatus}`, {
+        waste_log_id: wasteLog.id,
+        job_code: wasteLog.job_code,
+        verified_kg: parseFloat(wasteLog.verified_kg),
         earning: {
-          id: updatedEarning.id,
-          rate_per_kg: updatedEarning.rate_per_kg,
-          amount: updatedEarning.amount,
-          status: updatedEarning.status,
-          paid_at: updatedEarning.paid_at,
+          id: result.earning.id,
+          amount: result.earning.amount,
+          status: result.earning.status,
+          paid_at: result.earning.paid_at,
         },
-        payout_transaction: payoutTransaction ? {
-          id: payoutTransaction.id,
-          provider: payoutTransaction.provider,
-          provider_transaction_id: payoutTransaction.provider_transaction_id,
-          status: payoutTransaction.status,
-          paid_at: payoutTransaction.paid_at,
-        } : null,
+        payment_reference: result.payment_reference,
+        is_simulated: result.is_simulated,
+        payout_transaction: result.payout_transaction,
+        payment_status_history: history,
       });
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
     }
   } catch (error) {
-    console.error("[Waste Log Mark Paid Error]", { code: error.code, message: error.message });
-    sendError(res, "Database connection failed. Please check Neon DATABASE_URL or network configuration.", 503);
+    console.error("[Payout Transition Error]", { code: error.code, message: error.message });
+    const status = error.status || 503;
+    const message = error.status ? error.message : "Database connection failed. Please check Neon DATABASE_URL or network configuration.";
+    sendError(res, message, status);
   } finally {
     if (client) client.release();
   }
+};
+
+// PATCH /api/waste-logs/:id/payout/approve - PENDING -> APPROVED
+export const approvePayout = async (req, res) =>
+  handlePayoutTransition(req, res, PAYMENT_STATUS.APPROVED, {
+    notes: req.body?.notes || 'Earning approved for payout',
+  });
+
+// PATCH /api/waste-logs/:id/payout/initiate - APPROVED -> PAYOUT_INITIATED
+export const initiatePayout = async (req, res) =>
+  handlePayoutTransition(req, res, PAYMENT_STATUS.PAYOUT_INITIATED, {
+    notes: req.body?.notes || 'Payout initiated (demo/manual)',
+  });
+
+// PATCH /api/waste-logs/:id/payout/simulate-confirm - PAYOUT_INITIATED -> PAID (demo)
+export const simulatePayoutConfirm = async (req, res) =>
+  handlePayoutTransition(req, res, PAYMENT_STATUS.PAID, {
+    simulate: true,
+    notes: req.body?.notes || 'Demo/simulated mobile money payout confirmed',
+  });
+
+// PATCH /api/waste-logs/:id/mark-paid - Legacy alias; requires PAYOUT_INITIATED
+export const markWasteLogPaid = async (req, res) => {
+  const { id } = req.params;
+  let client;
+
+  try {
+    if (req.user?.role === 'PICKER') {
+      return sendError(res, 'Pickers are not allowed to mark waste logs as paid', 403);
+    }
+
+    client = await pool.connect();
+    const earningResult = await client.query(
+      'SELECT status FROM earnings WHERE waste_log_id = $1',
+      [id]
+    );
+
+    if (earningResult.rows.length === 0) {
+      return sendError(res, 'No earnings found for this waste log', 404);
+    }
+
+    const currentStatus = earningResult.rows[0].status;
+
+    if (currentStatus === PAYMENT_STATUS.PENDING) {
+      return sendError(
+        res,
+        'Earning must be approved and payout initiated before confirmation. Use Approve → Initiate Payout → Simulate Confirm.',
+        400
+      );
+    }
+
+    if (currentStatus === PAYMENT_STATUS.APPROVED) {
+      return sendError(
+        res,
+        'Payout must be initiated before confirmation. Use Initiate Payout first.',
+        400
+      );
+    }
+
+    if (currentStatus !== PAYMENT_STATUS.PAYOUT_INITIATED) {
+      return sendError(
+        res,
+        `Cannot mark as paid from status ${currentStatus}`,
+        400
+      );
+    }
+  } finally {
+    if (client) client.release();
+  }
+
+  return simulatePayoutConfirm(req, res);
 };

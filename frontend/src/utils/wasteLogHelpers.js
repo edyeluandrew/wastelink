@@ -15,6 +15,11 @@ export function getVerifiedKg(log) {
   return Number(
     log?.verified_kg ??
     log?.verifiedKg ??
+    log?.verified_weight_kg ??
+    log?.actual_weight ??
+    log?.actualWeight ??
+    log?.agent_verified_weight ??
+    log?.agentVerifiedWeight ??
     0
   );
 }
