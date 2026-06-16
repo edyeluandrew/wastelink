@@ -23,7 +23,7 @@ export default function AgentSidebar() {
           <img src="/brand/wastelink-icon.png" alt="WasteLink" className="h-8 w-8 object-contain" />
           <div className="inline-flex items-center gap-2 rounded-2xl bg-[#EAF6EA] px-3 py-2 font-semibold text-[#238636]">
             <CheckCircle2 size={18} />
-            <span style={{ fontFamily: 'Orbitron' }}>WasteLink Agent</span>
+            <span className="font-brand">WasteLink Agent</span>
           </div>
         </div>
 

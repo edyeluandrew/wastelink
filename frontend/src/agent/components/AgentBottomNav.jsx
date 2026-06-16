@@ -6,10 +6,17 @@ export default function AgentBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#D9D9D9] bg-white"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      className="agent-bottom-nav border-t border-[#D9D9D9] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
     >
-      <div className="flex h-16 items-stretch">
+      <div className="flex h-[4.5rem] items-stretch">
         {AGENT_NAV_ITEMS.map(({ path, label, icon: Icon, matchPaths }) => {
           const active = isAgentNavActive(location.pathname, { path, matchPaths });
 
@@ -18,19 +25,19 @@ export default function AgentBottomNav() {
               key={path}
               to={path}
               className={[
-                'flex flex-1 flex-col items-center justify-center gap-0.5 px-1 pt-2',
+                'flex flex-1 flex-col items-center justify-center gap-1 px-1',
                 active ? 'text-[#238636]' : 'text-[#6B7280]',
               ].join(' ')}
             >
               <span
                 className={[
-                  'flex h-8 w-8 items-center justify-center rounded-xl transition',
+                  'flex h-9 w-9 items-center justify-center rounded-2xl transition',
                   active ? 'bg-[#EAF6EA]' : 'bg-transparent',
                 ].join(' ')}
               >
                 <Icon size={20} />
               </span>
-              <span className="text-[10px] font-semibold leading-none">{label}</span>
+              <span className="text-[11px] font-semibold leading-none">{label}</span>
             </NavLink>
           );
         })}

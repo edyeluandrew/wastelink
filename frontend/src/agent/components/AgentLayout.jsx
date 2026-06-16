@@ -8,14 +8,14 @@ export default function AgentLayout() {
   const isDesktop = useIsDesktop();
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA]">
-      <div className={isDesktop ? 'flex min-h-screen' : 'flex min-h-screen flex-col'}>
+    <div className="agent-shell min-h-screen bg-[#F8F9FA]">
+      <div className={isDesktop ? 'flex min-h-screen' : 'min-h-screen'}>
         {isDesktop && <AgentSidebar />}
 
         <div className="flex min-h-screen flex-1 flex-col">
           <AgentTopbar showLogout={!isDesktop} />
 
-          <main className={`flex-1 ${isDesktop ? 'pb-8' : 'pb-20'}`}>
+          <main className={`flex-1 ${isDesktop ? 'pb-8' : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'}`}>
             <div className="mx-auto w-full max-w-7xl px-4 py-4 md:px-6 md:py-6">
               <Outlet />
             </div>

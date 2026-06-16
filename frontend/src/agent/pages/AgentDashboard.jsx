@@ -115,7 +115,7 @@ export default function AgentDashboard() {
     <div className="space-y-5">
       <div className="rounded-3xl border border-[#BDE5BF] bg-[linear-gradient(135deg,#EAF6EA_0%,#FFFFFF_75%)] p-5 shadow-sm">
         <p className="text-sm font-semibold text-[#238636]">Welcome back</p>
-        <h2 className="mt-1 text-2xl font-bold text-[#111111]" style={{ fontFamily: 'Orbitron' }}>
+        <h2 className="font-brand mt-1 text-xl font-bold text-[#111111] sm:text-2xl">
           Agent Dashboard
         </h2>
         {collectionPoint && (
@@ -164,31 +164,36 @@ export default function AgentDashboard() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <AgentStatCard
             icon={Clock3}
-            label="Pending"
+            label="Pending Deliveries"
+            shortLabel="Pending"
             value={stats.pendingDeliveries}
             color="amber"
           />
           <AgentStatCard
             icon={CheckCircle2}
             label="Verified Today"
+            shortLabel="Verified"
             value={stats.verifiedToday}
             color="green"
           />
           <AgentStatCard
             icon={CircleX}
             label="Rejected Today"
+            shortLabel="Rejected"
             value={stats.rejectedToday}
             color="red"
           />
           <AgentStatCard
             icon={Scale}
-            label="KG Verified"
+            label="Total KG Verified"
+            shortLabel="KG Today"
             value={`${formatNumber(stats.totalVerifiedKgToday)} kg`}
             color="blue"
           />
           <AgentStatCard
             icon={Wallet}
-            label="Earnings Today"
+            label="Earnings Generated"
+            shortLabel="Earnings"
             value={formatUGX(stats.totalEarningsToday)}
             color="green"
           />

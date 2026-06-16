@@ -23,18 +23,26 @@ const colorClasses = {
   },
 };
 
-export default function AgentStatCard({ icon, label, value, color = 'green' }) {
+export default function AgentStatCard({ icon, label, shortLabel, value, color = 'green' }) {
   const palette = colorClasses[color] || colorClasses.green;
+  const mobileLabel = shortLabel || label;
 
   return (
-    <div className={`rounded-3xl border p-4 shadow-sm transition hover:shadow-md ${palette.card}`}>
-      <div className="flex items-center gap-3">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${palette.icon}`}>
-          {icon ? React.createElement(icon, { size: 22, strokeWidth: 2.2 }) : null}
+    <div className={`rounded-3xl border p-3 shadow-sm sm:p-4 ${palette.card}`}>
+      <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:items-center sm:gap-3 sm:text-left">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl sm:h-11 sm:w-11 ${palette.icon}`}>
+          {icon ? React.createElement(icon, { size: 20, strokeWidth: 2.2 }) : null}
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#6B7280]">{label}</p>
-          <p className={`truncate text-xl font-bold md:text-2xl ${palette.value}`}>{value}</p>
+        <div className="min-w-0 w-full">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6B7280] sm:hidden">
+            {mobileLabel}
+          </p>
+          <p className="hidden text-xs font-semibold uppercase tracking-wide text-[#6B7280] sm:block">
+            {label}
+          </p>
+          <p className={`mt-0.5 break-words text-lg font-bold leading-tight sm:text-2xl ${palette.value}`}>
+            {value}
+          </p>
         </div>
       </div>
     </div>

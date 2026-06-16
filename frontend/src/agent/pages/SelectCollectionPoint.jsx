@@ -53,7 +53,7 @@ export default function SelectCollectionPoint() {
           <div className="flex items-center gap-3">
             <img src="/brand/wastelink-icon.png" alt="WasteLink" className="h-10 w-10 rounded-xl bg-white/20 p-1" />
             <div>
-              <h1 className="text-2xl font-bold md:text-3xl" style={{ fontFamily: 'Orbitron' }}>
+              <h1 className="font-brand text-2xl font-bold md:text-3xl">
                 WasteLink Agent
               </h1>
               <p className="mt-1 text-sm text-green-100">Select your collection point</p>

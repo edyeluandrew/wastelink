@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client'
+import './index.css'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import DashboardLayout from './layouts/DashboardLayout'
 import Overview from './pages/Overview'
