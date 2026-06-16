@@ -235,13 +235,16 @@ export const createPickerWithdrawal = async ({
     throw error;
   }
 
-  const client = await pool.connect();
+  let client = await pool.connect();
+  let withdrawal;
+  let eligible = [];
+  let totalAmount = 0;
 
   try {
     await client.query('BEGIN');
     await ensureWithdrawalTables(client);
 
-    const eligible = await getEligibleEarningsForWithdrawal(client, pickerId, { forUpdate: true });
+    eligible = await getEligibleEarningsForWithdrawal(client, pickerId, { forUpdate: true });
 
     if (eligible.length === 0) {
       const error = new Error(
@@ -253,7 +256,7 @@ export const createPickerWithdrawal = async ({
       throw error;
     }
 
-    const totalAmount = eligible.reduce((sum, row) => sum + parseInt(row.amount, 10), 0);
+    totalAmount = eligible.reduce((sum, row) => sum + parseInt(row.amount, 10), 0);
 
     const withdrawalInsert = await client.query(
       `INSERT INTO withdrawal_requests (
@@ -269,7 +272,7 @@ export const createPickerWithdrawal = async ({
       ]
     );
 
-    const withdrawal = withdrawalInsert.rows[0];
+    withdrawal = withdrawalInsert.rows[0];
 
     for (const earning of eligible) {
       await client.query(
@@ -280,71 +283,74 @@ export const createPickerWithdrawal = async ({
     }
 
     await client.query('COMMIT');
-    client.release();
-    client = null;
-
-    const simulationResult = await simulateMobileMoneyWithdrawal({
-      withdrawalId: withdrawal.id,
-      pickerId,
-      provider: normalizedProvider,
-      phone: normalizedPhone,
-      amount: totalAmount,
-    });
-
-    const tx = await pool.connect();
-    try {
-      await tx.query('BEGIN');
-
-      for (const earning of eligible) {
-        await markEarningPaidForWithdrawal(tx, {
-          earning,
-          pickerId,
-          provider: normalizedProvider,
-          phone: normalizedPhone,
-          paymentReference: `${simulationResult.provider_transaction_id}-E${earning.id}`,
-          changedBy,
-          isSimulated: true,
-        });
-      }
-
-      const completed = await tx.query(
-        `UPDATE withdrawal_requests
-         SET status = 'SUCCESS',
-             payment_reference = $1,
-             completed_at = NOW()
-         WHERE id = $2
-         RETURNING *`,
-        [simulationResult.provider_transaction_id, withdrawal.id]
-      );
-
-      await tx.query('COMMIT');
-
-      const items = await pool.query(
-        `SELECT wre.earning_id, wre.waste_log_id, wre.amount, wl.job_code
-         FROM withdrawal_request_earnings wre
-         JOIN waste_logs wl ON wre.waste_log_id = wl.id
-         WHERE wre.withdrawal_request_id = $1`,
-        [withdrawal.id]
-      );
-
-      return {
-        withdrawal: completed.rows[0],
-        simulation: simulationResult,
-        items: items.rows,
-        total_amount: totalAmount,
-        jobs_count: eligible.length,
-      };
-    } catch (error) {
-      await tx.query('ROLLBACK');
-      throw error;
-    } finally {
-      tx.release();
-    }
   } catch (error) {
-    if (client) await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => {});
     throw error;
   } finally {
-    if (client) client.release();
+    client.release();
+    client = null;
+  }
+
+  const simulationResult = await simulateMobileMoneyWithdrawal({
+    withdrawalId: withdrawal.id,
+    pickerId,
+    provider: normalizedProvider,
+    phone: normalizedPhone,
+    amount: totalAmount,
+  });
+
+  const tx = await pool.connect();
+  try {
+    await tx.query('BEGIN');
+
+    for (const earning of eligible) {
+      await markEarningPaidForWithdrawal(tx, {
+        earning,
+        pickerId,
+        provider: normalizedProvider,
+        phone: normalizedPhone,
+        paymentReference: `${simulationResult.provider_transaction_id}-E${earning.id}`,
+        changedBy,
+        isSimulated: true,
+      });
+    }
+
+    const completed = await tx.query(
+      `UPDATE withdrawal_requests
+       SET status = 'SUCCESS',
+           payment_reference = $1,
+           completed_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [simulationResult.provider_transaction_id, withdrawal.id]
+    );
+
+    await tx.query('COMMIT');
+
+    const items = await pool.query(
+      `SELECT wre.earning_id, wre.waste_log_id, wre.amount, wl.job_code
+       FROM withdrawal_request_earnings wre
+       JOIN waste_logs wl ON wre.waste_log_id = wl.id
+       WHERE wre.withdrawal_request_id = $1`,
+      [withdrawal.id]
+    );
+
+    return {
+      withdrawal: completed.rows[0],
+      simulation: simulationResult,
+      items: items.rows,
+      total_amount: totalAmount,
+      jobs_count: eligible.length,
+    };
+  } catch (error) {
+    await tx.query('ROLLBACK').catch(() => {});
+    await pool.query(
+      `UPDATE withdrawal_requests SET status = 'FAILED', failure_reason = $1 WHERE id = $2`,
+      [error.message, withdrawal.id]
+    ).catch(() => {});
+    throw error;
+  } finally {
+    tx.release();
   }
 };
 
