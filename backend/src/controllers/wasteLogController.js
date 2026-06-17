@@ -1,6 +1,12 @@
 import pool from "../config/db.js";
 import { generateWasteJobCode } from "../utils/generateCodes.js";
-import { calculateEarnings } from "../utils/calculateEarnings.js";
+import { calculateEarnings as calculateLegacyEarnings } from "../utils/calculateEarnings.js";
+import {
+  getActiveCityWasteTypeForLog,
+  getCityWasteTypeById,
+  calculateEarningFromCityWasteType,
+} from "../services/wasteTypeGovernanceService.js";
+import { normalizeCity } from "../utils/cityScope.js";
 import {
   transitionEarningPayment,
   getPaymentStatusHistory,
@@ -11,20 +17,39 @@ import { sendSuccess, sendError } from "../utils/apiResponse.js";
 // POST /api/waste-logs - Create a new waste log
 export const createWasteLog = async (req, res, next) => {
   try {
-    let { picker_id, collection_point_id, waste_type, estimated_kg, notes } = req.body;
+    let { picker_id, collection_point_id, waste_type, city_waste_type_id, estimated_kg, notes } = req.body;
 
     // If an authenticated PICKER is creating the log, force picker_id to their linked picker
     if (req.user?.role === 'PICKER') {
       picker_id = req.user.picker_id;
     }
 
-    // Validate required fields
-    if (!picker_id || !collection_point_id || !waste_type || estimated_kg === undefined) {
+    if (!picker_id || !collection_point_id || estimated_kg === undefined) {
       return sendError(
         res,
-        "Missing required fields: picker_id, collection_point_id, waste_type, estimated_kg",
+        "Missing required fields: picker_id, collection_point_id, estimated_kg",
         400
       );
+    }
+
+    if (!city_waste_type_id && !waste_type) {
+      return sendError(res, "city_waste_type_id or waste_type is required", 400);
+    }
+
+    const logCity = normalizeCity(process.env.DEFAULT_CITY);
+    let resolvedWasteType = waste_type;
+    let resolvedCityWasteTypeId = city_waste_type_id ? parseInt(city_waste_type_id, 10) : null;
+
+    if (resolvedCityWasteTypeId) {
+      const cityWasteType = await getActiveCityWasteTypeForLog(resolvedCityWasteTypeId, logCity);
+      if (!cityWasteType) {
+        return sendError(res, "Selected city waste type is not active for your city", 400);
+      }
+      resolvedWasteType = cityWasteType.name;
+    }
+
+    if (!resolvedWasteType) {
+      return sendError(res, "waste_type could not be resolved", 400);
     }
 
     // Validate picker exists and is ACTIVE
@@ -52,10 +77,14 @@ export const createWasteLog = async (req, res, next) => {
 
     // Insert waste log
     const result = await pool.query(
-      `INSERT INTO waste_logs (job_code, picker_id, collection_point_id, waste_type, estimated_kg, status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, job_code, picker_id, collection_point_id, waste_type, estimated_kg, verified_kg, status, notes, logged_at, created_at`,
-      [jobCode, picker_id, collection_point_id, waste_type, estimated_kg, "PENDING", notes || null]
+      `INSERT INTO waste_logs (
+        job_code, picker_id, collection_point_id, waste_type, city_waste_type_id,
+        estimated_kg, status, notes
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, job_code, picker_id, collection_point_id, waste_type, city_waste_type_id,
+         estimated_kg, verified_kg, status, notes, logged_at, created_at`,
+      [jobCode, picker_id, collection_point_id, resolvedWasteType, resolvedCityWasteTypeId, estimated_kg, "PENDING", notes || null]
     );
 
     const wasteLog = result.rows[0];
@@ -73,6 +102,7 @@ export const createWasteLog = async (req, res, next) => {
         collection_point_code: collectionPoint.point_code,
         collection_point_name: collectionPoint.name,
         waste_type: wasteLog.waste_type,
+        city_waste_type_id: wasteLog.city_waste_type_id,
         estimated_kg: parseFloat(wasteLog.estimated_kg),
         verified_kg: wasteLog.verified_kg ? parseFloat(wasteLog.verified_kg) : null,
         status: wasteLog.status,
@@ -105,14 +135,19 @@ export const getWasteLogs = async (req, res, next) => {
     let query = `
       SELECT 
         wl.id, wl.job_code, wl.picker_id, wl.collection_point_id,
-        wl.waste_type, wl.estimated_kg, wl.verified_kg, wl.status,
+        wl.waste_type, wl.city_waste_type_id, wl.estimated_kg, wl.verified_kg, wl.status,
         wl.notes, wl.logged_at, wl.verified_at, wl.created_at,
+        wl.price_per_kg_snapshot, wl.reporting_category_id,
         p.picker_code, p.name as picker_name, p.phone as picker_phone,
         cp.point_code, cp.name as collection_point_name, cp.division,
+        cwt.name as city_waste_type_name, cwt.price_per_kg as city_price_per_kg, cwt.is_payable as city_is_payable,
+        rc.name as reporting_category_name,
         e.id as earning_id, e.rate_per_kg, e.amount, e.status as earning_status, e.paid_at
       FROM waste_logs wl
       JOIN pickers p ON wl.picker_id = p.id
       JOIN collection_points cp ON wl.collection_point_id = cp.id
+      LEFT JOIN city_waste_types cwt ON wl.city_waste_type_id = cwt.id
+      LEFT JOIN reporting_categories rc ON wl.reporting_category_id = rc.id
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
       WHERE 1=1
     `;
@@ -155,6 +190,13 @@ export const getWasteLogs = async (req, res, next) => {
         collection_point_name: row.collection_point_name,
         division: row.division,
         waste_type: row.waste_type,
+        city_waste_type_id: row.city_waste_type_id,
+        city_waste_type_name: row.city_waste_type_name,
+        city_price_per_kg: row.city_price_per_kg != null ? parseFloat(row.city_price_per_kg) : null,
+        city_is_payable: row.city_is_payable,
+        reporting_category_id: row.reporting_category_id,
+        reporting_category_name: row.reporting_category_name,
+        price_per_kg_snapshot: row.price_per_kg_snapshot != null ? parseFloat(row.price_per_kg_snapshot) : null,
         estimated_kg: parseFloat(row.estimated_kg),
         verified_kg: row.verified_kg ? parseFloat(row.verified_kg) : null,
         status: row.status,
@@ -280,13 +322,18 @@ export const getWasteLogByJobCode = async (req, res, next) => {
     const result = await pool.query(
       `SELECT 
         wl.id, wl.job_code, wl.picker_id, wl.collection_point_id,
-        wl.waste_type, wl.estimated_kg, wl.verified_kg, wl.status,
+        wl.waste_type, wl.city_waste_type_id, wl.estimated_kg, wl.verified_kg, wl.status,
         wl.notes, wl.rejection_reason, wl.logged_at, wl.verified_at, wl.created_at, wl.updated_at,
+        wl.price_per_kg_snapshot, wl.is_payable_snapshot, wl.reporting_category_id,
         p.picker_code, p.name as picker_name, p.phone as picker_phone,
-        cp.point_code, cp.name as collection_point_name, cp.division
+        cp.point_code, cp.name as collection_point_name, cp.division,
+        cwt.name as city_waste_type_name, cwt.price_per_kg as city_price_per_kg, cwt.is_payable as city_is_payable,
+        rc.name as reporting_category_name
       FROM waste_logs wl
       JOIN pickers p ON wl.picker_id = p.id
       JOIN collection_points cp ON wl.collection_point_id = cp.id
+      LEFT JOIN city_waste_types cwt ON wl.city_waste_type_id = cwt.id
+      LEFT JOIN reporting_categories rc ON wl.reporting_category_id = rc.id
       WHERE wl.job_code = $1`,
       [jobCode]
     );
@@ -327,6 +374,14 @@ export const getWasteLogByJobCode = async (req, res, next) => {
       collection_point_name: row.collection_point_name,
       division: row.division,
       waste_type: row.waste_type,
+      city_waste_type_id: row.city_waste_type_id,
+      city_waste_type_name: row.city_waste_type_name,
+      city_price_per_kg: row.city_price_per_kg != null ? parseFloat(row.city_price_per_kg) : null,
+      city_is_payable: row.city_is_payable,
+      reporting_category_id: row.reporting_category_id,
+      reporting_category_name: row.reporting_category_name,
+      price_per_kg_snapshot: row.price_per_kg_snapshot != null ? parseFloat(row.price_per_kg_snapshot) : null,
+      is_payable_snapshot: row.is_payable_snapshot,
       estimated_kg: parseFloat(row.estimated_kg),
       verified_kg: row.verified_kg ? parseFloat(row.verified_kg) : null,
       status: row.status,
@@ -371,7 +426,8 @@ export const verifyWasteLog = async (req, res, next) => {
     try {
       // Check if waste log exists and is PENDING
       const wasteLogResult = await client.query(
-        "SELECT id, status, waste_type, picker_id, job_code, collection_point_id FROM waste_logs WHERE id = $1 FOR UPDATE",
+        `SELECT id, status, waste_type, city_waste_type_id, picker_id, job_code, collection_point_id
+         FROM waste_logs WHERE id = $1 FOR UPDATE`,
         [id]
       );
 
@@ -411,30 +467,63 @@ export const verifyWasteLog = async (req, res, next) => {
         return sendError(res, "Earnings already exist for this waste log", 400);
       }
 
-      // Update waste log — preserve estimated_kg and existing notes
+      let ratePerKg = 0;
+      let amount = 0;
+      let reportingCategoryId = null;
+      let pricePerKgSnapshot = null;
+      let isPayableSnapshot = false;
+      let cityWasteTypeId = wasteLog.city_waste_type_id || null;
+
+      let pricingSource = null;
+
+      if (cityWasteTypeId) {
+        pricingSource = await getActiveCityWasteTypeForLog(
+          cityWasteTypeId,
+          normalizeCity(process.env.DEFAULT_CITY),
+          client
+        );
+
+        if (!pricingSource) {
+          pricingSource = await getCityWasteTypeById(cityWasteTypeId, client);
+        }
+
+        if (!pricingSource) {
+          await client.query('ROLLBACK');
+          return sendError(res, 'Linked city waste type not found', 400);
+        }
+
+        ({ ratePerKg, amount } = calculateEarningFromCityWasteType(pricingSource, verified_kg));
+        reportingCategoryId = pricingSource.reporting_category_id;
+        pricePerKgSnapshot = pricingSource.price_per_kg;
+        isPayableSnapshot = pricingSource.is_payable;
+      } else {
+        ({ ratePerKg, amount } = calculateLegacyEarnings(wasteLog.waste_type, verified_kg));
+      }
+
       const updateResult = await client.query(
         `UPDATE waste_logs 
          SET verified_kg = $1, status = 'VERIFIED', verified_at = NOW(), updated_at = NOW(),
-             notes = CASE WHEN $2::text IS NOT NULL AND TRIM($2::text) != '' THEN $2::text ELSE notes END
-         WHERE id = $3
-         RETURNING id, job_code, waste_type, estimated_kg, verified_kg, picker_id`,
-        [verified_kg, notes || null, id]
+             reporting_category_id = $2,
+             price_per_kg_snapshot = $3,
+             is_payable_snapshot = $4,
+             notes = CASE WHEN $5::text IS NOT NULL AND TRIM($5::text) != '' THEN $5::text ELSE notes END
+         WHERE id = $6
+         RETURNING id, job_code, waste_type, city_waste_type_id, estimated_kg, verified_kg, picker_id,
+           price_per_kg_snapshot, reporting_category_id, is_payable_snapshot`,
+        [verified_kg, reportingCategoryId, pricePerKgSnapshot, isPayableSnapshot, notes || null, id]
       );
 
       const updatedWasteLog = updateResult.rows[0];
 
-      // Calculate earnings
-      const { ratePerKg, amount } = calculateEarnings(
-        wasteLog.waste_type,
-        verified_kg
-      );
-
-      // Insert earnings record
       const earningResult = await client.query(
-        `INSERT INTO earnings (picker_id, waste_log_id, rate_per_kg, amount, status)
-         VALUES ($1, $2, $3, $4, 'PENDING')
-         RETURNING id, rate_per_kg, amount, status, created_at, paid_at`,
-        [wasteLog.picker_id, id, ratePerKg, amount]
+        `INSERT INTO earnings (
+          picker_id, waste_log_id, rate_per_kg, amount, status,
+          city_waste_type_id, reporting_category_id
+        )
+         VALUES ($1, $2, $3, $4, 'PENDING', $5, $6)
+         RETURNING id, rate_per_kg, amount, status, created_at, paid_at,
+           city_waste_type_id, reporting_category_id`,
+        [wasteLog.picker_id, id, ratePerKg, amount, cityWasteTypeId, reportingCategoryId]
       );
 
       const earning = earningResult.rows[0];
@@ -446,8 +535,14 @@ export const verifyWasteLog = async (req, res, next) => {
         id: updatedWasteLog.id,
         job_code: updatedWasteLog.job_code,
         waste_type: updatedWasteLog.waste_type,
+        city_waste_type_id: updatedWasteLog.city_waste_type_id,
         estimated_kg: parseFloat(updatedWasteLog.estimated_kg),
         verified_kg: parseFloat(updatedWasteLog.verified_kg),
+        price_per_kg_snapshot: updatedWasteLog.price_per_kg_snapshot != null
+          ? parseFloat(updatedWasteLog.price_per_kg_snapshot)
+          : null,
+        reporting_category_id: updatedWasteLog.reporting_category_id,
+        is_payable_snapshot: updatedWasteLog.is_payable_snapshot,
         status: "VERIFIED",
         earning: {
           id: earning.id,

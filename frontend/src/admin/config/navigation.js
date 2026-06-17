@@ -6,6 +6,7 @@ import {
   Map,
   DollarSign,
   FileText,
+  Layers,
 } from 'lucide-react';
 import { normalizeRole } from '../../utils/auth';
 
@@ -21,6 +22,7 @@ export const getAdminNavItems = (role) => {
       ? [{ path: '/users', matchPaths: ['/users'], label: usersLabel, icon: Users }]
       : []),
     { path: '/collection-points', matchPaths: ['/collection-points'], label: 'Collection Points', icon: MapPin, shortLabel: 'Points' },
+    { path: '/waste-types', matchPaths: ['/waste-types'], label: 'Waste Types', icon: Layers, shortLabel: 'Types' },
     { path: '/waste-logs', matchPaths: ['/waste-logs'], label: 'Waste Logs', icon: Trash2, shortLabel: 'Logs' },
     { path: '/divisions', matchPaths: ['/divisions'], label: 'Divisions', icon: Map },
     { path: '/earnings', matchPaths: ['/earnings'], label: 'Earnings', icon: DollarSign },

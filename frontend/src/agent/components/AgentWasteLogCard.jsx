@@ -61,6 +61,9 @@ export default function AgentWasteLogCard({
   const verifiedKgValue = getVerifiedKg(log);
   const earningAmount = getEarningAmount(log);
   const earningStatus = getEarningStatus(log);
+  const wasteTypeLabel = log.city_waste_type_name || log.waste_type || 'N/A';
+  const pricePerKg = log.city_price_per_kg ?? log.price_per_kg_snapshot ?? null;
+  const isPayable = log.city_is_payable ?? log.is_payable_snapshot ?? true;
 
   return (
     <>
@@ -77,10 +80,12 @@ export default function AgentWasteLogCard({
                 <StatusBadge status={log.status} />
               </div>
               <p className="mt-1 text-sm text-[#6B7280]">
-                {log.picker_name || 'Unknown Picker'} · {log.waste_type || 'N/A'}
+                {log.picker_name || 'Unknown Picker'} · {wasteTypeLabel}
               </p>
               <p className="mt-1 text-xs text-[#6B7280]">
-                Est. {formatNumber(estimatedKg)} kg · {log.collection_point_name || 'Unknown location'}
+                Est. {formatNumber(estimatedKg)} kg
+                {pricePerKg != null && isPayable ? ` · UGX ${Number(pricePerKg).toLocaleString()}/kg` : ''}
+                {' · '}{log.collection_point_name || 'Unknown location'}
               </p>
             </div>
             <div className="shrink-0 text-[#6B7280]">
@@ -102,7 +107,18 @@ export default function AgentWasteLogCard({
               </div>
               <div className="rounded-2xl bg-white p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Waste Type</p>
-                <p className="mt-1 font-semibold text-[#111111]">{log.waste_type || 'N/A'}</p>
+                <p className="mt-1 font-semibold text-[#111111]">{wasteTypeLabel}</p>
+                {log.reporting_category_name && (
+                  <p className="mt-1 text-xs text-[#6B7280]">Category: {log.reporting_category_name}</p>
+                )}
+              </div>
+              <div className="rounded-2xl bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Price / Payable</p>
+                <p className="mt-1 font-semibold text-[#111111]">
+                  {isPayable && pricePerKg != null
+                    ? `${formatUGX(pricePerKg)}/kg`
+                    : 'Track-only (no payment)'}
+                </p>
               </div>
               <div className="rounded-2xl bg-white p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Status</p>
@@ -177,6 +193,11 @@ export default function AgentWasteLogCard({
           <div className="rounded-2xl bg-[#F8F9FA] p-4">
             <label className="block text-sm font-semibold text-[#6B7280]">Estimated Weight (Picker)</label>
             <p className="text-2xl font-bold text-[#111111]">{formatNumber(estimatedKg)} kg</p>
+            {isPayable && pricePerKg != null && verifiedKg && (
+              <p className="mt-2 text-sm text-[#238636]">
+                Est. earning: {formatUGX(parseFloat(verifiedKg) * Number(pricePerKg))}
+              </p>
+            )}
             <p className="mt-1 text-xs text-[#6B7280]">Enter the actual verified weight below.</p>
           </div>
           <div>
@@ -228,7 +249,7 @@ export default function AgentWasteLogCard({
         <div className="space-y-4">
           <div className="rounded-2xl bg-[#F8F9FA] p-4 text-sm text-[#6B7280]">
             <p>Job Code: <span className="font-semibold text-[#111111]">{log.job_code}</span></p>
-            <p className="mt-1">Waste: <span className="font-semibold text-[#111111]">{log.waste_type}</span></p>
+            <p className="mt-1">Waste: <span className="font-semibold text-[#111111]">{wasteTypeLabel}</span></p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-semibold text-[#111111]">Rejection Reason (Optional)</label>

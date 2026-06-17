@@ -10,6 +10,7 @@ import WasteLogs from './pages/WasteLogs'
 import Divisions from './pages/Divisions'
 import Earnings from './pages/Earnings'
 import Reports from './pages/Reports'
+import WasteTypes from './pages/WasteTypes'
 import Login from './pages/Login'
 import AccessDenied from './pages/AccessDenied'
 import AgentLayout from './agent/components/AgentLayout'
@@ -50,6 +51,7 @@ const router = createBrowserRouter([
       { path: 'overview', element: <Overview /> },
       { path: 'pickers', element: <Pickers /> },
       { path: 'collection-points', element: <CollectionPoints /> },
+      { path: 'waste-types', element: <WasteTypes /> },
       { path: 'waste-logs', element: <WasteLogs /> },
       { path: 'divisions', element: <Divisions /> },
       { path: 'earnings', element: <Earnings /> },

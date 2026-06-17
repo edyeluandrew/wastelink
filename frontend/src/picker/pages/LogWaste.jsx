@@ -1,27 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LoadingState, ErrorState, Button, Modal } from '../../components';
+import { LoadingState, ErrorState, Button } from '../../components';
 import apiClient from '../../api/axios';
-import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
+import { getCurrentPickerId } from '../utils/pickerSession';
 import { Recycle, MapPin, Scale } from 'lucide-react';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
-const WASTE_TYPES = ['PLASTIC', 'MIXED_RECYCLABLES', 'ORGANIC', 'E_WASTE', 'METAL_CARDBOARD'];
-
 export default function LogWaste() {
   const navigate = useNavigate();
   const location = useLocation();
-  const picker = getCurrentPicker();
   const pickerId = getCurrentPickerId();
 
   const [collectionPoints, setCollectionPoints] = useState([]);
+  const [cityWasteTypes, setCityWasteTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   const [form, setForm] = useState({
-    waste_type: '',
+    city_waste_type_id: '',
     estimated_kg: '',
     collection_point_id: '',
   });
@@ -33,8 +31,8 @@ export default function LogWaste() {
       navigate(AUTH_ENFORCED ? '/login' : '/picker/start', { replace: true });
       return;
     }
-    
-    fetchCollectionPoints();
+
+    fetchInitialData();
   }, [pickerId, navigate]);
 
   useEffect(() => {
@@ -46,21 +44,27 @@ export default function LogWaste() {
     }
   }, [preselectedCollectionPointId]);
 
-  const fetchCollectionPoints = async () => {
+  const fetchInitialData = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await apiClient.get('/collection-points');
-      
-      if (response.data?.success) {
-        const points = response.data.data || [];
-        const activePoints = points.filter(p => p.status === 'ACTIVE');
-        setCollectionPoints(activePoints);
+      const [pointsRes, typesRes] = await Promise.all([
+        apiClient.get('/collection-points'),
+        apiClient.get('/city-waste-types/active', { params: { city: 'kampala' } }),
+      ]);
+
+      if (pointsRes.data?.success) {
+        const points = pointsRes.data.data || [];
+        setCollectionPoints(points.filter(p => p.status === 'ACTIVE'));
+      }
+
+      if (typesRes.data?.success) {
+        setCityWasteTypes(typesRes.data.data || []);
       }
     } catch (err) {
-      console.error('[LogWaste] Error fetching points:', err);
-      setError('Failed to load collection points');
+      console.error('[LogWaste] Error fetching data:', err);
+      setError('Failed to load waste types and collection points');
     } finally {
       setLoading(false);
     }
@@ -71,12 +75,16 @@ export default function LogWaste() {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
+  const selectedWasteType = cityWasteTypes.find(
+    (t) => String(t.id) === String(form.city_waste_type_id)
+  );
+
   const validateForm = () => {
-    if (!form.waste_type) {
+    if (!form.city_waste_type_id) {
       setError('Please select a waste type');
       return false;
     }
-    if (!form.estimated_kg || parseInt(form.estimated_kg) <= 0) {
+    if (!form.estimated_kg || parseFloat(form.estimated_kg) <= 0) {
       setError('Estimated kg must be greater than 0');
       return false;
     }
@@ -89,7 +97,7 @@ export default function LogWaste() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setSubmitting(true);
@@ -98,8 +106,8 @@ export default function LogWaste() {
     try {
       const payload = {
         picker_id: pickerId,
-        collection_point_id: parseInt(form.collection_point_id),
-        waste_type: form.waste_type,
+        collection_point_id: parseInt(form.collection_point_id, 10),
+        city_waste_type_id: parseInt(form.city_waste_type_id, 10),
         estimated_kg: parseFloat(form.estimated_kg),
       };
 
@@ -126,14 +134,23 @@ export default function LogWaste() {
   };
 
   if (loading) {
-    return <LoadingState message="Loading collection points..." />;
+    return <LoadingState message="Loading waste types..." />;
   }
 
   if (collectionPoints.length === 0) {
     return (
       <ErrorState
         error="No active collection points available"
-        onRetry={fetchCollectionPoints}
+        onRetry={fetchInitialData}
+      />
+    );
+  }
+
+  if (cityWasteTypes.length === 0) {
+    return (
+      <ErrorState
+        error="No active waste types configured for your city. Please contact your city admin."
+        onRetry={fetchInitialData}
       />
     );
   }
@@ -179,15 +196,27 @@ export default function LogWaste() {
           <div>
             <label className="mb-2 block text-sm font-semibold text-[#111111]">Waste Type *</label>
             <select
-              name="waste_type"
-              value={form.waste_type}
+              name="city_waste_type_id"
+              value={form.city_waste_type_id}
               onChange={handleChange}
               className="w-full rounded-2xl border border-[#D9D9D9] px-4 py-3 text-sm focus:border-[#238636] focus:outline-none"
               disabled={submitting}
             >
               <option value="">Select waste type</option>
-              {WASTE_TYPES.map(w => <option key={w} value={w}>{w}</option>)}
+              {cityWasteTypes.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                  {type.reporting_category_name ? ` (${type.reporting_category_name})` : ''}
+                </option>
+              ))}
             </select>
+            {selectedWasteType && (
+              <p className="mt-2 text-xs text-[#6B7280]">
+                {selectedWasteType.is_payable
+                  ? `Payable at UGX ${Number(selectedWasteType.price_per_kg).toLocaleString()}/kg when verified`
+                  : 'Track-only — no payment for this waste type'}
+              </p>
+            )}
           </div>
 
           <div>
@@ -238,7 +267,7 @@ export default function LogWaste() {
 
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !form.waste_type || !form.estimated_kg || !form.collection_point_id}
+            disabled={submitting || !form.city_waste_type_id || !form.estimated_kg || !form.collection_point_id}
             className="w-full bg-[#238636] text-white hover:bg-[#2F9E44]"
           >
             {submitting ? 'Submitting...' : 'Submit Waste Log'}

@@ -438,6 +438,42 @@ export default function Reports() {
                 />
               </div>
 
+              {undpReport.environmental_impact.reporting_category_breakdown?.length > 0 && (
+                <div className="card mb-4">
+                  <h5 className="font-medium text-wastelink-dark mb-3">UNDP Reporting Categories</h5>
+                  <DataTable columns={['Category', 'Estimated KG', 'Verified KG', 'Pending KG', 'Rejected KG', 'Paid Earnings']}>
+                    {undpReport.environmental_impact.reporting_category_breakdown.map((item, idx) => (
+                      <tr key={idx} className="border-b border-wastelink-border">
+                        <td className="table-cell font-medium">{item.reporting_category_name}</td>
+                        <td className="table-cell">{formatKg(item.estimated_kg || 0)}</td>
+                        <td className="table-cell">{formatKg(item.verified_kg)}</td>
+                        <td className="table-cell">{formatKg(item.pending_kg || 0)}</td>
+                        <td className="table-cell">{formatKg(item.rejected_kg || 0)}</td>
+                        <td className="table-cell">{formatCurrencyUGX(item.paid_earnings || 0)}</td>
+                      </tr>
+                    ))}
+                  </DataTable>
+                </div>
+              )}
+
+              {undpReport.environmental_impact.city_waste_type_breakdown?.length > 0 && (
+                <div className="card mb-4">
+                  <h5 className="font-medium text-wastelink-dark mb-3">City Waste Type Breakdown</h5>
+                  <DataTable columns={['City Waste Type', 'Reporting Category', 'Estimated KG', 'Verified KG', 'Pending KG', 'Earnings']}>
+                    {undpReport.environmental_impact.city_waste_type_breakdown.map((item, idx) => (
+                      <tr key={idx} className="border-b border-wastelink-border">
+                        <td className="table-cell">{item.city_waste_type_name}</td>
+                        <td className="table-cell">{item.reporting_category_name}</td>
+                        <td className="table-cell">{formatKg(item.estimated_kg || 0)}</td>
+                        <td className="table-cell">{formatKg(item.verified_kg)}</td>
+                        <td className="table-cell">{formatKg(item.pending_kg || 0)}</td>
+                        <td className="table-cell">{formatCurrencyUGX(item.total_earnings || 0)}</td>
+                      </tr>
+                    ))}
+                  </DataTable>
+                </div>
+              )}
+
               {undpReport.environmental_impact.waste_type_breakdown?.length > 0 && (
                 <div className="card">
                   <h5 className="font-medium text-wastelink-dark mb-3">Waste Types</h5>

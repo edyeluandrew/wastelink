@@ -467,6 +467,63 @@ export const getUndpPilotReport = async (req, res, next) => {
       pending_kg: parseFloat(row.pending_kg),
     }));
 
+    const reportingCategoryBreakdownResult = await pool.query(`
+      SELECT
+        COALESCE(rc.id, 0) as reporting_category_id,
+        COALESCE(rc.name, 'Uncategorized') as reporting_category_name,
+        COALESCE(rc.slug, 'uncategorized') as reporting_category_slug,
+        COALESCE(SUM(CASE WHEN wl.status != 'REJECTED' THEN wl.estimated_kg ELSE 0 END), 0) as estimated_kg,
+        ${sqlVerifiedKgSum('wl')} as verified_kg,
+        COALESCE(SUM(CASE WHEN wl.status = 'PENDING' THEN wl.estimated_kg ELSE 0 END), 0) as pending_kg,
+        COALESCE(SUM(CASE WHEN wl.status = 'REJECTED' THEN COALESCE(wl.estimated_kg, 0) ELSE 0 END), 0) as rejected_kg,
+        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as paid_earnings
+      FROM waste_logs wl
+      LEFT JOIN reporting_categories rc ON wl.reporting_category_id = rc.id
+      LEFT JOIN earnings e ON e.waste_log_id = wl.id
+      WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
+      GROUP BY rc.id, rc.name, rc.slug
+      ORDER BY verified_kg DESC
+    `, [startDate, endDate]);
+
+    const reporting_category_breakdown = reportingCategoryBreakdownResult.rows.map(row => ({
+      reporting_category_id: parseInt(row.reporting_category_id, 10),
+      reporting_category_name: row.reporting_category_name,
+      reporting_category_slug: row.reporting_category_slug,
+      estimated_kg: parseFloat(row.estimated_kg),
+      verified_kg: parseFloat(row.verified_kg),
+      pending_kg: parseFloat(row.pending_kg),
+      rejected_kg: parseFloat(row.rejected_kg),
+      paid_earnings: parseInt(row.paid_earnings, 10),
+    }));
+
+    const cityWasteTypeBreakdownResult = await pool.query(`
+      SELECT
+        COALESCE(cwt.id, 0) as city_waste_type_id,
+        COALESCE(cwt.name, wl.waste_type) as city_waste_type_name,
+        COALESCE(rc.name, 'Uncategorized') as reporting_category_name,
+        COALESCE(SUM(CASE WHEN wl.status != 'REJECTED' THEN wl.estimated_kg ELSE 0 END), 0) as estimated_kg,
+        ${sqlVerifiedKgSum('wl')} as verified_kg,
+        COALESCE(SUM(CASE WHEN wl.status = 'PENDING' THEN wl.estimated_kg ELSE 0 END), 0) as pending_kg,
+        COALESCE(SUM(e.amount), 0) as total_earnings
+      FROM waste_logs wl
+      LEFT JOIN city_waste_types cwt ON wl.city_waste_type_id = cwt.id
+      LEFT JOIN reporting_categories rc ON wl.reporting_category_id = rc.id
+      LEFT JOIN earnings e ON e.waste_log_id = wl.id
+      WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
+      GROUP BY cwt.id, cwt.name, wl.waste_type, rc.name
+      ORDER BY verified_kg DESC
+    `, [startDate, endDate]);
+
+    const city_waste_type_breakdown = cityWasteTypeBreakdownResult.rows.map(row => ({
+      city_waste_type_id: parseInt(row.city_waste_type_id, 10),
+      city_waste_type_name: row.city_waste_type_name,
+      reporting_category_name: row.reporting_category_name,
+      estimated_kg: parseFloat(row.estimated_kg),
+      verified_kg: parseFloat(row.verified_kg),
+      pending_kg: parseFloat(row.pending_kg),
+      total_earnings: parseInt(row.total_earnings, 10),
+    }));
+
     // Get livelihood impact for the period
     const livelihoodResult = await pool.query(`
       SELECT
@@ -622,6 +679,8 @@ export const getUndpPilotReport = async (req, res, next) => {
         rejected_estimated_kg: parseFloat(rejected_estimated_kg),
         verified_waste_tonnes,
         waste_type_breakdown,
+        reporting_category_breakdown,
+        city_waste_type_breakdown,
       },
       livelihood_impact: {
         total_earnings_generated: parseInt(total_earnings_generated),
