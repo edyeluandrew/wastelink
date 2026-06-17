@@ -97,12 +97,12 @@ export default function LandingPage() {
             <div className="flex justify-center mb-4">
               <Smartphone className="w-8 h-8 text-[#238636]" />
             </div>
-            <h3 className="text-2xl font-bold text-[#238636] mb-3">USSD Feature Phone Access</h3>
+            <h3 className="text-2xl font-bold text-[#238636] mb-3">Try the full picker journey</h3>
             <p className="text-base text-wastelink-muted max-w-2xl mx-auto mb-6">
-              WasteLink supports feature phones via USSD, enabling pickers without smartphones to register, log waste, and check earnings via text-based menus.
+              Register, log waste, verify, check earnings, and withdraw — step by step in one demo UI (same USSD backend as feature phones).
             </p>
             <Button onClick={() => navigate('/ussd-simulator')} className="bg-[#238636] text-white">
-              Try USSD Simulator
+              Open Picker Journey Demo
             </Button>
           </div>
         </section>
