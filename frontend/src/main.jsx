@@ -29,6 +29,7 @@ import MyJobs from './picker/pages/MyJobs'
 import MyEarnings from './picker/pages/MyEarnings'
 import PickerCollectionPoints from './picker/pages/PickerCollectionPoints'
 import PickerHelp from './picker/pages/PickerHelp'
+import UssdSimulator from './pages/UssdSimulator'
 import ProtectedRoute from './components/ProtectedRoute'
 
 const router = createBrowserRouter([
@@ -71,6 +72,10 @@ const router = createBrowserRouter([
   {
     path: 'route-test',
     element: <div style={{padding: '40px', fontSize: '24px', color: '#238636'}}>✅ Route test works!</div>,
+  },
+  {
+    path: 'ussd-simulator',
+    element: <UssdSimulator />,
   },
   {
     path: 'agent/select-point',

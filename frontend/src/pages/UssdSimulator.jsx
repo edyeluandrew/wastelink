@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Smartphone, Send, RotateCcw, Phone, Menu, BookOpen } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -123,11 +122,7 @@ export default function UssdSimulator() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
       <div className="max-w-5xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-10"
-        >
+        <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Smartphone className="w-8 h-8 text-emerald-600" />
             <h1 className="text-4xl font-bold text-gray-900">WasteLink USSD Simulator</h1>
@@ -135,14 +130,10 @@ export default function UssdSimulator() {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Feature-phone demo for pickers without smartphones. Uses <code className="text-sm bg-gray-100 px-1 rounded">{API_BASE_URL}/ussd</code>
           </p>
-        </motion.div>
+        </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="lg:col-span-2"
-          >
+          <div className="lg:col-span-2">
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border-8 border-gray-900">
               <div className="bg-gray-900 px-6 py-3 flex items-center gap-2">
                 <Phone className="w-4 h-4 text-white" />
@@ -164,7 +155,7 @@ export default function UssdSimulator() {
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && sendInput()}
-                    placeholder="Enter option (e.g. 2 or 2*1*5*1*1). Use 0=back, 00=menu"
+                    placeholder="Enter option (e.g. 2 or 2*1*5*1*3). Use 0=back, 00=menu"
                     disabled={!sessionActive || loading}
                     className="w-full bg-emerald-900 text-emerald-300 placeholder-emerald-600 px-3 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50"
                   />
@@ -194,13 +185,9 @@ export default function UssdSimulator() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-6"
-          >
+          <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Menu className="w-5 h-5 text-emerald-600" />
@@ -244,7 +231,7 @@ export default function UssdSimulator() {
                 Registration example path: <code className="bg-gray-100 px-1">1*Your Name*1*Bwaise*1</code>
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                Log waste example: <code className="bg-gray-100 px-1">2*1*5*1*1</code> (type → kg → division → point)
+                Log waste example: <code className="bg-gray-100 px-1">2*1*5*1*3</code> (type → kg → Kawempe → Kawempe Main = option 3)
               </p>
             </div>
 
@@ -268,15 +255,11 @@ export default function UssdSimulator() {
               />
               <p className="text-xs text-gray-500 mt-2">Change phone and Reset to test registration</p>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {history.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 bg-white rounded-lg shadow-lg p-6"
-          >
+          <div className="mt-8 bg-white rounded-lg shadow-lg p-6">
             <h3 className="font-bold text-gray-900 mb-4">Session History</h3>
             <div className="space-y-4 max-h-96 overflow-y-auto">
               {history.map((item, idx) => (
@@ -286,7 +269,7 @@ export default function UssdSimulator() {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
     </div>
