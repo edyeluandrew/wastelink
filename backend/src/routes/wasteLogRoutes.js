@@ -10,6 +10,9 @@ import {
   approvePayout,
   initiatePayout,
   simulatePayoutConfirm,
+  simulatePayoutFail,
+  retryPayout,
+  returnPayoutToBalance,
 } from "../controllers/wasteLogController.js";
 import { optionalAuth } from "../middleware/authMiddleware.js";
 import { requireAuth } from "../middleware/authMiddleware.js";
@@ -26,6 +29,9 @@ router.patch("/:id/reject", optionalAuth, rejectWasteLog);
 router.patch("/:id/payout/approve", requireAuth, approvePayout);
 router.patch("/:id/payout/initiate", requireAuth, initiatePayout);
 router.patch("/:id/payout/simulate-confirm", requireAuth, simulatePayoutConfirm);
+router.patch("/:id/payout/simulate-fail", requireAuth, simulatePayoutFail);
+router.patch("/:id/payout/retry", requireAuth, retryPayout);
+router.patch("/:id/payout/return-to-balance", requireAuth, returnPayoutToBalance);
 router.patch("/:id/mark-paid", requireAuth, markWasteLogPaid);
 
 export default router;

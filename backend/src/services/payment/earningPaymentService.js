@@ -1,6 +1,7 @@
 import {
   PAYMENT_STATUS,
   canTransitionPaymentStatus,
+  normalizePaymentStatus,
 } from '../../utils/paymentStatus.js';
 import { recordManualPayoutTransaction, upsertPayoutTransaction } from './paymentService.js';
 import { simulatePayment } from './simulationPaymentService.js';
@@ -85,6 +86,7 @@ export const transitionEarningPayment = async (
     paymentReference = null,
     phone = null,
     simulate = false,
+    transitionAmount = null,
   }
 ) => {
   const earningResult = await client.query(
@@ -99,24 +101,29 @@ export const transitionEarningPayment = async (
   }
 
   const earning = earningResult.rows[0];
-  const fromStatus = earning.status;
+  const fromStatus = normalizePaymentStatus(earning.status);
+  const targetStatus = normalizePaymentStatus(toStatus);
 
-  if (!canTransitionPaymentStatus(fromStatus, toStatus)) {
+  if (!canTransitionPaymentStatus(fromStatus, targetStatus)) {
     const error = new Error(
-      `Cannot transition payment from ${fromStatus} to ${toStatus}`
+      `Cannot transition payment from ${fromStatus} to ${targetStatus}`
     );
     error.status = 400;
     throw error;
   }
 
   const updateFields = ['status = $1'];
-  const params = [toStatus];
+  const params = [targetStatus];
   let paidAt = null;
 
-  if (toStatus === PAYMENT_STATUS.PAID) {
+  if (targetStatus === PAYMENT_STATUS.PAID) {
     paidAt = new Date();
     updateFields.push(`paid_at = $${params.length + 1}`);
     params.push(paidAt);
+  }
+
+  if (targetStatus === PAYMENT_STATUS.AVAILABLE) {
+    updateFields.push('paid_at = NULL');
   }
 
   params.push(earningId);
@@ -127,23 +134,24 @@ export const transitionEarningPayment = async (
   );
 
   const updatedEarning = updatedEarningResult.rows[0];
+  const amountForRecord = transitionAmount ?? earning.amount;
   let payoutTransaction = null;
   let resolvedReference = paymentReference;
 
-  if (toStatus === PAYMENT_STATUS.PAYOUT_INITIATED) {
+  if (targetStatus === PAYMENT_STATUS.PAYOUT_PROCESSING) {
     resolvedReference =
-      paymentReference || `PAYOUT-INIT-${earningId}-${Date.now()}`;
+      paymentReference || `PAYOUT-PROC-${earningId}-${Date.now()}`;
 
     try {
       payoutTransaction = await upsertPayoutTransaction(client, {
         earningId,
         wasteLogId: wasteLogId || earning.waste_log_id,
         pickerId: pickerId || earning.picker_id,
-        provider: simulate ? 'SIMULATION' : 'MANUAL',
+        provider: simulate ? 'DEMO' : 'MANUAL',
         phone,
-        amount: earning.amount,
+        amount: amountForRecord,
         providerTransactionId: resolvedReference,
-        status: 'INITIATED',
+        status: 'PROCESSING',
         paidAt: null,
       });
     } catch (payoutError) {
@@ -151,13 +159,13 @@ export const transitionEarningPayment = async (
     }
   }
 
-  if (toStatus === PAYMENT_STATUS.PAID) {
+  if (targetStatus === PAYMENT_STATUS.PAID) {
     const simResult = simulate
       ? await simulatePayment({
           earningId,
           wasteLogId: wasteLogId || earning.waste_log_id,
           pickerId: pickerId || earning.picker_id,
-          amount: earning.amount,
+          amount: amountForRecord,
           phone,
         })
       : null;
@@ -165,16 +173,16 @@ export const transitionEarningPayment = async (
     resolvedReference =
       paymentReference ||
       simResult?.provider_transaction_id ||
-      `DEMO-PAID-${earningId}-${Date.now()}`;
+      `PAID-${earningId}-${Date.now()}`;
 
     try {
       payoutTransaction = await upsertPayoutTransaction(client, {
         earningId,
         wasteLogId: wasteLogId || earning.waste_log_id,
         pickerId: pickerId || earning.picker_id,
-        provider: simulate ? 'SIMULATION' : 'MANUAL',
+        provider: simulate ? 'DEMO' : 'MANUAL',
         phone,
-        amount: earning.amount,
+        amount: amountForRecord,
         providerTransactionId: resolvedReference,
         status: 'SUCCESS',
         paidAt: paidAt || new Date(),
@@ -193,9 +201,9 @@ export const transitionEarningPayment = async (
     earningId,
     wasteLogId: wasteLogId || earning.waste_log_id,
     fromStatus,
-    toStatus,
+    toStatus: targetStatus,
     paymentReference: resolvedReference,
-    amount: earning.amount,
+    amount: amountForRecord,
     changedBy,
     notes,
     isSimulated: simulate,
@@ -206,7 +214,7 @@ export const transitionEarningPayment = async (
     payout_transaction: payoutTransaction,
     payment_reference: resolvedReference,
     from_status: fromStatus,
-    to_status: toStatus,
+    to_status: targetStatus,
     is_simulated: simulate,
   };
 };

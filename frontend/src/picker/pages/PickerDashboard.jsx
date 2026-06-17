@@ -6,7 +6,6 @@ import PickerJobCard from '../components/PickerJobCard';
 import apiClient from '../../api/axios';
 import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX } from '../../utils/formatters';
-import { sumRemainingEarnings } from '../../utils/earningsHelper';
 import { Wind, FileText, Wallet } from 'lucide-react';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
@@ -17,6 +16,7 @@ export default function PickerDashboard() {
   const picker = getCurrentPicker();
   const pickerId = getCurrentPickerId();
 
+  const [balance, setBalance] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,11 +50,17 @@ export default function PickerDashboard() {
     setError(null);
 
     try {
-      const response = await apiClient.get(`/waste-logs?picker_id=${pickerId}`);
-      
-      if (response.data?.success) {
-        const allLogs = response.data.data || [];
-        setLogs(allLogs);
+      const [logsRes, balanceRes] = await Promise.all([
+        apiClient.get(`/waste-logs?picker_id=${pickerId}`),
+        apiClient.get('/withdrawals/balance'),
+      ]);
+
+      if (logsRes.data?.success) {
+        setLogs(logsRes.data.data || []);
+      }
+
+      if (balanceRes.data?.success) {
+        setBalance(balanceRes.data.data);
       }
     } catch (err) {
       console.error('[PickerDashboard] Error:', err);
@@ -77,13 +83,10 @@ export default function PickerDashboard() {
   const verified = logs.filter(l => l.status === 'VERIFIED').length;
   const paid = logs.filter(l => l.status === 'PAID').length;
   const totalKg = logs.reduce((sum, l) => sum + (l.verified_kg || 0), 0);
-  const totalEarnings = sumRemainingEarnings(logs);
-  const pendingEarnings = logs.reduce((sum, l) => {
-    if (l.status === 'VERIFIED' && l.earning?.status !== 'PAID') {
-      return sum + (l.earning?.amount || 0);
-    }
-    return sum;
-  }, 0);
+  const availableBalance = balance?.available_balance ?? balance?.available_to_withdraw ?? 0;
+  const processingBalance = balance?.payout_processing_balance ?? 0;
+  const totalPaid = balance?.total_paid ?? 0;
+  const pendingVerification = balance?.pending_logs_count ?? pending;
 
   // Recent jobs — newest first
   const recentJobs = [...logs]
@@ -119,20 +122,35 @@ export default function PickerDashboard() {
       </div>
 
       {/* Earnings Cards */}
-      <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
         <div className="bg-green-100 border border-green-300 rounded-lg p-4">
-          <p className="text-xs text-green-700 font-medium mb-1">Remaining Balance</p>
-          <p className="text-2xl font-bold text-green-900">{formatUGX(totalEarnings)}</p>
+          <p className="text-xs text-green-700 font-medium mb-1">Withdrawable</p>
+          <p className="text-2xl font-bold text-green-900">{formatUGX(availableBalance)}</p>
         </div>
-
-        {pendingEarnings > 0 && (
+        <div className="bg-purple-100 border border-purple-300 rounded-lg p-4">
+          <p className="text-xs text-purple-700 font-medium mb-1">Processing</p>
+          <p className="text-2xl font-bold text-purple-900">{formatUGX(processingBalance)}</p>
+        </div>
+        <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
+          <p className="text-xs text-blue-700 font-medium mb-1">Total Paid</p>
+          <p className="text-2xl font-bold text-blue-900">{formatUGX(totalPaid)}</p>
+        </div>
+        {pendingVerification > 0 && (
           <div className="bg-amber-100 border border-amber-300 rounded-lg p-4">
-            <p className="text-xs text-amber-700 font-medium mb-1">Pending Earnings</p>
-            <p className="text-2xl font-bold text-amber-900">{formatUGX(pendingEarnings)}</p>
-            <p className="text-xs text-amber-700 mt-1">Awaiting verification completion</p>
+            <p className="text-xs text-amber-700 font-medium mb-1">Awaiting Verification</p>
+            <p className="text-2xl font-bold text-amber-900">{pendingVerification}</p>
           </div>
         )}
       </div>
+
+      {availableBalance > 0 && (
+        <Button
+          onClick={() => navigate('/picker/earnings')}
+          className="w-full bg-[#238636] text-white hover:bg-[#2F9E44]"
+        >
+          <Wallet className="w-5 h-5" /> Withdraw {formatUGX(availableBalance)}
+        </Button>
+      )}
 
       {/* Action Buttons */}
       <div className="grid grid-cols-2 gap-3">

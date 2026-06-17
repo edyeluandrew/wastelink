@@ -4,12 +4,24 @@ import {
   getWithdrawalBalance,
   getWithdrawalById,
   listWithdrawals,
+  confirmWithdrawal,
+  failWithdrawal,
+  retryFailedWithdrawal,
+  returnFailedWithdrawalToBalance,
 } from '../services/payment/withdrawalService.js';
-import { getProviderLabel, isSimulationWithdrawalMode } from '../utils/mobileMoney.js';
+import { getProviderLabel } from '../utils/mobileMoney.js';
 
 const requirePicker = (req, res) => {
   if (req.user?.role !== 'PICKER' || !req.user?.picker_id) {
     sendError(res, 'Only pickers can access this resource', 403);
+    return false;
+  }
+  return true;
+};
+
+const requireAdmin = (req, res) => {
+  if (!['SUPER_ADMIN', 'CITY_ADMIN'].includes(req.user?.role)) {
+    sendError(res, 'Forbidden', 403);
     return false;
   }
   return true;
@@ -23,7 +35,6 @@ export const getMyWithdrawalBalance = async (req, res) => {
 
     sendSuccess(res, 'Withdrawal balance fetched successfully', {
       ...balance,
-      simulation_mode: isSimulationWithdrawalMode(),
       providers: [
         { id: 'MTN', label: getProviderLabel('MTN') },
         { id: 'AIRTEL', label: getProviderLabel('AIRTEL') },
@@ -46,7 +57,7 @@ export const getWithdrawals = async (req, res) => {
 
     const withdrawals = await listWithdrawals({
       pickerId: isAdmin && req.query.all === 'true' ? null : pickerId,
-      limit: parseInt(req.query.limit || '20', 10),
+      limit: parseInt(req.query.limit || '50', 10),
     });
 
     sendSuccess(res, 'Withdrawals fetched successfully', withdrawals);
@@ -97,11 +108,11 @@ export const requestWithdrawal = async (req, res) => {
       changedBy: req.user.id,
     });
 
-    sendSuccess(res, result.simulation.message, {
+    sendSuccess(res, 'Withdrawal submitted — payout is processing', {
       withdrawal: {
         id: result.withdrawal.id,
         provider: result.withdrawal.provider,
-        provider_label: result.simulation.provider_label,
+        provider_label: getProviderLabel(result.withdrawal.provider),
         phone: result.withdrawal.phone,
         amount: result.total_amount,
         currency: result.withdrawal.currency,
@@ -110,13 +121,58 @@ export const requestWithdrawal = async (req, res) => {
         is_simulated: true,
         jobs_count: result.jobs_count,
         created_at: result.withdrawal.created_at,
-        completed_at: result.withdrawal.completed_at,
       },
       items: result.items,
-      demo_notice: 'This is a simulated mobile money withdrawal. No real MTN or Airtel transfer was made.',
+      demo_notice: result.demo_notice,
     }, 201);
   } catch (error) {
     console.error('[Withdrawal Request Error]', error.message);
     sendError(res, error.message || 'Withdrawal failed', error.status || 503);
+  }
+};
+
+export const simulateConfirmWithdrawal = async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const withdrawal = await confirmWithdrawal(req.params.id, {
+      changedBy: req.user.id,
+      notes: req.body?.notes || 'Admin simulated provider payment success',
+    });
+    sendSuccess(res, 'Withdrawal confirmed (demo)', withdrawal);
+  } catch (error) {
+    sendError(res, error.message || 'Failed to confirm withdrawal', error.status || 503);
+  }
+};
+
+export const simulateFailWithdrawal = async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const withdrawal = await failWithdrawal(req.params.id, {
+      changedBy: req.user.id,
+      reason: req.body?.reason || req.body?.notes || 'Admin simulated provider payment failure',
+    });
+    sendSuccess(res, 'Withdrawal marked failed (demo)', withdrawal);
+  } catch (error) {
+    sendError(res, error.message || 'Failed to fail withdrawal', error.status || 503);
+  }
+};
+
+export const retryWithdrawalHandler = async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const withdrawal = await retryFailedWithdrawal(req.params.id, { changedBy: req.user.id });
+    sendSuccess(res, 'Withdrawal retry initiated', withdrawal);
+  } catch (error) {
+    sendError(res, error.message || 'Failed to retry withdrawal', error.status || 503);
+  }
+};
+
+export const returnWithdrawalToBalanceHandler = async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const withdrawal = await returnFailedWithdrawalToBalance(req.params.id, { changedBy: req.user.id });
+    sendSuccess(res, 'Withdrawal returned to picker balance', withdrawal);
+  } catch (error) {
+    sendError(res, error.message || 'Failed to return withdrawal to balance', error.status || 503);
   }
 };

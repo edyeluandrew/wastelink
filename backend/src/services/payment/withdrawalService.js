@@ -2,26 +2,23 @@ import pool from '../../config/db.js';
 import {
   MOBILE_PROVIDERS,
   detectMobileProvider,
-  isSimulationWithdrawalMode,
   isValidUgandaMobile,
   normalizeUgandaPhone,
   providerMatchesPhone,
 } from '../../utils/mobileMoney.js';
 import {
-  simulateMobileMoneyWithdrawal,
-} from './mobileMoneyWithdrawalService.js';
-import {
   recordPaymentStatusChange,
+  transitionEarningPayment,
 } from './earningPaymentService.js';
 import { upsertPayoutTransaction } from './paymentService.js';
-import { PAYMENT_STATUS } from '../../utils/paymentStatus.js';
+import { PAYMENT_STATUS, normalizePaymentStatus } from '../../utils/paymentStatus.js';
 
 export const ensureWithdrawalTables = async (client) => {
   await client.query(`
     CREATE TABLE IF NOT EXISTS withdrawal_requests (
       id SERIAL PRIMARY KEY,
       picker_id INT NOT NULL REFERENCES pickers(id),
-      provider VARCHAR(20) NOT NULL CHECK (provider IN ('MTN','AIRTEL')),
+      provider VARCHAR(20) NOT NULL CHECK (provider IN ('MTN','AIRTEL','DEMO')),
       phone VARCHAR(30) NOT NULL,
       amount INT NOT NULL,
       currency VARCHAR(10) NOT NULL DEFAULT 'UGX',
@@ -49,8 +46,6 @@ export const ensureWithdrawalTables = async (client) => {
 
 export const getEligibleEarningsForWithdrawal = async (client, pickerId, { forUpdate = false } = {}) => {
   await ensureWithdrawalTables(client);
-  const simulation = isSimulationWithdrawalMode();
-
   const lock = forUpdate ? 'FOR UPDATE OF e' : '';
 
   const result = await client.query(
@@ -65,13 +60,11 @@ export const getEligibleEarningsForWithdrawal = async (client, pickerId, { forUp
     FROM earnings e
     JOIN waste_logs wl ON e.waste_log_id = wl.id
     WHERE e.picker_id = $1
-      AND (
-        e.status = $2
-        OR ($3 = true AND e.status = 'PENDING' AND wl.status IN ('VERIFIED', 'PAID'))
-      )
+      AND e.status = $2
+      AND e.amount > 0
     ORDER BY e.created_at ASC
     ${lock}`,
-    [pickerId, PAYMENT_STATUS.APPROVED, simulation]
+    [pickerId, PAYMENT_STATUS.AVAILABLE]
   );
 
   return result.rows;
@@ -84,34 +77,34 @@ export const getWithdrawalBalance = async (pickerId) => {
 
     const summary = await client.query(
       `SELECT
-        COALESCE(SUM(CASE WHEN e.status = 'APPROVED' THEN e.amount ELSE 0 END), 0) AS approved_amount,
-        COALESCE(SUM(CASE WHEN e.status = 'PENDING' AND wl.status IN ('VERIFIED','PAID') THEN e.amount ELSE 0 END), 0) AS pending_approval_amount,
-        COALESCE(SUM(CASE WHEN e.status = 'PAYOUT_INITIATED' THEN e.amount ELSE 0 END), 0) AS processing_amount,
-        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) AS paid_amount,
-        COUNT(CASE WHEN e.status = 'APPROVED' THEN 1 END) AS approved_jobs,
-        COUNT(CASE WHEN e.status = 'PENDING' AND wl.status IN ('VERIFIED','PAID') THEN 1 END) AS pending_approval_jobs
+        COALESCE(SUM(CASE WHEN e.status = 'AVAILABLE' THEN e.amount ELSE 0 END), 0) AS available_balance,
+        COALESCE(SUM(CASE WHEN e.status = 'PAYOUT_PROCESSING' THEN e.amount ELSE 0 END), 0) AS payout_processing_balance,
+        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) AS total_paid,
+        COALESCE(SUM(CASE WHEN e.status = 'FAILED' THEN e.amount ELSE 0 END), 0) AS failed_balance,
+        COUNT(CASE WHEN e.status = 'AVAILABLE' THEN 1 END) AS available_jobs
       FROM earnings e
-      JOIN waste_logs wl ON e.waste_log_id = wl.id
       WHERE e.picker_id = $1`,
       [pickerId]
     );
 
-    const simulation = isSimulationWithdrawalMode();
+    const pendingLogs = await client.query(
+      `SELECT COUNT(*) AS pending_logs_count
+       FROM waste_logs
+       WHERE picker_id = $1 AND status = 'PENDING'`,
+      [pickerId]
+    );
+
     const row = summary.rows[0];
-    const approvedAmount = parseInt(row.approved_amount, 10);
-    const pendingApprovalAmount = parseInt(row.pending_approval_amount, 10);
+    const availableBalance = parseInt(row.available_balance, 10);
 
     return {
-      available_to_withdraw: simulation
-        ? approvedAmount + pendingApprovalAmount
-        : approvedAmount,
-      approved_amount: approvedAmount,
-      pending_approval_amount: pendingApprovalAmount,
-      processing_amount: parseInt(row.processing_amount, 10),
-      paid_amount: parseInt(row.paid_amount, 10),
-      approved_jobs: parseInt(row.approved_jobs, 10),
-      pending_approval_jobs: parseInt(row.pending_approval_jobs, 10),
-      simulation_mode: simulation,
+      available_balance: availableBalance,
+      available_to_withdraw: availableBalance,
+      payout_processing_balance: parseInt(row.payout_processing_balance, 10),
+      total_paid: parseInt(row.total_paid, 10),
+      failed_balance: parseInt(row.failed_balance, 10),
+      pending_logs_count: parseInt(pendingLogs.rows[0].pending_logs_count, 10),
+      available_jobs: parseInt(row.available_jobs, 10),
       currency: 'UGX',
     };
   } finally {
@@ -119,7 +112,6 @@ export const getWithdrawalBalance = async (pickerId) => {
   }
 };
 
-/** Pick earnings oldest-first until requested amount is allocated (supports partial last earning). */
 export const allocateEarningsForAmount = (eligible, requestedAmount) => {
   const target = parseInt(requestedAmount, 10);
   let remaining = target;
@@ -140,69 +132,53 @@ export const allocateEarningsForAmount = (eligible, requestedAmount) => {
     remaining -= withdrawAmount;
   }
 
-  if (remaining > 0) {
-    return null;
-  }
-
+  if (remaining > 0) return null;
   return allocations;
 };
 
-const markEarningPaidForWithdrawal = async (
+const reserveEarningForWithdrawal = async (
   client,
-  { earning, withdrawAmount, pickerId, provider, phone, paymentReference, changedBy, isSimulated }
+  { allocation, withdrawalId, changedBy, provider, phone, paymentReference }
 ) => {
-  const fullAmount = parseInt(earning.amount, 10);
-  const payoutAmount = parseInt(withdrawAmount ?? earning.amount, 10);
-  const isPartial = payoutAmount < fullAmount;
-  let currentStatus = earning.status;
-
-  if (currentStatus === PAYMENT_STATUS.PENDING) {
-    await client.query(`UPDATE earnings SET status = $1 WHERE id = $2`, [
-      PAYMENT_STATUS.APPROVED,
-      earning.id,
-    ]);
-    await recordPaymentStatusChange(client, {
-      earningId: earning.id,
-      wasteLogId: earning.waste_log_id,
-      fromStatus: PAYMENT_STATUS.PENDING,
-      toStatus: PAYMENT_STATUS.APPROVED,
-      amount: fullAmount,
-      changedBy,
-      notes: 'Auto-approved for demo mobile money withdrawal',
-      isSimulated: true,
-    });
-    currentStatus = PAYMENT_STATUS.APPROVED;
-  }
+  const withdrawAmount = parseInt(allocation.withdraw_amount, 10);
+  const fullAmount = parseInt(allocation.amount, 10);
+  const isPartial = allocation.is_partial;
 
   if (isPartial) {
     await client.query(`UPDATE earnings SET amount = $1 WHERE id = $2`, [
-      fullAmount - payoutAmount,
-      earning.id,
+      fullAmount - withdrawAmount,
+      allocation.id,
     ]);
 
     await recordPaymentStatusChange(client, {
-      earningId: earning.id,
-      wasteLogId: earning.waste_log_id,
-      fromStatus: currentStatus,
-      toStatus: PAYMENT_STATUS.APPROVED,
-      amount: payoutAmount,
+      earningId: allocation.id,
+      wasteLogId: allocation.waste_log_id,
+      fromStatus: PAYMENT_STATUS.AVAILABLE,
+      toStatus: PAYMENT_STATUS.AVAILABLE,
+      amount: withdrawAmount,
       changedBy,
       paymentReference,
-      notes: `Partial demo ${provider} withdrawal — ${fullAmount - payoutAmount} UGX remaining`,
-      isSimulated: isSimulated,
+      notes: `Partial withdrawal reserve — ${fullAmount - withdrawAmount} UGX remains available`,
+      isSimulated: true,
     });
+
+    await client.query(
+      `INSERT INTO withdrawal_request_earnings (withdrawal_request_id, earning_id, waste_log_id, amount)
+       VALUES ($1, $2, $3, $4)`,
+      [withdrawalId, allocation.id, allocation.waste_log_id, withdrawAmount]
+    );
 
     try {
       await upsertPayoutTransaction(client, {
-        earningId: earning.id,
-        wasteLogId: earning.waste_log_id,
-        pickerId,
-        provider: `${provider}_SIM`,
+        earningId: allocation.id,
+        wasteLogId: allocation.waste_log_id,
+        pickerId: allocation.picker_id,
+        provider: `${provider}_DEMO`,
         phone,
-        amount: payoutAmount,
-        providerTransactionId: `${paymentReference}-PARTIAL`,
-        status: 'SUCCESS',
-        paidAt: new Date(),
+        amount: withdrawAmount,
+        providerTransactionId: `${paymentReference}-PARTIAL-E${allocation.id}`,
+        status: 'PROCESSING',
+        paidAt: null,
       });
     } catch (payoutError) {
       if (payoutError?.code !== '42P01') throw payoutError;
@@ -211,65 +187,23 @@ const markEarningPaidForWithdrawal = async (
     return;
   }
 
-  if (currentStatus === PAYMENT_STATUS.APPROVED) {
-    await client.query(`UPDATE earnings SET status = $1 WHERE id = $2`, [
-      PAYMENT_STATUS.PAYOUT_INITIATED,
-      earning.id,
-    ]);
-    await recordPaymentStatusChange(client, {
-      earningId: earning.id,
-      wasteLogId: earning.waste_log_id,
-      fromStatus: PAYMENT_STATUS.APPROVED,
-      toStatus: PAYMENT_STATUS.PAYOUT_INITIATED,
-      amount: fullAmount,
-      changedBy,
-      paymentReference,
-      notes: `Mobile money withdrawal initiated via ${provider}`,
-      isSimulated: isSimulated,
-    });
-    currentStatus = PAYMENT_STATUS.PAYOUT_INITIATED;
-  }
-
-  const paidAt = new Date();
-  await client.query(`UPDATE earnings SET status = $1, paid_at = $2 WHERE id = $3`, [
-    PAYMENT_STATUS.PAID,
-    paidAt,
-    earning.id,
-  ]);
-
-  await client.query(
-    `UPDATE waste_logs SET status = 'PAID', updated_at = NOW()
-     WHERE id = $1 AND status IN ('VERIFIED', 'PAID')`,
-    [earning.waste_log_id]
-  );
-
-  await recordPaymentStatusChange(client, {
-    earningId: earning.id,
-    wasteLogId: earning.waste_log_id,
-    fromStatus: currentStatus,
-    toStatus: PAYMENT_STATUS.PAID,
-    amount: fullAmount,
+  await transitionEarningPayment(client, {
+    earningId: allocation.id,
+    wasteLogId: allocation.waste_log_id,
+    pickerId: allocation.picker_id,
+    toStatus: PAYMENT_STATUS.PAYOUT_PROCESSING,
     changedBy,
+    phone,
     paymentReference,
-    notes: `Demo ${provider} mobile money withdrawal completed`,
-    isSimulated: isSimulated,
+    simulate: true,
+    notes: `Withdrawal #${withdrawalId} initiated via ${provider}`,
   });
 
-  try {
-    await upsertPayoutTransaction(client, {
-      earningId: earning.id,
-      wasteLogId: earning.waste_log_id,
-      pickerId,
-      provider: `${provider}_SIM`,
-      phone,
-      amount: fullAmount,
-      providerTransactionId: paymentReference,
-      status: 'SUCCESS',
-      paidAt,
-    });
-  } catch (payoutError) {
-    if (payoutError?.code !== '42P01') throw payoutError;
-  }
+  await client.query(
+    `INSERT INTO withdrawal_request_earnings (withdrawal_request_id, earning_id, waste_log_id, amount)
+     VALUES ($1, $2, $3, $4)`,
+    [withdrawalId, allocation.id, allocation.waste_log_id, withdrawAmount]
+  );
 };
 
 export const createPickerWithdrawal = async ({
@@ -279,8 +213,8 @@ export const createPickerWithdrawal = async ({
   amount = null,
   changedBy = null,
 }) => {
-  const normalizedProvider = String(provider || '').toUpperCase();
-  if (![MOBILE_PROVIDERS.MTN, MOBILE_PROVIDERS.AIRTEL].includes(normalizedProvider)) {
+  const normalizedProvider = String(provider || 'DEMO').toUpperCase();
+  if (![MOBILE_PROVIDERS.MTN, MOBILE_PROVIDERS.AIRTEL, 'DEMO'].includes(normalizedProvider)) {
     const error = new Error('Provider must be MTN or AIRTEL');
     error.status = 400;
     throw error;
@@ -293,7 +227,10 @@ export const createPickerWithdrawal = async ({
     throw error;
   }
 
-  if (!providerMatchesPhone(normalizedProvider, normalizedPhone)) {
+  if (
+    normalizedProvider !== 'DEMO' &&
+    !providerMatchesPhone(normalizedProvider, normalizedPhone)
+  ) {
     const detected = detectMobileProvider(normalizedPhone);
     const error = new Error(
       detected
@@ -304,11 +241,7 @@ export const createPickerWithdrawal = async ({
     throw error;
   }
 
-  let client = await pool.connect();
-  let withdrawal;
-  let allocations = [];
-  let totalAmount = 0;
-
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await ensureWithdrawalTables(client);
@@ -317,9 +250,7 @@ export const createPickerWithdrawal = async ({
 
     if (eligible.length === 0) {
       const error = new Error(
-        isSimulationWithdrawalMode()
-          ? 'No earnings available to withdraw. Wait for agent verification first.'
-          : 'No approved earnings available. Admin must approve your earnings before withdrawal.'
+        'No withdrawable balance. Wait for agent verification before withdrawing.'
       );
       error.status = 400;
       throw error;
@@ -343,85 +274,45 @@ export const createPickerWithdrawal = async ({
       throw error;
     }
 
-    allocations = allocateEarningsForAmount(eligible, requestedAmount);
-
-    if (!allocations || allocations.length === 0) {
+    const allocations = allocateEarningsForAmount(eligible, requestedAmount);
+    if (!allocations?.length) {
       const error = new Error('Unable to allocate that amount from your earnings. Try a lower amount.');
       error.status = 400;
       throw error;
     }
 
-    totalAmount = allocations.reduce((sum, row) => sum + row.withdraw_amount, 0);
+    const totalAmount = allocations.reduce((sum, row) => sum + row.withdraw_amount, 0);
+    const paymentReference = `WD-${pickerId}-${Date.now()}`;
 
     const withdrawalInsert = await client.query(
       `INSERT INTO withdrawal_requests (
-        picker_id, provider, phone, amount, currency, status, is_simulated, notes
-      ) VALUES ($1, $2, $3, $4, 'UGX', 'PROCESSING', TRUE, $5)
+        picker_id, provider, phone, amount, currency, status, payment_reference, is_simulated, notes
+      ) VALUES ($1, $2, $3, $4, 'UGX', 'PROCESSING', $5, TRUE, $6)
       RETURNING *`,
       [
         pickerId,
         normalizedProvider,
         normalizedPhone,
         totalAmount,
-        `Demo mobile money withdrawal${totalAmount < maxAvailable ? ' (partial)' : ''} — no real funds transferred`,
+        paymentReference,
+        `Mobile money withdrawal pending provider confirmation (demo)`,
       ]
     );
 
-    withdrawal = withdrawalInsert.rows[0];
+    const withdrawal = withdrawalInsert.rows[0];
 
     for (const allocation of allocations) {
-      await client.query(
-        `INSERT INTO withdrawal_request_earnings (withdrawal_request_id, earning_id, waste_log_id, amount)
-         VALUES ($1, $2, $3, $4)`,
-        [withdrawal.id, allocation.id, allocation.waste_log_id, allocation.withdraw_amount]
-      );
-    }
-
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  } finally {
-    client.release();
-    client = null;
-  }
-
-  const simulationResult = await simulateMobileMoneyWithdrawal({
-    withdrawalId: withdrawal.id,
-    pickerId,
-    provider: normalizedProvider,
-    phone: normalizedPhone,
-    amount: totalAmount,
-  });
-
-  const tx = await pool.connect();
-  try {
-    await tx.query('BEGIN');
-
-    for (const allocation of allocations) {
-      await markEarningPaidForWithdrawal(tx, {
-        earning: allocation,
-        withdrawAmount: allocation.withdraw_amount,
-        pickerId,
+      await reserveEarningForWithdrawal(client, {
+        allocation,
+        withdrawalId: withdrawal.id,
+        changedBy,
         provider: normalizedProvider,
         phone: normalizedPhone,
-        paymentReference: `${simulationResult.provider_transaction_id}-E${allocation.id}`,
-        changedBy,
-        isSimulated: true,
+        paymentReference,
       });
     }
 
-    const completed = await tx.query(
-      `UPDATE withdrawal_requests
-       SET status = 'SUCCESS',
-           payment_reference = $1,
-           completed_at = NOW()
-       WHERE id = $2
-       RETURNING *`,
-      [simulationResult.provider_transaction_id, withdrawal.id]
-    );
-
-    await tx.query('COMMIT');
+    await client.query('COMMIT');
 
     const items = await pool.query(
       `SELECT wre.earning_id, wre.waste_log_id, wre.amount, wl.job_code
@@ -432,21 +323,344 @@ export const createPickerWithdrawal = async ({
     );
 
     return {
-      withdrawal: completed.rows[0],
-      simulation: simulationResult,
+      withdrawal,
       items: items.rows,
       total_amount: totalAmount,
       jobs_count: allocations.length,
+      demo_notice:
+        'Withdrawal submitted. Funds are processing — admin or provider will confirm payment.',
     };
   } catch (error) {
-    await tx.query('ROLLBACK').catch(() => {});
-    await pool.query(
-      `UPDATE withdrawal_requests SET status = 'FAILED', failure_reason = $1 WHERE id = $2`,
-      [error.message, withdrawal.id]
-    ).catch(() => {});
+    await client.query('ROLLBACK').catch(() => {});
     throw error;
   } finally {
-    tx.release();
+    client.release();
+  }
+};
+
+const loadWithdrawalWithItems = async (client, withdrawalId, { forUpdate = false } = {}) => {
+  await ensureWithdrawalTables(client);
+  const lock = forUpdate ? 'FOR UPDATE' : '';
+
+  const withdrawalResult = await client.query(
+    `SELECT wr.*, p.name AS picker_name, p.phone AS picker_phone
+     FROM withdrawal_requests wr
+     JOIN pickers p ON wr.picker_id = p.id
+     WHERE wr.id = $1
+     ${lock}`,
+    [withdrawalId]
+  );
+
+  if (withdrawalResult.rows.length === 0) return null;
+
+  const items = await client.query(
+    `SELECT wre.*, e.status AS earning_status, e.amount AS earning_amount, wl.job_code
+     FROM withdrawal_request_earnings wre
+     JOIN earnings e ON e.id = wre.earning_id
+     JOIN waste_logs wl ON wl.id = wre.waste_log_id
+     WHERE wre.withdrawal_request_id = $1`,
+    [withdrawalId]
+  );
+
+  return {
+    withdrawal: withdrawalResult.rows[0],
+    items: items.rows,
+  };
+};
+
+const finalizeWithdrawalItemPaid = async (
+  client,
+  { item, withdrawal, changedBy, paymentReference, simulate = true }
+) => {
+  const earningStatus = normalizePaymentStatus(item.earning_status);
+  const payoutAmount = parseInt(item.amount, 10);
+
+  if (earningStatus === PAYMENT_STATUS.PAYOUT_PROCESSING) {
+    await transitionEarningPayment(client, {
+      earningId: item.earning_id,
+      wasteLogId: item.waste_log_id,
+      pickerId: withdrawal.picker_id,
+      toStatus: PAYMENT_STATUS.PAID,
+      changedBy,
+      phone: withdrawal.phone,
+      paymentReference: `${paymentReference}-E${item.earning_id}`,
+      simulate,
+      notes: `Withdrawal #${withdrawal.id} confirmed`,
+      transitionAmount: payoutAmount,
+    });
+    return;
+  }
+
+  if (earningStatus === PAYMENT_STATUS.AVAILABLE) {
+    await recordPaymentStatusChange(client, {
+      earningId: item.earning_id,
+      wasteLogId: item.waste_log_id,
+      fromStatus: PAYMENT_STATUS.AVAILABLE,
+      toStatus: PAYMENT_STATUS.PAID,
+      amount: payoutAmount,
+      changedBy,
+      paymentReference,
+      notes: `Partial withdrawal #${withdrawal.id} confirmed`,
+      isSimulated: simulate,
+    });
+
+    try {
+      await upsertPayoutTransaction(client, {
+        earningId: item.earning_id,
+        wasteLogId: item.waste_log_id,
+        pickerId: withdrawal.picker_id,
+        provider: `${withdrawal.provider}_DEMO`,
+        phone: withdrawal.phone,
+        amount: payoutAmount,
+        providerTransactionId: `${paymentReference}-E${item.earning_id}`,
+        status: 'SUCCESS',
+        paidAt: new Date(),
+      });
+    } catch (payoutError) {
+      if (payoutError?.code !== '42P01') throw payoutError;
+    }
+
+    const earningRow = await client.query('SELECT amount FROM earnings WHERE id = $1', [item.earning_id]);
+    const remaining = parseInt(earningRow.rows[0]?.amount || 0, 10);
+    if (remaining <= 0) {
+      await client.query(
+        `UPDATE earnings SET status = $1, paid_at = NOW() WHERE id = $2`,
+        [PAYMENT_STATUS.PAID, item.earning_id]
+      );
+      await client.query(
+        `UPDATE waste_logs SET status = 'PAID', updated_at = NOW() WHERE id = $1 AND status = 'VERIFIED'`,
+        [item.waste_log_id]
+      );
+    }
+  }
+};
+
+const restoreWithdrawalItem = async (client, { item, withdrawal, changedBy, reason, toStatus }) => {
+  const earningStatus = normalizePaymentStatus(item.earning_status);
+  const payoutAmount = parseInt(item.amount, 10);
+
+  if (earningStatus === PAYMENT_STATUS.PAYOUT_PROCESSING) {
+    await transitionEarningPayment(client, {
+      earningId: item.earning_id,
+      wasteLogId: item.waste_log_id,
+      pickerId: withdrawal.picker_id,
+      toStatus,
+      changedBy,
+      notes: reason,
+      transitionAmount: payoutAmount,
+    });
+    return;
+  }
+
+  if (earningStatus === PAYMENT_STATUS.AVAILABLE && toStatus === PAYMENT_STATUS.AVAILABLE) {
+    await client.query(`UPDATE earnings SET amount = amount + $1 WHERE id = $2`, [
+      payoutAmount,
+      item.earning_id,
+    ]);
+    await recordPaymentStatusChange(client, {
+      earningId: item.earning_id,
+      wasteLogId: item.waste_log_id,
+      fromStatus: PAYMENT_STATUS.AVAILABLE,
+      toStatus: PAYMENT_STATUS.AVAILABLE,
+      amount: payoutAmount,
+      changedBy,
+      notes: reason,
+      isSimulated: true,
+    });
+  }
+};
+
+export const confirmWithdrawal = async (withdrawalId, { changedBy = null, notes = null } = {}) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const loaded = await loadWithdrawalWithItems(client, withdrawalId, { forUpdate: true });
+    if (!loaded) {
+      const error = new Error('Withdrawal not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const { withdrawal, items } = loaded;
+    if (withdrawal.status !== 'PROCESSING') {
+      const error = new Error(`Cannot confirm withdrawal in status ${withdrawal.status}`);
+      error.status = 400;
+      throw error;
+    }
+
+    const paymentReference = withdrawal.payment_reference || `WD-CONFIRM-${withdrawalId}`;
+
+    for (const item of items) {
+      await finalizeWithdrawalItemPaid(client, {
+        item,
+        withdrawal,
+        changedBy,
+        paymentReference,
+        simulate: true,
+      });
+    }
+
+    const updated = await client.query(
+      `UPDATE withdrawal_requests
+       SET status = 'SUCCESS', completed_at = NOW(), notes = COALESCE($2, notes)
+       WHERE id = $1
+       RETURNING *`,
+      [withdrawalId, notes]
+    );
+
+    await client.query('COMMIT');
+    return updated.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const failWithdrawal = async (withdrawalId, { changedBy = null, reason = null } = {}) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const loaded = await loadWithdrawalWithItems(client, withdrawalId, { forUpdate: true });
+    if (!loaded) {
+      const error = new Error('Withdrawal not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const { withdrawal, items } = loaded;
+    if (withdrawal.status !== 'PROCESSING') {
+      const error = new Error(`Cannot fail withdrawal in status ${withdrawal.status}`);
+      error.status = 400;
+      throw error;
+    }
+
+    for (const item of items) {
+      await restoreWithdrawalItem(client, {
+        item,
+        withdrawal,
+        changedBy,
+        reason: reason || 'Provider payout failed',
+        toStatus: PAYMENT_STATUS.FAILED,
+      });
+    }
+
+    const updated = await client.query(
+      `UPDATE withdrawal_requests
+       SET status = 'FAILED', failure_reason = $2, completed_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [withdrawalId, reason || 'Simulated provider failure']
+    );
+
+    await client.query('COMMIT');
+    return updated.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const retryFailedWithdrawal = async (withdrawalId, { changedBy = null } = {}) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const loaded = await loadWithdrawalWithItems(client, withdrawalId, { forUpdate: true });
+    if (!loaded) {
+      const error = new Error('Withdrawal not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const { withdrawal, items } = loaded;
+    if (withdrawal.status !== 'FAILED') {
+      const error = new Error('Only failed withdrawals can be retried');
+      error.status = 400;
+      throw error;
+    }
+
+    for (const item of items) {
+      const earningStatus = normalizePaymentStatus(item.earning_status);
+      if (earningStatus === PAYMENT_STATUS.FAILED) {
+        await transitionEarningPayment(client, {
+          earningId: item.earning_id,
+          wasteLogId: item.waste_log_id,
+          pickerId: withdrawal.picker_id,
+          toStatus: PAYMENT_STATUS.PAYOUT_PROCESSING,
+          changedBy,
+          phone: withdrawal.phone,
+          paymentReference: `${withdrawal.payment_reference}-RETRY`,
+          simulate: true,
+          notes: `Withdrawal #${withdrawalId} retry`,
+          transitionAmount: parseInt(item.amount, 10),
+        });
+      }
+    }
+
+    const updated = await client.query(
+      `UPDATE withdrawal_requests
+       SET status = 'PROCESSING', failure_reason = NULL, completed_at = NULL
+       WHERE id = $1
+       RETURNING *`,
+      [withdrawalId]
+    );
+
+    await client.query('COMMIT');
+    return updated.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const returnFailedWithdrawalToBalance = async (withdrawalId, { changedBy = null } = {}) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const loaded = await loadWithdrawalWithItems(client, withdrawalId, { forUpdate: true });
+    if (!loaded) {
+      const error = new Error('Withdrawal not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const { withdrawal, items } = loaded;
+    if (withdrawal.status !== 'FAILED') {
+      const error = new Error('Only failed withdrawals can be returned to balance');
+      error.status = 400;
+      throw error;
+    }
+
+    for (const item of items) {
+      await restoreWithdrawalItem(client, {
+        item,
+        withdrawal,
+        changedBy,
+        reason: 'Returned to withdrawable balance after failed payout',
+        toStatus: PAYMENT_STATUS.AVAILABLE,
+      });
+    }
+
+    const updated = await client.query(
+      `UPDATE withdrawal_requests
+       SET status = 'CANCELLED', notes = COALESCE(notes, '') || ' Returned to picker balance.'
+       WHERE id = $1
+       RETURNING *`,
+      [withdrawalId]
+    );
+
+    await client.query('COMMIT');
+    return updated.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
   }
 };
 
@@ -536,9 +750,10 @@ export const getWithdrawalById = async (withdrawalId, pickerId = null) => {
 
   const withdrawal = result.rows[0];
   const items = await pool.query(
-    `SELECT wre.earning_id, wre.waste_log_id, wre.amount, wl.job_code
+    `SELECT wre.earning_id, wre.waste_log_id, wre.amount, wl.job_code, e.status AS earning_status
      FROM withdrawal_request_earnings wre
      JOIN waste_logs wl ON wre.waste_log_id = wl.id
+     JOIN earnings e ON e.id = wre.earning_id
      WHERE wre.withdrawal_request_id = $1`,
     [withdrawalId]
   );

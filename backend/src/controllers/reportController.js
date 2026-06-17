@@ -1,5 +1,6 @@
 import pool from "../config/db.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import { SQL_CONFIRMED_EARNING_STATUSES } from "../utils/paymentStatus.js";
 import {
   sqlVerifiedKgSum,
   sqlEstimatedKgSum,
@@ -99,18 +100,18 @@ export const getMonthlyReport = async (req, res, next) => {
     // Get earnings for the month
     const earningsResult = await pool.query(`
       SELECT
-        COALESCE(SUM(e.amount), 0) as total_earnings,
-        COALESCE(SUM(CASE WHEN e.status = 'PENDING' THEN e.amount ELSE 0 END), 0) as pending_earnings,
-        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as paid_earnings
+        COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) as confirmed_earnings,
+        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as paid_earnings,
+        COALESCE(SUM(CASE WHEN e.status IN ('AVAILABLE','PAYOUT_PROCESSING') THEN e.amount ELSE 0 END), 0) as in_flight_earnings
       FROM earnings e
       JOIN waste_logs wl ON e.waste_log_id = wl.id
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
     `, [startDate, endDate]);
 
     const {
-      total_earnings,
-      pending_earnings,
+      confirmed_earnings,
       paid_earnings,
+      in_flight_earnings,
     } = earningsResult.rows[0];
 
     // Get waste type breakdown for the month
@@ -227,8 +228,9 @@ export const getMonthlyReport = async (req, res, next) => {
       total_estimated_kg: parseFloat(total_estimated_kg),
       total_verified_kg: parseFloat(total_verified_kg),
       pending_unverified_kg: parseFloat(pending_unverified_kg),
-      total_earnings: parseInt(total_earnings),
-      pending_earnings: parseInt(pending_earnings),
+      total_earnings: parseInt(confirmed_earnings),
+      confirmed_earnings: parseInt(confirmed_earnings),
+      in_flight_earnings: parseInt(in_flight_earnings),
       paid_earnings: parseInt(paid_earnings),
       waste_type_breakdown: wasteTypeBreakdownResult.rows.map(row => ({
         waste_type: row.waste_type,
@@ -330,16 +332,16 @@ export const getPlatformSummary = async (req, res, next) => {
     // Get all-time earnings
     const earningsResult = await pool.query(`
       SELECT
-        COALESCE(SUM(e.amount), 0) as total_earnings,
+        COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) as total_earnings,
         COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as total_paid_earnings,
-        COALESCE(SUM(CASE WHEN e.status = 'PENDING' THEN e.amount ELSE 0 END), 0) as total_pending_earnings
+        COALESCE(SUM(CASE WHEN e.status IN ('AVAILABLE','PAYOUT_PROCESSING') THEN e.amount ELSE 0 END), 0) as total_in_flight_earnings
       FROM earnings e
     `);
 
     const {
       total_earnings,
       total_paid_earnings,
-      total_pending_earnings,
+      total_in_flight_earnings,
     } = earningsResult.rows[0];
 
     // Get divisions covered
@@ -366,7 +368,8 @@ export const getPlatformSummary = async (req, res, next) => {
       total_verified_kg: parseFloat(total_verified_kg),
       total_earnings: parseInt(total_earnings),
       total_paid_earnings: parseInt(total_paid_earnings),
-      total_pending_earnings: parseInt(total_pending_earnings),
+      total_pending_earnings: parseInt(total_in_flight_earnings),
+      total_in_flight_earnings: parseInt(total_in_flight_earnings),
       total_verified_jobs: parseInt(total_verified_jobs),
       total_rejected_jobs: parseInt(total_rejected_jobs),
       women_pickers: parseInt(women_pickers),
@@ -527,9 +530,9 @@ export const getUndpPilotReport = async (req, res, next) => {
     // Get livelihood impact for the period
     const livelihoodResult = await pool.query(`
       SELECT
-        COALESCE(SUM(e.amount), 0) as total_earnings_generated,
+        COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) as total_earnings_generated,
         COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as paid_earnings,
-        COALESCE(SUM(CASE WHEN e.status = 'PENDING' THEN e.amount ELSE 0 END), 0) as pending_earnings
+        COALESCE(SUM(CASE WHEN e.status IN ('AVAILABLE','PAYOUT_PROCESSING') THEN e.amount ELSE 0 END), 0) as in_flight_earnings
       FROM earnings e
       JOIN waste_logs wl ON e.waste_log_id = wl.id
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
@@ -538,7 +541,7 @@ export const getUndpPilotReport = async (req, res, next) => {
     const {
       total_earnings_generated,
       paid_earnings,
-      pending_earnings,
+      in_flight_earnings,
     } = livelihoodResult.rows[0];
 
     const average_earning_per_picker = registered_pickers > 0
@@ -685,7 +688,7 @@ export const getUndpPilotReport = async (req, res, next) => {
       livelihood_impact: {
         total_earnings_generated: parseInt(total_earnings_generated),
         paid_earnings: parseInt(paid_earnings),
-        pending_earnings: parseInt(pending_earnings),
+        in_flight_earnings: parseInt(in_flight_earnings),
         average_earning_per_picker,
       },
       operations: {

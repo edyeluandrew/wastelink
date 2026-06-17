@@ -10,6 +10,7 @@ import { normalizeCity } from "../utils/cityScope.js";
 import {
   transitionEarningPayment,
   getPaymentStatusHistory,
+  recordPaymentStatusChange,
 } from "../services/payment/earningPaymentService.js";
 import { PAYMENT_STATUS } from "../utils/paymentStatus.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
@@ -520,13 +521,26 @@ export const verifyWasteLog = async (req, res, next) => {
           picker_id, waste_log_id, rate_per_kg, amount, status,
           city_waste_type_id, reporting_category_id
         )
-         VALUES ($1, $2, $3, $4, 'PENDING', $5, $6)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id, rate_per_kg, amount, status, created_at, paid_at,
            city_waste_type_id, reporting_category_id`,
-        [wasteLog.picker_id, id, ratePerKg, amount, cityWasteTypeId, reportingCategoryId]
+        [wasteLog.picker_id, id, ratePerKg, amount, PAYMENT_STATUS.AVAILABLE, cityWasteTypeId, reportingCategoryId]
       );
 
       const earning = earningResult.rows[0];
+
+      if (amount > 0) {
+        await recordPaymentStatusChange(client, {
+          earningId: earning.id,
+          wasteLogId: id,
+          fromStatus: null,
+          toStatus: PAYMENT_STATUS.AVAILABLE,
+          amount,
+          changedBy: req.user?.id || null,
+          notes: 'Earning created on agent verification — immediately withdrawable',
+          isSimulated: false,
+        });
+      }
 
       // Commit transaction
       await client.query("COMMIT");
@@ -733,24 +747,38 @@ const handlePayoutTransition = async (req, res, toStatus, { simulate = false, no
   }
 };
 
-// PATCH /api/waste-logs/:id/payout/approve - PENDING -> APPROVED
-export const approvePayout = async (req, res) =>
-  handlePayoutTransition(req, res, PAYMENT_STATUS.APPROVED, {
-    notes: req.body?.notes || 'Earning approved for payout',
-  });
-
-// PATCH /api/waste-logs/:id/payout/initiate - APPROVED -> PAYOUT_INITIATED
-export const initiatePayout = async (req, res) =>
-  handlePayoutTransition(req, res, PAYMENT_STATUS.PAYOUT_INITIATED, {
-    notes: req.body?.notes || 'Payout initiated (demo/manual)',
-  });
-
-// PATCH /api/waste-logs/:id/payout/simulate-confirm - PAYOUT_INITIATED -> PAID (demo)
+// PATCH /api/waste-logs/:id/payout/simulate-confirm - PAYOUT_PROCESSING -> PAID (demo)
 export const simulatePayoutConfirm = async (req, res) =>
   handlePayoutTransition(req, res, PAYMENT_STATUS.PAID, {
     simulate: true,
     notes: req.body?.notes || 'Demo/simulated mobile money payout confirmed',
   });
+
+// PATCH /api/waste-logs/:id/payout/simulate-fail - PAYOUT_PROCESSING -> FAILED (demo)
+export const simulatePayoutFail = async (req, res) =>
+  handlePayoutTransition(req, res, PAYMENT_STATUS.FAILED, {
+    notes: req.body?.notes || req.body?.reason || 'Simulated provider payout failure',
+  });
+
+// PATCH /api/waste-logs/:id/payout/retry - FAILED -> PAYOUT_PROCESSING
+export const retryPayout = async (req, res) =>
+  handlePayoutTransition(req, res, PAYMENT_STATUS.PAYOUT_PROCESSING, {
+    simulate: true,
+    notes: req.body?.notes || 'Payout retry initiated',
+  });
+
+// PATCH /api/waste-logs/:id/payout/return-to-balance - FAILED -> AVAILABLE
+export const returnPayoutToBalance = async (req, res) =>
+  handlePayoutTransition(req, res, PAYMENT_STATUS.AVAILABLE, {
+    notes: req.body?.notes || 'Returned to picker withdrawable balance',
+  });
+
+// Legacy endpoints — admin approval no longer required (Module 15)
+export const approvePayout = async (req, res) =>
+  sendError(res, 'Admin approval is no longer required. Earnings are AVAILABLE after agent verification.', 410);
+
+export const initiatePayout = async (req, res) =>
+  sendError(res, 'Use picker withdrawal flow instead. Earnings move to PAYOUT_PROCESSING when picker withdraws.', 410);
 
 // PATCH /api/waste-logs/:id/mark-paid - Legacy alias; requires PAYOUT_INITIATED
 export const markWasteLogPaid = async (req, res) => {
@@ -774,29 +802,23 @@ export const markWasteLogPaid = async (req, res) => {
 
     const currentStatus = earningResult.rows[0].status;
 
-    if (currentStatus === PAYMENT_STATUS.PENDING) {
+    if (currentStatus === PAYMENT_STATUS.PAYOUT_PROCESSING) {
+      return simulatePayoutConfirm(req, res);
+    }
+
+    if (currentStatus === PAYMENT_STATUS.AVAILABLE) {
       return sendError(
         res,
-        'Earning must be approved and payout initiated before confirmation. Use Approve → Initiate Payout → Simulate Confirm.',
+        'Picker must request withdrawal first. Earnings become PAYOUT_PROCESSING when a withdrawal is submitted.',
         400
       );
     }
 
-    if (currentStatus === PAYMENT_STATUS.APPROVED) {
-      return sendError(
-        res,
-        'Payout must be initiated before confirmation. Use Initiate Payout first.',
-        400
-      );
-    }
-
-    if (currentStatus !== PAYMENT_STATUS.PAYOUT_INITIATED) {
-      return sendError(
-        res,
-        `Cannot mark as paid from status ${currentStatus}`,
-        400
-      );
-    }
+    return sendError(
+      res,
+      `Cannot mark as paid from status ${currentStatus}`,
+      400
+    );
   } finally {
     if (client) client.release();
   }

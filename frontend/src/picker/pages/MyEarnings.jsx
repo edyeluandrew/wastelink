@@ -5,7 +5,7 @@ import apiClient from '../../api/axios';
 import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX, formatDate, formatDateTime } from '../../utils/formatters';
 import { Wallet, Scale, CreditCard, Hourglass, TrendingUp, Smartphone, ShieldAlert } from 'lucide-react';
-import { getEarningAmount, getEarningStatus, sumRemainingEarnings, sumSuccessfulWithdrawals } from '../../utils/earningsHelper';
+import { getEarningAmount, getEarningStatus, sumSuccessfulWithdrawals, sumProcessingWithdrawals } from '../../utils/earningsHelper';
 import MobileMoneyProviderIcon from '../components/MobileMoneyProviderIcon';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
@@ -60,22 +60,18 @@ export default function MyEarnings() {
         const allJobs = logsRes.data.data || [];
         const verified = allJobs.filter(j => j.status === 'VERIFIED' || j.status === 'PAID');
         const withdrawalList = withdrawalsRes.data?.success ? (withdrawalsRes.data.data || []) : [];
-        const totalEarnings = sumRemainingEarnings(allJobs);
+        const pendingVerification = allJobs.filter(j => j.status === 'PENDING').length;
         const paidEarnings = sumSuccessfulWithdrawals(withdrawalList);
-        const pendingEarnings = allJobs
-          .filter(j => ['PENDING', 'APPROVED', 'PAYOUT_INITIATED'].includes(getEarningStatus(j)))
-          .reduce((sum, j) => sum + getEarningAmount(j), 0);
+        const processingEarnings = sumProcessingWithdrawals(withdrawalList);
         const totalKg = verified.reduce((sum, j) => sum + (j.verified_kg || 0), 0);
         const paidJobs = allJobs.filter(j => j.status === 'PAID').length;
-        const unpaidJobs = allJobs.filter(j => j.status === 'VERIFIED').length;
 
         setEarnings({
-          total: totalEarnings,
+          pendingVerification,
           paid: paidEarnings,
-          pending: pendingEarnings,
+          processing: processingEarnings,
           totalKg,
           paidJobs,
-          unpaidJobs,
         });
 
         const earningJobs = verified
@@ -152,8 +148,14 @@ export default function MyEarnings() {
     return <EmptyState title="No verified earnings yet" message="Log waste and wait for agent verification." icon={Wallet} />;
   }
 
-  const averageEarning = earnings.totalKg > 0 ? earnings.total / (jobs.length || 1) : 0;
-  const availableToWithdraw = balance?.available_to_withdraw || 0;
+  const averageEarning = earnings.totalKg > 0 && jobs.length > 0
+    ? jobs.reduce((sum, j) => sum + getEarningAmount(j), 0) / jobs.length
+    : 0;
+  const availableToWithdraw = balance?.available_balance ?? balance?.available_to_withdraw ?? 0;
+  const payoutProcessing = balance?.payout_processing_balance ?? earnings.processing ?? 0;
+  const totalPaid = balance?.total_paid ?? earnings.paid ?? 0;
+  const failedBalance = balance?.failed_balance ?? 0;
+  const pendingVerification = balance?.pending_logs_count ?? earnings.pendingVerification ?? 0;
   const canWithdraw = availableToWithdraw > 0;
   const parsedWithdrawAmount = parseInt(String(withdrawAmount).replace(/[^\d]/g, ''), 10) || 0;
   const isValidWithdrawAmount =
@@ -190,9 +192,7 @@ export default function MyEarnings() {
             </p>
             <p className="mt-2 text-4xl font-bold text-[#111111]">{formatUGX(availableToWithdraw)}</p>
             <p className="mt-1 text-sm text-[#6B7280]">
-              {balance?.simulation_mode
-                ? 'Demo mode — simulated MTN & Airtel payouts (no real money sent)'
-                : 'Admin-approved earnings ready for mobile money'}
+              Available after agent verification — withdraw anytime
             </p>
           </div>
           <Button
@@ -204,17 +204,16 @@ export default function MyEarnings() {
           </Button>
         </div>
 
-        {balance?.pending_approval_amount > 0 && (
+        {payoutProcessing > 0 && (
           <p className="mt-3 rounded-2xl bg-white/80 p-3 text-sm text-[#6B7280]">
-            {formatUGX(balance.pending_approval_amount)} verified and awaiting admin approval
-            {balance.simulation_mode ? ' (included in demo withdrawals)' : ''}.
+            {formatUGX(payoutProcessing)} is being processed to your mobile money.
           </p>
         )}
       </div>
 
       {withdrawSuccess && (
         <div className="rounded-3xl border border-[#BDE5BF] bg-[#EAF6EA] p-5">
-          <p className="text-lg font-bold text-[#238636]">Withdrawal successful (Demo)</p>
+          <p className="text-lg font-bold text-[#238636]">Withdrawal submitted</p>
           <p className="mt-1 text-sm text-[#111111]">{withdrawSuccess.demo_notice}</p>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl bg-white p-3">
@@ -243,23 +242,33 @@ export default function MyEarnings() {
       )}
 
       <div className="rounded-3xl border border-[#BDE5BF] bg-[linear-gradient(135deg,#EAF6EA_0%,#FFFFFF_70%)] p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Remaining Balance</p>
-            <p className="mt-2 text-3xl font-bold text-[#111111]">{formatUGX(earnings.total)}</p>
-            <p className="mt-1 text-sm text-[#6B7280]">Earnings not yet withdrawn</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Pending Verification</p>
+            <p className="mt-2 text-3xl font-bold text-[#B45309]">{pendingVerification}</p>
+            <p className="mt-1 text-sm text-[#6B7280]">Jobs awaiting agent</p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Paid / Withdrawn</p>
-            <p className="mt-2 text-3xl font-bold text-[#238636]">{formatUGX(earnings.paid)}</p>
-            <p className="mt-1 text-sm text-[#6B7280]">{earnings.paidJobs} completed payments</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Withdrawable Balance</p>
+            <p className="mt-2 text-3xl font-bold text-[#111111]">{formatUGX(availableToWithdraw)}</p>
+            <p className="mt-1 text-sm text-[#6B7280]">Ready to withdraw</p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Pending Pipeline</p>
-            <p className="mt-2 text-3xl font-bold text-[#B45309]">{formatUGX(earnings.pending)}</p>
-            <p className="mt-1 text-sm text-[#6B7280]">{earnings.unpaidJobs} jobs in progress</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Payout Processing</p>
+            <p className="mt-2 text-3xl font-bold text-[#7C3AED]">{formatUGX(payoutProcessing)}</p>
+            <p className="mt-1 text-sm text-[#6B7280]">In-flight to mobile money</p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Total Paid</p>
+            <p className="mt-2 text-3xl font-bold text-[#238636]">{formatUGX(totalPaid)}</p>
+            <p className="mt-1 text-sm text-[#6B7280]">{earnings.paidJobs} completed jobs</p>
           </div>
         </div>
+        {failedBalance > 0 && (
+          <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+            {formatUGX(failedBalance)} in failed payouts — contact support or retry from admin.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -272,8 +281,8 @@ export default function MyEarnings() {
           <p className="mt-2 text-2xl font-bold text-[#111111]">{earnings.paidJobs}</p>
         </div>
         <div className="rounded-2xl border border-[#D9D9D9] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#6B7280]"><Hourglass size={14} /> Pending Payment</p>
-          <p className="mt-2 text-2xl font-bold text-[#111111]">{earnings.unpaidJobs}</p>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#6B7280]"><Hourglass size={14} /> Pending Verification</p>
+          <p className="mt-2 text-2xl font-bold text-[#111111]">{pendingVerification}</p>
         </div>
         <div className="rounded-2xl border border-[#D9D9D9] bg-white p-4 shadow-sm">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#6B7280]"><TrendingUp size={14} /> Average / Job</p>
