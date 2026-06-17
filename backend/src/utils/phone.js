@@ -52,7 +52,29 @@ export const getShortPhoneFormat = (phone) => {
   return phone;
 };
 
+/**
+ * Build lookup variants for DB phone matching.
+ */
+export const getPhoneLookupVariants = (phone) => {
+  const normalized = normalizePhoneNumber(phone);
+  if (!normalized) return [];
+
+  const variants = new Set([normalized, String(phone || '').trim()]);
+
+  if (normalized.startsWith('+256')) {
+    variants.add(normalized.slice(1));
+    variants.add('0' + normalized.slice(4));
+  }
+
+  if (normalized.length >= 9) {
+    variants.add(normalized.slice(-9));
+  }
+
+  return [...variants].filter(Boolean);
+};
+
 export default {
   normalizePhoneNumber,
   getShortPhoneFormat,
+  getPhoneLookupVariants,
 };
