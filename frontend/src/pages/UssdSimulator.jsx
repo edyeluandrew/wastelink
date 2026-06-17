@@ -34,7 +34,7 @@ async function apiJson(url, { method = 'GET', token, body } = {}) {
 
 export default function UssdSimulator() {
   const [sessionId, setSessionId] = useState(() => `sim-${Date.now()}`);
-  const [phoneNumber, setPhoneNumber] = useState('+256700000001');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -65,14 +65,15 @@ export default function UssdSimulator() {
   };
 
   const postUssd = useCallback(
-    async (text) => {
+    async (text, phoneOverride) => {
+      const activePhone = phoneOverride ?? phoneNumber;
       const response = await fetch(`${API_BASE_URL}/ussd`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
           serviceCode: SERVICE_CODE,
-          phoneNumber,
+          phoneNumber: activePhone,
           text,
         }),
       });
@@ -115,15 +116,31 @@ export default function UssdSimulator() {
     return sendPath(next);
   };
 
+  const normalizePhoneInput = (raw) => {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('+')) return trimmed;
+    if (trimmed.startsWith('0')) return `+256${trimmed.slice(1)}`;
+    if (trimmed.startsWith('256')) return `+${trimmed}`;
+    return trimmed;
+  };
+
   const handleDial = async () => {
+    const normalized = normalizePhoneInput(phoneNumber);
+    if (!normalized || normalized.length < 10) {
+      setError('Enter your phone number first (e.g. +256700000099 or 0779305759)');
+      return;
+    }
+    if (normalized !== phoneNumber) setPhoneNumber(normalized);
+
     setLoading(true);
     setError('');
     setDialDisplay(SERVICE_CODE);
     try {
-      await postUssd('');
+      await postUssd('', normalized);
       setConnected(true);
       setCurrentPath('');
-      addTimeline(`Dialed ${SERVICE_CODE}`, 'neutral');
+      addTimeline(`Dialed ${SERVICE_CODE} as ${normalized}`, 'neutral');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -148,12 +165,15 @@ export default function UssdSimulator() {
 
   const handleKeyPress = (digit) => {
     if (!connected) {
-      if (digit === '1') setDialDisplay((d) => d + '1');
-      else if (digit === '2') setDialDisplay((d) => d + '2');
-      else if (digit === '3') setDialDisplay((d) => d + '3');
-      else if (digit === '*') setDialDisplay('*');
-      else if (digit === '0') setDialDisplay((d) => (d === '*' ? '*0' : d + '0'));
-      else if (digit === '#') setDialDisplay((d) => (d.startsWith('*') ? d + '#' : d));
+      if (/^[0-9]$/.test(digit)) {
+        setPhoneNumber((p) => p + digit);
+      } else if (digit === '*') {
+        setPhoneNumber((p) => (p ? p : '+'));
+      } else if (digit === '0') {
+        setPhoneNumber((p) => p + '0');
+      } else if (digit === '#') {
+        handleDial();
+      }
       return;
     }
 
@@ -283,7 +303,15 @@ export default function UssdSimulator() {
     }
   };
 
-  const pathDisplay = connected ? (currentPath || '(main menu)') : dialDisplay;
+  const handleDeletePress = () => {
+    if (!connected) {
+      setPhoneNumber((p) => p.slice(0, -1));
+      return;
+    }
+    setBuffer((b) => String(b).slice(0, -1));
+  };
+
+  const pathDisplay = connected ? (currentPath || '(main menu)') : '';
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] py-8 px-4">
@@ -302,6 +330,7 @@ export default function UssdSimulator() {
           <div className="lg:col-span-2">
             <UssdPhone
               phoneNumber={phoneNumber}
+              onPhoneNumberChange={setPhoneNumber}
               dialDisplay={pathDisplay}
               ussdScreen={ussdScreen}
               parsed={parsed}
@@ -316,19 +345,8 @@ export default function UssdSimulator() {
               onHangUp={handleHangUp}
               onBack={handleBack}
               onMainMenu={handleMainMenu}
+              onDeletePress={handleDeletePress}
             />
-
-            <div className="mt-4 bg-white rounded-xl border border-[#D9D9D9] p-4">
-              <label className="block text-xs font-semibold text-[#666666] mb-1">SIM / Phone number</label>
-              <input
-                type="text"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                disabled={connected}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm disabled:bg-gray-100"
-              />
-              <p className="text-[10px] text-[#999999] mt-1">Change before dialing to test a new registration</p>
-            </div>
           </div>
 
           <div className="lg:col-span-3 space-y-4">
@@ -348,11 +366,11 @@ export default function UssdSimulator() {
                 </button>
               </div>
               <ol className="text-sm text-[#444444] space-y-2 list-decimal list-inside">
-                <li>Tap the <span className="text-[#238636] font-semibold">green call button</span> to dial *123#</li>
+                <li>Enter <strong>your phone number</strong> (type or use keypad), then tap <span className="text-[#238636] font-semibold">green call</span> to dial *123#</li>
                 <li>Tap a menu number on screen <em>or</em> press it on the keypad</li>
                 <li>When asked for name, area, kg, or amount — type in the bar and press <strong># Send</strong></li>
                 <li>Use <strong>0 Back</strong> or <strong>00 Menu</strong> to navigate</li>
-                <li>Red button hangs up; dial again for a new session</li>
+                <li>Red button hangs up — change number and dial again for a new picker</li>
               </ol>
             </div>
 

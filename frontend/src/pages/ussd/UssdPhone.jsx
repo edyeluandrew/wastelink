@@ -17,6 +17,7 @@ const KEYPAD = [
 
 export default function UssdPhone({
   phoneNumber,
+  onPhoneNumberChange,
   dialDisplay,
   ussdScreen,
   parsed,
@@ -31,25 +32,44 @@ export default function UssdPhone({
   onHangUp,
   onBack,
   onMainMenu,
+  onDeletePress,
 }) {
   const showTextField = connected && parsed.inputMode === 'text';
   const showNumericHint = connected && parsed.inputMode === 'numeric';
+  const phoneEditable = !connected;
 
   return (
     <div className="mx-auto w-full max-w-[320px]">
       <div className="rounded-[2.5rem] border-[6px] border-[#1a1a1a] bg-[#1a1a1a] shadow-2xl overflow-hidden">
         {/* Notch / status */}
-        <div className="bg-[#111111] px-4 pt-3 pb-1 text-center">
+        <div className="bg-[#111111] px-4 pt-3 pb-2 text-center">
           <div className="mx-auto mb-2 h-5 w-24 rounded-full bg-black" />
           <p className="text-[10px] text-gray-400 tracking-wide">WasteLink · Feature Phone</p>
-          <p className="text-xs text-white font-semibold mt-0.5">{phoneNumber}</p>
+          {phoneEditable ? (
+            <div className="mt-2 px-1">
+              <label className="text-[9px] text-gray-500 uppercase tracking-wide">Your number (SIM)</label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => onPhoneNumberChange(e.target.value)}
+                disabled={loading}
+                placeholder="+256700000099 or 077..."
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#333] rounded-lg px-2 py-1.5 text-center text-sm text-white font-semibold placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-[#238636]"
+              />
+            </div>
+          ) : (
+            <p className="text-xs text-white font-semibold mt-1">{phoneNumber || '—'}</p>
+          )}
         </div>
 
         {/* Dial / USSD screen */}
         <div className="bg-[#eef6ee] px-3 py-2 min-h-[52px] border-b border-[#c8dcc8]">
           <p className="text-center font-mono text-lg text-[#111111] tracking-wider min-h-[28px]">
-            {connected ? (dialDisplay || '*123#') : dialDisplay || ''}
+            {connected ? (dialDisplay || '*123#') : (phoneEditable ? '*123#' : dialDisplay || '')}
           </p>
+          {phoneEditable && (
+            <p className="text-center text-[10px] text-[#666666] mt-0.5">Service code · press green to call</p>
+          )}
         </div>
 
         <div className="bg-[#0c180c] px-3 py-3 min-h-[200px] max-h-[240px] overflow-y-auto">
@@ -84,8 +104,9 @@ export default function UssdPhone({
               )}
             </>
           ) : (
-            <p className="text-[#6b7280] text-sm text-center mt-8">
-              Press the green call button to dial <span className="text-[#4ade80] font-mono">*123#</span>
+            <p className="text-[#6b7280] text-sm text-center mt-6 px-2 leading-relaxed">
+              Enter <span className="text-[#4ade80]">your phone number</span> above, then press the green button to dial{' '}
+              <span className="text-[#4ade80] font-mono">*123#</span>
             </p>
           )}
         </div>
@@ -130,7 +151,7 @@ export default function UssdPhone({
               <button
                 key={digit}
                 type="button"
-                disabled={loading || (!connected && !['*', '0', '#'].includes(digit) && !/^[1-9]$/.test(digit))}
+                disabled={loading}
                 onClick={() => onKeyPress(digit)}
                 className="rounded-xl bg-[#2a2a2a] hover:bg-[#3a3a3a] active:bg-[#444] py-3 flex flex-col items-center justify-center disabled:opacity-40 transition"
               >
@@ -143,8 +164,8 @@ export default function UssdPhone({
           <div className="grid grid-cols-3 gap-1.5 mt-2">
             <button
               type="button"
-              onClick={() => onBufferChange(String(buffer).slice(0, -1))}
-              disabled={!buffer || loading}
+              onClick={onDeletePress}
+              disabled={loading || (connected ? !buffer : !phoneNumber)}
               className="col-span-1 rounded-xl bg-[#2a2a2a] py-3 flex items-center justify-center text-gray-400 hover:bg-[#3a3a3a] disabled:opacity-40"
             >
               <Delete size={18} />
