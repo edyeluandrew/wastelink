@@ -1,0 +1,174 @@
+.knife-nav-shell {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+
+.knife-nav {
+  pointer-events: auto;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 520px;
+  height: 68px;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.16));
+}
+
+/* Left metallic tip */
+.knife-tip {
+  flex: 0 0 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 34px 0 0 34px;
+  background: linear-gradient(165deg, #f4f4f4 0%, #c9c9c9 38%, #ececec 62%, #a8a8a8 100%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-right: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.knife-tip img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  opacity: 0.85;
+}
+
+/* Blade — main nav area */
+.knife-blade {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  background: linear-gradient(180deg, #faf7f2 0%, #f0ebe3 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.knife-blade-inner {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.knife-blade-inner::-webkit-scrollbar {
+  display: none;
+}
+
+.knife-nav-item {
+  flex: 1 1 0;
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  color: #7a6a58;
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.knife-nav-item svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.75;
+}
+
+.knife-nav-item-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.knife-nav-item.is-active {
+  color: #3d342c;
+  background: linear-gradient(180deg, #ffffff 0%, #f3eee6 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  position: relative;
+}
+
+.knife-nav-item.is-active .knife-nav-item-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.knife-nav-item.is-active .knife-active-line {
+  display: block;
+  width: 18px;
+  height: 2px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: #3d342c;
+}
+
+.knife-nav-item:not(.is-active) .knife-active-line {
+  display: none;
+}
+
+.knife-nav-item.is-active svg {
+  display: none;
+}
+
+/* Silver bolster */
+.knife-bolster {
+  flex: 0 0 10px;
+  background: linear-gradient(160deg, #e2e2e2, #9a9a9a);
+  transform: skewX(-14deg);
+  margin-left: -2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Wood handle */
+.knife-handle {
+  flex: 0 0 38px;
+  position: relative;
+  border-radius: 0 16px 16px 0;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.15) 0%, transparent 18%),
+    repeating-linear-gradient(
+      175deg,
+      #3b2618 0px,
+      #4a3020 3px,
+      #2f1c12 6px,
+      #5c3d28 9px,
+      #3b2618 12px
+    );
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-left: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.knife-handle-pin {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%, #e8c872, #b8892a 55%, #8b6914 100%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+@media (min-width: 768px) {
+  .knife-nav-shell {
+    display: none;
+  }
+}

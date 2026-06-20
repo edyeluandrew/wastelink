@@ -20,7 +20,7 @@ export default function DashboardLayout() {
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <Topbar onOpenMenu={() => setMobileMenuOpen(true)} />
 
-          <main className={`flex-1 overflow-y-auto ${isDesktop ? 'pb-8' : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'}`}>
+          <main className={`flex-1 overflow-y-auto ${isDesktop ? 'pb-8' : 'pb-[calc(5.5rem+env(safe-area-inset-bottom))]'}`}>
             <div className="mx-auto w-full max-w-7xl p-4 md:p-6 lg:p-8">
               <Outlet />
             </div>

@@ -15,7 +15,7 @@ export default function AgentLayout() {
         <div className="flex min-h-screen flex-1 flex-col">
           <AgentTopbar showLogout={!isDesktop} />
 
-          <main className={`flex-1 ${isDesktop ? 'pb-8' : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'}`}>
+          <main className={`flex-1 ${isDesktop ? 'pb-8' : 'pb-[calc(5.5rem+env(safe-area-inset-bottom))]'}`}>
             <div className="mx-auto w-full max-w-7xl px-4 py-4 md:px-6 md:py-6">
               <Outlet />
             </div>

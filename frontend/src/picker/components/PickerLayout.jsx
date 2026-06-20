@@ -15,7 +15,7 @@ export default function PickerLayout() {
       <div className="flex min-h-screen flex-1 flex-col">
         <PickerTopbar picker={picker} />
 
-        <main className="flex-1 pb-24 md:pb-8">
+        <main className="flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
           <div className="mx-auto w-full max-w-7xl px-4 py-4 md:px-6 md:py-6">
             <Outlet />
           </div>
