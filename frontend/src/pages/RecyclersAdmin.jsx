@@ -96,30 +96,6 @@ export default function RecyclersAdmin() {
   if (loading) return <LoadingState message="Loading recyclers..." />;
   if (error) return <ErrorState error={error} onRetry={fetchRecyclers} />;
 
-  const columns = [
-    { key: 'company_name', label: 'Company' },
-    { key: 'contact_person', label: 'Contact' },
-    { key: 'phone', label: 'Phone' },
-    { key: 'waste_types_accepted', label: 'Waste types' },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (row) => <StatusBadge status={row.status} />,
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (row) => (
-        <div className="flex gap-2">
-          <button type="button" onClick={() => openEdit(row)} className="text-[#238636]"><Edit2 size={16} /></button>
-          <Button size="sm" variant="secondary" onClick={() => toggleStatus(row)}>
-            {row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -133,10 +109,32 @@ export default function RecyclersAdmin() {
       {recyclers.length === 0 ? (
         <EmptyState title="No recyclers yet" description="Add your first approved recycler." />
       ) : (
-        <DataTable columns={columns} data={recyclers} />
+        <DataTable
+          columns={['Company', 'Contact', 'Phone', 'Waste types', 'Status', 'Actions']}
+        >
+          {recyclers.map((recycler) => (
+            <tr key={recycler.id} className="border-b border-[#F3F4F6] hover:bg-[#F9FAFB]">
+              <td className="px-4 py-3 font-medium">{recycler.company_name}</td>
+              <td className="px-4 py-3">{recycler.contact_person}</td>
+              <td className="px-4 py-3">{recycler.phone}</td>
+              <td className="px-4 py-3">{recycler.waste_types_accepted || '—'}</td>
+              <td className="px-4 py-3"><StatusBadge status={recycler.status} /></td>
+              <td className="px-4 py-3">
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => openEdit(recycler)} className="text-[#238636]">
+                    <Edit2 size={16} />
+                  </button>
+                  <Button size="sm" variant="secondary" onClick={() => toggleStatus(recycler)}>
+                    {recycler.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </DataTable>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit recycler' : 'Add recycler'}>
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit recycler' : 'Add recycler'}>
         <form onSubmit={handleSubmit} className="space-y-3">
           {['company_name', 'contact_person', 'phone', 'email', 'location', 'waste_types_accepted'].map((field) => (
             <div key={field}>

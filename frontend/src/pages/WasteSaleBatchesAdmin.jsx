@@ -124,23 +124,6 @@ export default function WasteSaleBatchesAdmin() {
   if (loading) return <LoadingState message="Loading sale batches..." />;
   if (error) return <ErrorState error={error} onRetry={fetchData} />;
 
-  const columns = [
-    { key: 'batch_code', label: 'Batch' },
-    { key: 'waste_type', label: 'Type' },
-    { key: 'collection_point_name', label: 'Collection point' },
-    { key: 'verified_kg', label: 'Kg', render: (r) => Number(r.verified_kg).toFixed(1) },
-    { key: 'recycler_sale_price_per_kg', label: 'Sale/kg', render: (r) => formatUGX(r.recycler_sale_price_per_kg) },
-    { key: 'expected_total_amount', label: 'Expected', render: (r) => formatUGX(r.expected_total_amount) },
-    { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (r) => r.status === 'AVAILABLE' ? (
-        <Button size="sm" variant="secondary" onClick={() => cancelBatch(r)}>Cancel</Button>
-      ) : null,
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -176,10 +159,29 @@ export default function WasteSaleBatchesAdmin() {
       {batches.length === 0 ? (
         <EmptyState title="No sale batches" description="Create a batch from verified waste inventory." />
       ) : (
-        <DataTable columns={columns} data={batches} />
+        <DataTable
+          columns={['Batch', 'Type', 'Collection point', 'Kg', 'Sale/kg', 'Expected', 'Status', 'Actions']}
+        >
+          {batches.map((batch) => (
+            <tr key={batch.id} className="border-b border-[#F3F4F6] hover:bg-[#F9FAFB]">
+              <td className="px-4 py-3 font-medium">{batch.batch_code}</td>
+              <td className="px-4 py-3">{batch.waste_type}</td>
+              <td className="px-4 py-3">{batch.collection_point_name}</td>
+              <td className="px-4 py-3">{Number(batch.verified_kg).toFixed(1)}</td>
+              <td className="px-4 py-3">{formatUGX(batch.recycler_sale_price_per_kg)}</td>
+              <td className="px-4 py-3">{formatUGX(batch.expected_total_amount)}</td>
+              <td className="px-4 py-3"><StatusBadge status={batch.status} /></td>
+              <td className="px-4 py-3">
+                {batch.status === 'AVAILABLE' && (
+                  <Button size="sm" variant="secondary" onClick={() => cancelBatch(batch)}>Cancel</Button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </DataTable>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create sale batch">
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Create sale batch">
         <form onSubmit={handleSubmit} className="space-y-3">
           <select
             className="w-full rounded-lg border px-3 py-2"

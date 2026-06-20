@@ -92,7 +92,7 @@ export default function PurchaseHistory() {
         </div>
       )}
 
-      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Purchase receipt">
+      <Modal isOpen={Boolean(receipt)} onClose={() => setReceipt(null)} title="Purchase receipt">
         {receipt && (
           <div className="space-y-2 text-sm">
             <p><strong>Receipt:</strong> {receipt.receipt_id}</p>
