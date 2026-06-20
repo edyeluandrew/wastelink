@@ -14,7 +14,11 @@ import {
 } from "../services/payment/earningPaymentService.js";
 import { PAYMENT_STATUS } from "../utils/paymentStatus.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+
+const forPickerResponse = (req, data) =>
+  req.user?.role === "PICKER" ? stripPickerPricingFields(data) : data;
 import { enrichWasteLogWithPricing } from "../utils/wasteLogPricing.js";
+import { stripPickerPricingFields } from "../utils/pickerResponseSanitizer.js";
 
 // POST /api/waste-logs - Create a new waste log
 export const createWasteLog = async (req, res, next) => {
@@ -114,13 +118,16 @@ export const createWasteLog = async (req, res, next) => {
     sendSuccess(
       res,
       "Waste log created successfully",
-      enrichWasteLogWithPricing(responsePayload, {
-        status: wasteLog.status,
-        estimated_kg: wasteLog.estimated_kg,
-        waste_type: resolvedWasteType,
-        city_price_per_kg: pricingSource?.price_per_kg,
-        city_is_payable: pricingSource?.is_payable,
-      }),
+      forPickerResponse(
+        req,
+        enrichWasteLogWithPricing(responsePayload, {
+          status: wasteLog.status,
+          estimated_kg: wasteLog.estimated_kg,
+          waste_type: resolvedWasteType,
+          city_price_per_kg: pricingSource?.price_per_kg,
+          city_is_payable: pricingSource?.is_payable,
+        })
+      ),
       201
     );
   } catch (error) {
@@ -239,7 +246,7 @@ export const getWasteLogs = async (req, res, next) => {
       return enrichWasteLogWithPricing(wasteLog, row);
     });
 
-    sendSuccess(res, "Waste logs retrieved successfully", wasteLogs);
+    sendSuccess(res, "Waste logs retrieved successfully", forPickerResponse(req, wasteLogs));
   } catch (error) {
     console.error("[Waste Logs List Error]", { code: error.code, message: error.message });
     sendError(res, "Database connection failed. Please check Neon DATABASE_URL or network configuration.", 503);

@@ -1,12 +1,15 @@
+import { sendSuccess, sendError } from '../utils/apiResponse.js';
 import {
   listCityWasteTypes,
   createCityWasteType,
   updateCityWasteType,
   getCityWasteTypeById,
   getCityWasteTypeHistory,
+  getActiveCityWasteTypeForLog,
+  calculateEarningFromCityWasteType,
 } from '../services/wasteTypeGovernanceService.js';
 import { canManageCity, normalizeCity, resolveUserCity } from '../utils/cityScope.js';
-import { sendSuccess, sendError } from '../utils/apiResponse.js';
+import { stripPickerWasteTypeFields } from '../utils/pickerResponseSanitizer.js';
 
 const resolveListCity = (req) => {
   if (req.user.role === 'SUPER_ADMIN') {
@@ -38,10 +41,46 @@ export const getActiveCityWasteTypes = async (req, res) => {
       : resolveUserCity(req.user) || normalizeCity(process.env.DEFAULT_CITY);
 
     const items = await listCityWasteTypes({ city, activeOnly: true });
-    sendSuccess(res, 'Active city waste types retrieved', items);
+    const isPicker = req.user?.role === 'PICKER';
+    const payload = isPicker ? items.map(stripPickerWasteTypeFields) : items;
+    sendSuccess(res, 'Active city waste types retrieved', payload);
   } catch (error) {
     console.error('[Active City Waste Types]', error);
     sendError(res, error.message || 'Failed to load active city waste types', error.status || 500);
+  }
+};
+
+export const estimateCityWasteTypeEarning = async (req, res) => {
+  try {
+    const cityWasteTypeId = parseInt(req.query.city_waste_type_id, 10);
+    const estimatedKg = parseFloat(req.query.estimated_kg);
+
+    if (!Number.isFinite(cityWasteTypeId) || cityWasteTypeId <= 0) {
+      return sendError(res, 'city_waste_type_id is required', 400);
+    }
+    if (!Number.isFinite(estimatedKg) || estimatedKg <= 0) {
+      return sendError(res, 'estimated_kg must be greater than 0', 400);
+    }
+
+    const city = req.query.city
+      ? normalizeCity(req.query.city)
+      : resolveUserCity(req.user) || normalizeCity(process.env.DEFAULT_CITY);
+
+    const cityWasteType = await getActiveCityWasteTypeForLog(cityWasteTypeId, city);
+    if (!cityWasteType) {
+      return sendError(res, 'Selected waste type is not active', 404);
+    }
+
+    const { amount } = calculateEarningFromCityWasteType(cityWasteType, estimatedKg);
+
+    sendSuccess(res, 'Estimated earning calculated', {
+      estimated_amount: amount,
+      is_estimate: true,
+      is_payable: cityWasteType.is_payable,
+    });
+  } catch (error) {
+    console.error('[Estimate City Waste Type Earning]', error);
+    sendError(res, error.message || 'Failed to estimate earning', error.status || 500);
   }
 };
 

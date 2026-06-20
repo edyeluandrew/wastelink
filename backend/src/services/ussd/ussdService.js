@@ -214,7 +214,7 @@ const handleLogWaste = async (parts, phoneNumber) => {
       : null;
 
     return `END Waste logged successfully. Job ${created.wasteLog.job_code}.${
-      est ? ` Est. earning ${est} (if verified at ${kg}kg).` : ''
+      est ? ` Est. earning ${est} (pending verification).` : ''
     } Agent will verify before earnings become withdrawable.`;
   }
 

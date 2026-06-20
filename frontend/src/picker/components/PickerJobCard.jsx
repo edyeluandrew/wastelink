@@ -35,9 +35,8 @@ export default function PickerJobCard({ job }) {
         )}
         {job.status === 'PENDING' && job.estimated_amount > 0 && (
           <div className="col-span-2">
-            <p className="text-xs text-amber-600">Estimated earning (if verified at {job.estimated_kg} kg)</p>
+            <p className="text-xs text-amber-600">Estimated earning (pending verification)</p>
             <p className="text-lg font-semibold text-amber-700">{formatUGX(job.estimated_amount)}</p>
-            <p className="text-[10px] text-amber-600/80">Final amount confirmed at collection point</p>
           </div>
         )}
         {job.earning && (

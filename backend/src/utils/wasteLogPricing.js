@@ -64,7 +64,8 @@ export const enrichWasteLogWithPricing = (wasteLog, row = null) => {
 
   return {
     ...wasteLog,
-    ...estimate,
+    estimated_amount: estimate.estimated_amount,
+    is_estimate: true,
   };
 };
 

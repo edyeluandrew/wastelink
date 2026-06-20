@@ -3,6 +3,7 @@ import { requireAuth, requireRole, optionalAuth } from '../middleware/authMiddle
 import {
   getCityWasteTypes,
   getActiveCityWasteTypes,
+  estimateCityWasteTypeEarning,
   getCityWasteType,
   createCityWasteTypeHandler,
   updateCityWasteTypeHandler,
@@ -12,6 +13,7 @@ import {
 const router = Router();
 
 router.get('/active', optionalAuth, getActiveCityWasteTypes);
+router.get('/estimate', optionalAuth, estimateCityWasteTypeEarning);
 router.get('/', requireAuth, requireRole(['SUPER_ADMIN', 'CITY_ADMIN']), getCityWasteTypes);
 router.get('/:id/history', requireAuth, requireRole(['SUPER_ADMIN', 'CITY_ADMIN']), getCityWasteTypeHistoryHandler);
 router.get('/:id', requireAuth, requireRole(['SUPER_ADMIN', 'CITY_ADMIN']), getCityWasteType);

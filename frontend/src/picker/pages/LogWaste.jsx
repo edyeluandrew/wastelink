@@ -4,6 +4,7 @@ import { LoadingState, ErrorState, Button } from '../../components';
 import apiClient from '../../api/axios';
 import { getCurrentPickerId } from '../utils/pickerSession';
 import { Recycle, MapPin, Scale } from 'lucide-react';
+import { formatUGX } from '../../utils/formatters';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
 
@@ -17,6 +18,8 @@ export default function LogWaste() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [estimatedAmount, setEstimatedAmount] = useState(0);
+  const [estimatePayable, setEstimatePayable] = useState(true);
 
   const [form, setForm] = useState({
     city_waste_type_id: '',
@@ -43,6 +46,39 @@ export default function LogWaste() {
       }));
     }
   }, [preselectedCollectionPointId]);
+
+  useEffect(() => {
+    const kg = parseFloat(form.estimated_kg);
+    if (!form.city_waste_type_id || !Number.isFinite(kg) || kg <= 0) {
+      setEstimatedAmount(0);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const response = await apiClient.get('/city-waste-types/estimate', {
+          params: {
+            city: 'kampala',
+            city_waste_type_id: form.city_waste_type_id,
+            estimated_kg: kg,
+          },
+        });
+        if (cancelled) return;
+        if (response.data?.success) {
+          setEstimatedAmount(Number(response.data.data?.estimated_amount) || 0);
+          setEstimatePayable(response.data.data?.is_payable !== false);
+        }
+      } catch {
+        if (!cancelled) setEstimatedAmount(0);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.city_waste_type_id, form.estimated_kg]);
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -78,12 +114,6 @@ export default function LogWaste() {
   const selectedWasteType = cityWasteTypes.find(
     (t) => String(t.id) === String(form.city_waste_type_id)
   );
-
-  const estimatedAmount = (() => {
-    const kg = parseFloat(form.estimated_kg);
-    if (!selectedWasteType?.is_payable || !Number.isFinite(kg) || kg <= 0) return 0;
-    return Math.round(Number(selectedWasteType.price_per_kg) * kg);
-  })();
 
   const validateForm = () => {
     if (!form.city_waste_type_id) {
@@ -203,13 +233,17 @@ export default function LogWaste() {
 
         {estimatedAmount > 0 && (
           <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Estimated earning</p>
-            <p className="mt-1 text-2xl font-bold text-amber-900">
-              UGX {estimatedAmount.toLocaleString('en-UG')}
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Your estimated earning</p>
+            <p className="mt-1 text-2xl font-bold text-amber-900">{formatUGX(estimatedAmount)}</p>
             <p className="mt-1 text-xs text-amber-700">
-              For {form.estimated_kg} kg × UGX {Number(selectedWasteType?.price_per_kg || 0).toLocaleString()}/kg — final amount after agent verification
+              Pending agent verification — final amount confirmed at the collection point
             </p>
+          </div>
+        )}
+
+        {selectedWasteType && !estimatePayable && form.estimated_kg && (
+          <div className="mb-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+            This waste type is tracked for reporting only — no payment for this log.
           </div>
         )}
 
@@ -233,9 +267,9 @@ export default function LogWaste() {
             </select>
             {selectedWasteType && (
               <p className="mt-2 text-xs text-[#6B7280]">
-                {selectedWasteType.is_payable
-                  ? `Payable at UGX ${Number(selectedWasteType.price_per_kg).toLocaleString()}/kg when verified`
-                  : 'Track-only — no payment for this waste type'}
+                {estimatePayable === false
+                  ? 'Track-only — no payment for this waste type'
+                  : 'You will see your estimated earning after entering weight'}
               </p>
             )}
           </div>
