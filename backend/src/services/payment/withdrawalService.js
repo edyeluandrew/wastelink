@@ -94,6 +94,19 @@ export const getWithdrawalBalance = async (pickerId) => {
       [pickerId]
     );
 
+    const pendingEstimate = await client.query(
+      `SELECT COALESCE(SUM(
+         CASE
+           WHEN cwt.is_payable THEN ROUND(cwt.price_per_kg * wl.estimated_kg)
+           ELSE 0
+         END
+       ), 0) AS pending_estimated_total
+       FROM waste_logs wl
+       LEFT JOIN city_waste_types cwt ON wl.city_waste_type_id = cwt.id
+       WHERE wl.picker_id = $1 AND wl.status = 'PENDING'`,
+      [pickerId]
+    );
+
     const row = summary.rows[0];
     const availableBalance = parseInt(row.available_balance, 10);
 
@@ -104,6 +117,7 @@ export const getWithdrawalBalance = async (pickerId) => {
       total_paid: parseInt(row.total_paid, 10),
       failed_balance: parseInt(row.failed_balance, 10),
       pending_logs_count: parseInt(pendingLogs.rows[0].pending_logs_count, 10),
+      pending_estimated_total: parseInt(pendingEstimate.rows[0].pending_estimated_total, 10),
       available_jobs: parseInt(row.available_jobs, 10),
       currency: 'UGX',
     };

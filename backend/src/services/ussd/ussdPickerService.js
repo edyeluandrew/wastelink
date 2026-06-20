@@ -2,7 +2,12 @@ import pool from '../../config/db.js';
 import { generatePickerCode, generateWasteJobCode } from '../../utils/generateCodes.js';
 import { normalizePhoneNumber, getPhoneLookupVariants } from '../../utils/phone.js';
 import { normalizeCity } from '../../utils/cityScope.js';
-import { listCityWasteTypes, getActiveCityWasteTypeForLog } from '../wasteTypeGovernanceService.js';
+import {
+  listCityWasteTypes,
+  getActiveCityWasteTypeForLog,
+  calculateEarningFromCityWasteType,
+} from '../wasteTypeGovernanceService.js';
+import { computeEstimatedEarning } from '../../utils/wasteLogPricing.js';
 
 const PILOT_CITY = normalizeCity(process.env.DEFAULT_CITY || 'kampala');
 
@@ -101,7 +106,7 @@ export const getCollectionPointsByDivision = async (division) => {
 export const getRecentWasteLogsForPicker = async (pickerId, limit = 5) => {
   const result = await pool.query(
     `SELECT wl.id, wl.job_code, wl.waste_type, wl.estimated_kg, wl.verified_kg, wl.status, wl.logged_at,
-            cwt.name AS city_waste_type_name
+            cwt.name AS city_waste_type_name, cwt.price_per_kg AS city_price_per_kg, cwt.is_payable AS city_is_payable
      FROM waste_logs wl
      LEFT JOIN city_waste_types cwt ON wl.city_waste_type_id = cwt.id
      WHERE wl.picker_id = $1
@@ -109,7 +114,10 @@ export const getRecentWasteLogsForPicker = async (pickerId, limit = 5) => {
      LIMIT $2`,
     [pickerId, limit]
   );
-  return result.rows;
+  return result.rows.map((row) => {
+    const estimate = computeEstimatedEarning(row);
+    return estimate ? { ...row, ...estimate } : row;
+  });
 };
 
 export const createUssdWasteLog = async ({
@@ -153,7 +161,10 @@ export const createUssdWasteLog = async ({
     ]
   );
 
-  return { wasteLog: result.rows[0] };
+  return {
+    wasteLog: result.rows[0],
+    estimate: calculateEarningFromCityWasteType(cityWasteType, estimatedKg),
+  };
 };
 
 export const DIVISIONS = {

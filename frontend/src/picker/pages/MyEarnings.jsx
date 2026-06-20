@@ -156,6 +156,7 @@ export default function MyEarnings() {
   const totalPaid = balance?.total_paid ?? earnings.paid ?? 0;
   const failedBalance = balance?.failed_balance ?? 0;
   const pendingVerification = balance?.pending_logs_count ?? earnings.pendingVerification ?? 0;
+  const pendingEstimated = balance?.pending_estimated_total ?? 0;
   const canWithdraw = availableToWithdraw > 0;
   const parsedWithdrawAmount = parseInt(String(withdrawAmount).replace(/[^\d]/g, ''), 10) || 0;
   const isValidWithdrawAmount =
@@ -247,6 +248,9 @@ export default function MyEarnings() {
             <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Pending Verification</p>
             <p className="mt-2 text-3xl font-bold text-[#B45309]">{pendingVerification}</p>
             <p className="mt-1 text-sm text-[#6B7280]">Jobs awaiting agent</p>
+            {pendingEstimated > 0 && (
+              <p className="mt-2 text-sm font-semibold text-amber-700">Est. ~{formatUGX(pendingEstimated)}</p>
+            )}
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Withdrawable Balance</p>

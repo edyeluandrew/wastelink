@@ -57,6 +57,10 @@ export function parseJourneyFromEnd(body) {
       paid: Number((paid?.[1] || '0').replace(/,/g, '')),
     };
   }
+  const pendingEst = body.match(/Est\. if verified: UGX ([\d,]+)/);
+  if (pendingEst) {
+    updates.pendingEstimated = Number(pendingEst[1].replace(/,/g, ''));
+  }
 
   return updates;
 }

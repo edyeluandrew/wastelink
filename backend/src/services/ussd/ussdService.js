@@ -209,7 +209,13 @@ const handleLogWaste = async (parts, phoneNumber) => {
       return 'END Could not log waste. Please try again later.';
     }
 
-    return `END Waste logged successfully. Job ${created.wasteLog.job_code}. Agent will verify before earnings become withdrawable.`;
+    const est = created.estimate?.amount
+      ? formatUgx(created.estimate.amount)
+      : null;
+
+    return `END Waste logged successfully. Job ${created.wasteLog.job_code}.${
+      est ? ` Est. earning ${est} (if verified at ${kg}kg).` : ''
+    } Agent will verify before earnings become withdrawable.`;
   }
 
   return 'END Invalid option. Please dial again.';
@@ -228,7 +234,11 @@ const handleJobStatus = async (parts, phoneNumber) => {
   logs.forEach((log, index) => {
     const label = log.city_waste_type_name || log.waste_type;
     const kg = log.verified_kg || log.estimated_kg || 0;
-    message += `${index + 1}. ${label} ${kg}kg - ${statusLabel(log.status)}\n`;
+    let priceHint = '';
+    if (log.status === 'PENDING' && log.estimated_amount > 0) {
+      priceHint = ` ~${formatUgx(log.estimated_amount)} est`;
+    }
+    message += `${index + 1}. ${label} ${kg}kg - ${statusLabel(log.status)}${priceHint}\n`;
   });
 
   return message.trimEnd();
@@ -251,6 +261,9 @@ Paid: ${formatUgx(balance.total_paid)}`;
 
   if (balance.pending_logs_count > 0) {
     message += `\nPending verification: ${balance.pending_logs_count} job(s)`;
+    if (balance.pending_estimated_total > 0) {
+      message += `\nEst. if verified: ${formatUgx(balance.pending_estimated_total)}`;
+    }
   }
 
   return message;

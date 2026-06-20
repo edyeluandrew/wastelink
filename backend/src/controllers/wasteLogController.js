@@ -14,6 +14,7 @@ import {
 } from "../services/payment/earningPaymentService.js";
 import { PAYMENT_STATUS } from "../utils/paymentStatus.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import { enrichWasteLogWithPricing } from "../utils/wasteLogPricing.js";
 
 // POST /api/waste-logs - Create a new waste log
 export const createWasteLog = async (req, res, next) => {
@@ -40,6 +41,7 @@ export const createWasteLog = async (req, res, next) => {
     const logCity = normalizeCity(process.env.DEFAULT_CITY);
     let resolvedWasteType = waste_type;
     let resolvedCityWasteTypeId = city_waste_type_id ? parseInt(city_waste_type_id, 10) : null;
+    let pricingSource = null;
 
     if (resolvedCityWasteTypeId) {
       const cityWasteType = await getActiveCityWasteTypeForLog(resolvedCityWasteTypeId, logCity);
@@ -47,6 +49,7 @@ export const createWasteLog = async (req, res, next) => {
         return sendError(res, "Selected city waste type is not active for your city", 400);
       }
       resolvedWasteType = cityWasteType.name;
+      pricingSource = cityWasteType;
     }
 
     if (!resolvedWasteType) {
@@ -89,11 +92,7 @@ export const createWasteLog = async (req, res, next) => {
     );
 
     const wasteLog = result.rows[0];
-
-    sendSuccess(
-      res,
-      "Waste log created successfully",
-      {
+    const responsePayload = {
         id: wasteLog.id,
         job_code: wasteLog.job_code,
         picker_id: wasteLog.picker_id,
@@ -110,7 +109,18 @@ export const createWasteLog = async (req, res, next) => {
         notes: wasteLog.notes,
         logged_at: wasteLog.logged_at,
         created_at: wasteLog.created_at,
-      },
+      };
+
+    sendSuccess(
+      res,
+      "Waste log created successfully",
+      enrichWasteLogWithPricing(responsePayload, {
+        status: wasteLog.status,
+        estimated_kg: wasteLog.estimated_kg,
+        waste_type: resolvedWasteType,
+        city_price_per_kg: pricingSource?.price_per_kg,
+        city_is_payable: pricingSource?.is_payable,
+      }),
       201
     );
   } catch (error) {
@@ -226,7 +236,7 @@ export const getWasteLogs = async (req, res, next) => {
         wasteLog.earning = null;
       }
       
-      return wasteLog;
+      return enrichWasteLogWithPricing(wasteLog, row);
     });
 
     sendSuccess(res, "Waste logs retrieved successfully", wasteLogs);
@@ -395,7 +405,7 @@ export const getWasteLogByJobCode = async (req, res, next) => {
       earning,
     };
 
-    sendSuccess(res, "Waste log retrieved successfully", wasteLog);
+    sendSuccess(res, "Waste log retrieved successfully", enrichWasteLogWithPricing(wasteLog, row));
   } catch (error) {
     console.error("[Waste Log Job Code Error]", { code: error.code, message: error.message });
     sendError(res, "Database connection failed. Please check Neon DATABASE_URL or network configuration.", 503);

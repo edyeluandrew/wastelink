@@ -79,6 +79,12 @@ export default function LogWaste() {
     (t) => String(t.id) === String(form.city_waste_type_id)
   );
 
+  const estimatedAmount = (() => {
+    const kg = parseFloat(form.estimated_kg);
+    if (!selectedWasteType?.is_payable || !Number.isFinite(kg) || kg <= 0) return 0;
+    return Math.round(Number(selectedWasteType.price_per_kg) * kg);
+  })();
+
   const validateForm = () => {
     if (!form.city_waste_type_id) {
       setError('Please select a waste type');
@@ -115,10 +121,13 @@ export default function LogWaste() {
 
       if (response.data?.success && response.data.data) {
         const logged = response.data.data;
+        const estText = logged.estimated_amount
+          ? ` Est. earning ${Number(logged.estimated_amount).toLocaleString()} UGX (pending verification).`
+          : '';
         navigate('/picker/dashboard', {
           replace: true,
           state: {
-            toast: `Waste logged successfully! Job Code: ${logged.job_code}`,
+            toast: `Waste logged! Job ${logged.job_code}.${estText}`,
             newLogId: logged.id,
           },
         });
@@ -189,8 +198,20 @@ export default function LogWaste() {
 
       <div className="rounded-3xl border border-[#D9D9D9] bg-white p-5 shadow-sm">
         <div className="mb-4 rounded-2xl bg-[#EAF6EA] p-4 text-sm text-[#111111]">
-          Estimated weight will be confirmed at the collection point.
+          Estimated weight will be confirmed at the collection point. Any price shown is an estimate until the agent verifies your actual kg.
         </div>
+
+        {estimatedAmount > 0 && (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Estimated earning</p>
+            <p className="mt-1 text-2xl font-bold text-amber-900">
+              UGX {estimatedAmount.toLocaleString('en-UG')}
+            </p>
+            <p className="mt-1 text-xs text-amber-700">
+              For {form.estimated_kg} kg × UGX {Number(selectedWasteType?.price_per_kg || 0).toLocaleString()}/kg — final amount after agent verification
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

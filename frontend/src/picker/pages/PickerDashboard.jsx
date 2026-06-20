@@ -87,6 +87,7 @@ export default function PickerDashboard() {
   const processingBalance = balance?.payout_processing_balance ?? 0;
   const totalPaid = balance?.total_paid ?? 0;
   const pendingVerification = balance?.pending_logs_count ?? pending;
+  const pendingEstimated = balance?.pending_estimated_total ?? 0;
 
   // Recent jobs — newest first
   const recentJobs = [...logs]
@@ -136,9 +137,12 @@ export default function PickerDashboard() {
           <p className="text-2xl font-bold text-blue-900">{formatUGX(totalPaid)}</p>
         </div>
         {pendingVerification > 0 && (
-          <div className="bg-amber-100 border border-amber-300 rounded-lg p-4">
+          <div className="bg-amber-100 border border-amber-300 rounded-lg p-4 col-span-2 sm:col-span-1">
             <p className="text-xs text-amber-700 font-medium mb-1">Awaiting Verification</p>
-            <p className="text-2xl font-bold text-amber-900">{pendingVerification}</p>
+            <p className="text-2xl font-bold text-amber-900">{pendingVerification} job(s)</p>
+            {pendingEstimated > 0 && (
+              <p className="text-xs text-amber-800 mt-1">Est. ~{formatUGX(pendingEstimated)} if verified as logged</p>
+            )}
           </div>
         )}
       </div>
