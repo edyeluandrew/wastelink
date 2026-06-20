@@ -28,12 +28,18 @@ const authUserSelectQuery = `
     p.division AS picker_division,
     p.main_waste_type AS picker_main_waste_type,
     p.status AS picker_status,
+    u.recycler_id,
+    r.company_name AS recycler_company_name,
+    r.contact_person AS recycler_contact_person,
+    r.phone AS recycler_phone,
+    r.status AS recycler_status,
     u.status,
     u.created_at,
     u.updated_at
   FROM users u
   LEFT JOIN collection_points cp ON u.collection_point_id = cp.id
   LEFT JOIN pickers p ON u.picker_id = p.id
+  LEFT JOIN recyclers r ON u.recycler_id = r.id
 `;
 
 const loadUserById = async (userId) => {

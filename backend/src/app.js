@@ -12,6 +12,8 @@ import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import ussdRoutes from "./routes/ussdRoutes.js";
 import withdrawalRoutes from "./routes/withdrawalRoutes.js";
+import recyclerRoutes from "./routes/recyclerRoutes.js";
+import adminRecyclerRoutes from "./routes/adminRecyclerRoutes.js";
 import { sendSuccess, sendError } from "./utils/apiResponse.js";
 import errorHandler from "./middleware/errorHandler.js";
 
@@ -201,6 +203,11 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/ussd", ussdRoutes);
 app.use("/api/withdrawals", withdrawalRoutes);
+app.use("/api/recycler", recyclerRoutes);
+app.use("/api/admin", adminRecyclerRoutes);
+// Spec-compatible aliases
+app.use("/api/v1/recycler", recyclerRoutes);
+app.use("/api/v1/admin", adminRecyclerRoutes);
 
 app.use((req, res, next) => {
   const error = new Error("Route not found");

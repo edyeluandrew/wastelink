@@ -30,6 +30,16 @@ import MyEarnings from './picker/pages/MyEarnings'
 import PickerCollectionPoints from './picker/pages/PickerCollectionPoints'
 import PickerHelp from './picker/pages/PickerHelp'
 import UssdSimulator from './pages/UssdSimulator'
+import RecyclersAdmin from './pages/RecyclersAdmin'
+import WasteSaleBatchesAdmin from './pages/WasteSaleBatchesAdmin'
+import RecyclerPurchaseRequestsAdmin from './pages/RecyclerPurchaseRequestsAdmin'
+import RecyclerLayout from './recycler/components/RecyclerLayout'
+import RecyclerDashboard from './recycler/pages/RecyclerDashboard'
+import AvailableInventory from './recycler/pages/AvailableInventory'
+import BatchDetails from './recycler/pages/BatchDetails'
+import PurchaseRequests from './recycler/pages/PurchaseRequests'
+import PurchaseHistory from './recycler/pages/PurchaseHistory'
+import RecyclerProfile from './recycler/pages/RecyclerProfile'
 import ProtectedRoute from './components/ProtectedRoute'
 
 const router = createBrowserRouter([
@@ -57,6 +67,9 @@ const router = createBrowserRouter([
       { path: 'divisions', element: <Divisions /> },
       { path: 'earnings', element: <Earnings /> },
       { path: 'reports', element: <Reports /> },
+      { path: 'recyclers', element: <RecyclersAdmin /> },
+      { path: 'waste-sale-batches', element: <WasteSaleBatchesAdmin /> },
+      { path: 'recycler-requests', element: <RecyclerPurchaseRequestsAdmin /> },
     ],
   },
   {
@@ -111,6 +124,19 @@ const router = createBrowserRouter([
       { path: 'earnings', element: <MyEarnings /> },
       { path: 'collection-points', element: <PickerCollectionPoints /> },
       { path: 'help', element: <PickerHelp /> },
+    ],
+  },
+  {
+    path: 'recycler',
+    element: <ProtectedRoute allowedRoles={['RECYCLER']} fallbackPath="/login"><RecyclerLayout /></ProtectedRoute>,
+    children: [
+      { index: true, element: <RecyclerDashboard /> },
+      { path: 'dashboard', element: <RecyclerDashboard /> },
+      { path: 'inventory', element: <AvailableInventory /> },
+      { path: 'inventory/:batchId', element: <BatchDetails /> },
+      { path: 'requests', element: <PurchaseRequests /> },
+      { path: 'history', element: <PurchaseHistory /> },
+      { path: 'profile', element: <RecyclerProfile /> },
     ],
   },
 ])

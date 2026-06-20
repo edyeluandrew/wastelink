@@ -1,6 +1,6 @@
 import pool from "../config/db.js";
 
-export const ALLOWED_USER_ROLES = ["SUPER_ADMIN", "CITY_ADMIN", "AGENT", "PICKER"];
+export const ALLOWED_USER_ROLES = ["SUPER_ADMIN", "CITY_ADMIN", "AGENT", "PICKER", "RECYCLER"];
 export const ALLOWED_USER_STATUSES = ["ACTIVE", "INACTIVE"];
 
 export const normalizeUserRole = (role) => {
@@ -18,11 +18,11 @@ export const canCreateRole = (actorRole, targetRole) => {
   const normalizedTargetRole = normalizeUserRole(targetRole);
 
   if (normalizedActorRole === 'SUPER_ADMIN') {
-    return ['CITY_ADMIN', 'AGENT', 'PICKER'].includes(normalizedTargetRole);
+    return ['CITY_ADMIN', 'AGENT', 'PICKER', 'RECYCLER'].includes(normalizedTargetRole);
   }
 
   if (normalizedActorRole === 'CITY_ADMIN') {
-    return ['AGENT', 'PICKER'].includes(normalizedTargetRole);
+    return ['AGENT', 'PICKER', 'RECYCLER'].includes(normalizedTargetRole);
   }
 
   return false;
@@ -83,6 +83,16 @@ export const safeUserFromRow = (row) => ({
     : null,
   picker_id: row.picker_id,
   picker_name: row.picker_name || null,
+  recycler_id: row.recycler_id,
+  recycler: row.recycler_id
+    ? {
+        id: row.recycler_id,
+        company_name: row.recycler_company_name || null,
+        contact_person: row.recycler_contact_person || null,
+        phone: row.recycler_phone || null,
+        status: row.recycler_status || null,
+      }
+    : null,
   picker: row.picker_id
     ? {
         id: row.picker_id,
@@ -107,7 +117,8 @@ export const ensureUsersTableSchema = async () => {
       ADD COLUMN IF NOT EXISTS city VARCHAR(100),
       ADD COLUMN IF NOT EXISTS division VARCHAR(100),
       ADD COLUMN IF NOT EXISTS collection_point_id INT,
-      ADD COLUMN IF NOT EXISTS picker_id INT
+      ADD COLUMN IF NOT EXISTS picker_id INT,
+      ADD COLUMN IF NOT EXISTS recycler_id INT
   `);
 
   const constraintResult = await pool.query(`
@@ -122,6 +133,7 @@ export const ensureUsersTableSchema = async () => {
     && existingConstraint?.definition.includes("'CITY_ADMIN'")
     && existingConstraint?.definition.includes("'AGENT'")
     && existingConstraint?.definition.includes("'PICKER'")
+    && existingConstraint?.definition.includes("'RECYCLER'")
     && !existingConstraint.definition.includes("'ADMIN'")
     && !existingConstraint.definition.includes('MUNICIPAL_OFFICER');
 
@@ -136,14 +148,14 @@ export const ensureUsersTableSchema = async () => {
   await pool.query(`
     ALTER TABLE users
     ADD CONSTRAINT users_role_check
-    CHECK (role IN ('SUPER_ADMIN', 'CITY_ADMIN', 'AGENT', 'PICKER'))
+    CHECK (role IN ('SUPER_ADMIN', 'CITY_ADMIN', 'AGENT', 'PICKER', 'RECYCLER'))
     NOT VALID
   `).catch(() => {
     // Best effort only; application validation remains the source of truth for now.
   });
 };
 
-export const validateUserRoleRules = ({ role, city, collection_point_id, picker_id }) => {
+export const validateUserRoleRules = ({ role, city, collection_point_id, picker_id, recycler_id }) => {
   if (role === 'AGENT' && !collection_point_id) {
     return 'AGENT users must be assigned to a collection point';
   }
@@ -154,6 +166,10 @@ export const validateUserRoleRules = ({ role, city, collection_point_id, picker_
 
   if (role === 'PICKER' && !picker_id) {
     return 'PICKER users must be linked to a picker profile';
+  }
+
+  if (role === 'RECYCLER' && !recycler_id) {
+    return 'RECYCLER users must be linked to a recycler profile';
   }
 
   return null;

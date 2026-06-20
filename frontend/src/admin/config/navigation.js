@@ -7,6 +7,9 @@ import {
   DollarSign,
   FileText,
   Layers,
+  Recycle,
+  Package,
+  ClipboardCheck,
 } from 'lucide-react';
 import { normalizeRole } from '../../utils/auth';
 
@@ -27,6 +30,9 @@ export const getAdminNavItems = (role) => {
     { path: '/divisions', matchPaths: ['/divisions'], label: 'Divisions', icon: Map },
     { path: '/earnings', matchPaths: ['/earnings'], label: 'Earnings', icon: DollarSign },
     { path: '/reports', matchPaths: ['/reports'], label: 'Reports', icon: FileText },
+    { path: '/recyclers', matchPaths: ['/recyclers'], label: 'Recyclers', icon: Recycle },
+    { path: '/waste-sale-batches', matchPaths: ['/waste-sale-batches'], label: 'Sale Batches', icon: Package, shortLabel: 'Batches' },
+    { path: '/recycler-requests', matchPaths: ['/recycler-requests'], label: 'Recycler Requests', icon: ClipboardCheck, shortLabel: 'Recycler' },
   ];
 
   return baseMenuItems;

@@ -82,6 +82,8 @@ export const getDefaultRouteForRole = (role) => {
       return '/agent/dashboard';
     case 'PICKER':
       return '/picker/dashboard';
+    case 'RECYCLER':
+      return '/recycler/dashboard';
     default:
       return '/login';
   }

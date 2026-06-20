@@ -41,12 +41,18 @@ const pickerAuthSelectQuery = `
     p.division AS picker_division,
     p.main_waste_type AS picker_main_waste_type,
     p.status AS picker_status,
+    u.recycler_id,
+    r.company_name AS recycler_company_name,
+    r.contact_person AS recycler_contact_person,
+    r.phone AS recycler_phone,
+    r.status AS recycler_status,
     u.status,
     u.created_at,
     u.updated_at
   FROM users u
   LEFT JOIN collection_points cp ON u.collection_point_id = cp.id
   LEFT JOIN pickers p ON u.picker_id = p.id
+  LEFT JOIN recyclers r ON u.recycler_id = r.id
 `;
 
 const normalizeText = (value) => String(value ?? "").trim();
@@ -219,39 +225,10 @@ export const login = async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT
-        u.id,
-        u.name,
-        u.email,
-        u.phone,
-        u.password_hash,
-        u.role,
-        u.city,
-        u.division,
-        u.collection_point_id,
-        cp.point_code AS collection_point_point_code,
-        cp.name AS collection_point_name,
-        cp.division AS collection_point_division,
-        cp.agent_name AS collection_point_agent_name,
-        cp.agent_phone AS collection_point_agent_phone,
-        cp.status AS collection_point_status,
-        u.picker_id,
-        p.picker_code AS picker_code,
-        p.name AS picker_name,
-        p.phone AS picker_phone,
-        p.gender AS picker_gender,
-        p.age_group AS picker_age_group,
-        p.division AS picker_division,
-        p.main_waste_type AS picker_main_waste_type,
-        p.status AS picker_status,
-        u.status,
-        u.created_at,
-        u.updated_at
-      FROM users u
-      LEFT JOIN collection_points cp ON u.collection_point_id = cp.id
-      LEFT JOIN pickers p ON u.picker_id = p.id
-      WHERE LOWER(u.email) = $1 OR u.phone = $2
-      LIMIT 1`,
+      `SELECT u.id, u.email, u.role, u.password_hash, u.status
+       FROM users u
+       WHERE LOWER(u.email) = $1 OR u.phone = $2
+       LIMIT 1`,
       [loginIdentifier.toLowerCase(), loginIdentifier]
     );
 
@@ -259,18 +236,23 @@ export const login = async (req, res) => {
       return sendError(res, "Invalid email or password", 401);
     }
 
-    const user = result.rows[0];
+    const authRow = result.rows[0];
 
-    if (user.status !== "ACTIVE") {
+    if (authRow.status !== "ACTIVE") {
       return sendError(res, "Account is inactive", 403);
     }
 
-    if (!user.password_hash) {
+    if (!authRow.password_hash) {
       return sendError(res, "Invalid email or password", 401);
     }
 
-    const passwordMatches = await bcrypt.compare(password, user.password_hash);
+    const passwordMatches = await bcrypt.compare(password, authRow.password_hash);
     if (!passwordMatches) {
+      return sendError(res, "Invalid email or password", 401);
+    }
+
+    const user = await loadAuthUserById(authRow.id);
+    if (!user) {
       return sendError(res, "Invalid email or password", 401);
     }
 
@@ -291,7 +273,7 @@ export const login = async (req, res) => {
 
     return sendSuccess(res, "Login successful", {
       token,
-      user: safeUserFromRow(user),
+      user,
     });
   } catch (error) {
     console.error("[Auth Login Error]", { code: error.code, message: error.message });

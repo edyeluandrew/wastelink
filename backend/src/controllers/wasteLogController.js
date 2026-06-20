@@ -141,6 +141,11 @@ export const getWasteLogs = async (req, res, next) => {
   try {
     let { status, waste_type, division, picker_id, collection_point_id } = req.query;
 
+    // Recyclers must not access raw waste logs
+    if (req.user?.role === 'RECYCLER') {
+      return sendError(res, 'Forbidden', 403);
+    }
+
     // If authenticated as a PICKER, enforce picker_id scoping
     if (req.user?.role === 'PICKER') {
       // If a picker_id was provided but doesn't match the auth user's picker_id, forbid
