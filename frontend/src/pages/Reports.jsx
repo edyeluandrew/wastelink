@@ -7,6 +7,7 @@ import {
   EmptyState,
   DataTable,
   Button,
+  Modal,
 } from '../components';
 import {
   formatCurrencyUGX,
@@ -36,6 +37,9 @@ export default function Reports() {
   const [exportError, setExportError] = useState(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef(null);
+  const [exportPreview, setExportPreview] = useState(null);
+  const [exportPreviewLoading, setExportPreviewLoading] = useState(false);
+  const [emptyExportModal, setEmptyExportModal] = useState(null);
 
   const [monthFilter, setMonthFilter] = useState(
     new Date().toISOString().slice(0, 7)
@@ -96,6 +100,22 @@ export default function Reports() {
     loadExportMeta(activeCity);
   }, [activeCity]);
 
+  useEffect(() => {
+    loadExportPreview();
+  }, [exportParams]);
+
+  const loadExportPreview = async () => {
+    try {
+      setExportPreviewLoading(true);
+      const res = await api.get('/reports/export/preview', { params: exportParams });
+      setExportPreview(res.data?.data || null);
+    } catch (err) {
+      setExportPreview(null);
+    } finally {
+      setExportPreviewLoading(false);
+    }
+  };
+
   const loadExportMeta = async (city) => {
     try {
       const res = await api.get('/reports/export/meta', { params: { city } });
@@ -153,7 +173,7 @@ export default function Reports() {
     }
   };
 
-  const downloadReport = async (format) => {
+  const runDownload = async (format) => {
     try {
       setExportLoading(true);
       setExportError(null);
@@ -180,12 +200,36 @@ export default function Reports() {
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+      setEmptyExportModal(null);
     } catch (err) {
       setExportError(err);
     } finally {
       setExportLoading(false);
     }
   };
+
+  const requestDownload = async (format) => {
+    setExportMenuOpen(false);
+
+    try {
+      setExportLoading(true);
+      const res = await api.get('/reports/export/preview', { params: exportParams });
+      const preview = res.data?.data;
+
+      if (preview?.has_activity) {
+        await runDownload(format);
+        return;
+      }
+
+      setEmptyExportModal({ format, preview });
+    } catch (err) {
+      setExportError(err);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const downloadReport = requestDownload;
 
   const cityOptions = exportMeta?.cities?.length
     ? exportMeta.cities
@@ -203,6 +247,11 @@ export default function Reports() {
             <h2 className="text-lg font-semibold text-wastelink-dark">City Reports</h2>
             <p className="text-sm text-wastelink-muted mt-1">
               Monthly city report and UNDP pilot impact data for {activeCity}.
+              {exportPreview?.pilot_started_date && (
+                <span className="block mt-1">
+                  Pilot activity started: {new Date(exportPreview.pilot_started_date).toLocaleDateString()}
+                </span>
+              )}
             </p>
           </div>
 
@@ -248,6 +297,22 @@ export default function Reports() {
           <p className="text-sm text-red-600">
             Export failed. Check your filters and try again.
           </p>
+        )}
+
+        {!exportPreviewLoading && exportPreview && !exportPreview.has_activity && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-medium">No activity found for this period</p>
+            <p className="mt-1">
+              {exportPreview.message}
+              {exportPreview.pilot_started_date && exportPreview.period_before_pilot && (
+                <span>
+                  {' '}
+                  Try selecting a month on or after{' '}
+                  {new Date(exportPreview.pilot_started_date).toLocaleDateString()}.
+                </span>
+              )}
+            </p>
+          </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -827,6 +892,43 @@ export default function Reports() {
           )}
         </div>
       )}
+
+      <Modal
+        isOpen={Boolean(emptyExportModal)}
+        onClose={() => setEmptyExportModal(null)}
+        title="No activity for this period"
+        size="md"
+      >
+        {emptyExportModal && (
+          <div className="space-y-4 text-sm">
+            <p className="text-wastelink-dark">
+              {emptyExportModal.preview?.message ||
+                'No waste logs match your selected period and filters.'}
+            </p>
+            {emptyExportModal.preview?.pilot_started_date && (
+              <p className="text-wastelink-muted">
+                Pilot activity for {emptyExportModal.preview.city_label} started on{' '}
+                {new Date(emptyExportModal.preview.pilot_started_date).toLocaleDateString()}.
+              </p>
+            )}
+            <p className="text-wastelink-muted">
+              The exported file will contain empty tables and zero totals. Choose a month with
+              logged waste if you need a report for UNDP or municipality sharing.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button variant="secondary" onClick={() => setEmptyExportModal(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => runDownload(emptyExportModal.format)}
+                disabled={exportLoading}
+              >
+                Download empty report anyway
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

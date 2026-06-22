@@ -583,4 +583,72 @@ const buildUndpNarrative = ({
 }) =>
   `During ${periodLabel}, the WasteLink pilot in ${cityLabel} engaged ${registeredPickers} waste pickers across ${activeCollectionPoints} collection points. Pickers logged an estimated ${totalEstimatedKg.toFixed(1)} kg of waste; agents verified ${totalVerifiedKg.toFixed(1)} kg (${verifiedWasteTonnes} tonnes) across ${verifiedLogs} jobs. Pending/unverified material totalled ${pendingUnverifiedKg.toFixed(1)} kg, while ${rejectedEstimatedKg.toFixed(1)} kg was rejected during verification. Inclusion outcomes included ${womenPickers} women (${womenPercentage}%) and ${youthPickers} youth (${youthPercentage}%) among active pickers. The platform generated UGX ${confirmedEarnings.toLocaleString('en-UG')} in confirmed picker earnings, with UGX ${paidEarnings.toLocaleString('en-UG')} paid out through mobile money withdrawals. This UNDP-aligned pilot report demonstrates how digital traceability links informal waste collection to measurable environmental recovery and livelihood creation in ${cityLabel}.`;
 
+const scopedLogJoins = `
+  FROM waste_logs wl
+  JOIN pickers p ON wl.picker_id = p.id
+  JOIN collection_points cp ON wl.collection_point_id = cp.id
+  LEFT JOIN city_waste_types cwt ON wl.city_waste_type_id = cwt.id
+`;
+
+export const previewCityReportExport = async (query, user) => {
+  const filters = parseReportFilters(query, user);
+  const scope = buildScopedLogSql(filters, 3);
+  const periodParams = [filters.startDate, filters.endDate, ...scope.params];
+  const cityScope = buildScopedLogSql(filters, 1);
+
+  const [periodResult, pilotResult] = await Promise.all([
+    pool.query(
+      `SELECT
+         COUNT(wl.id)::int AS total_waste_logs,
+         ${sqlVerifiedKgSum('wl')} AS total_verified_kg
+       ${scopedLogJoins}
+       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
+       ${scope.whereSql}`,
+      periodParams
+    ),
+    pool.query(
+      `SELECT
+         MIN(wl.logged_at) AS pilot_started_at,
+         COUNT(wl.id)::int AS all_time_logs
+       ${scopedLogJoins}
+       WHERE 1=1 ${cityScope.whereSql}`,
+      cityScope.params
+    ),
+  ]);
+
+  const totalWasteLogs = int(periodResult.rows[0]?.total_waste_logs);
+  const totalVerifiedKg = num(periodResult.rows[0]?.total_verified_kg);
+  const pilotStartedAt = pilotResult.rows[0]?.pilot_started_at || null;
+  const allTimeLogs = int(pilotResult.rows[0]?.all_time_logs);
+
+  const pilotStartedDate = pilotStartedAt
+    ? new Date(pilotStartedAt).toISOString().split('T')[0]
+    : null;
+
+  const periodEndsBeforePilot =
+    pilotStartedDate && filters.endDate < pilotStartedDate;
+
+  return {
+    city: filters.city,
+    city_label: filters.cityLabel,
+    reporting_period_start: filters.startDate,
+    reporting_period_end: filters.endDate,
+    period_label: filters.periodLabel,
+    has_activity: totalWasteLogs > 0,
+    total_waste_logs: totalWasteLogs,
+    total_verified_kg: totalVerifiedKg,
+    pilot_started_at: pilotStartedAt,
+    pilot_started_date: pilotStartedDate,
+    pilot_has_data: allTimeLogs > 0,
+    period_before_pilot: periodEndsBeforePilot,
+    message: totalWasteLogs
+      ? null
+      : periodEndsBeforePilot
+        ? `No waste was logged in ${filters.cityLabel} during this period. Pilot activity for these filters started on ${pilotStartedDate}.`
+        : allTimeLogs
+          ? `No waste logs match your selected period and filters for ${filters.cityLabel}.`
+          : `No waste has been logged yet for ${filters.cityLabel} with the current filters.`,
+  };
+};
+
 export { formatCityLabel, parseReportFilters };

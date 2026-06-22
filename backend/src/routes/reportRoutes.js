@@ -9,6 +9,7 @@ import {
   downloadCityReportPdf,
   downloadCityReportXlsx,
   getReportExportMeta,
+  getReportExportPreview,
 } from "../controllers/reportExportController.js";
 
 const router = Router();
@@ -19,6 +20,7 @@ router.get("/summary", getPlatformSummary);
 router.get("/undp-pilot", getUndpPilotReport);
 
 router.get("/export/meta", requireAuth, requireRole(adminRoles), getReportExportMeta);
+router.get("/export/preview", requireAuth, requireRole(adminRoles), getReportExportPreview);
 router.get("/export/xlsx", requireAuth, requireRole(adminRoles), downloadCityReportXlsx);
 router.get("/export/pdf", requireAuth, requireRole(adminRoles), downloadCityReportPdf);
 

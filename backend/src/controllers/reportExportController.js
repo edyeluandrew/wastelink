@@ -3,6 +3,7 @@ import {
   buildCityReportPack,
   getReportFilterOptions,
   listReportCities,
+  previewCityReportExport,
 } from '../services/cityReportService.js';
 import { generateCityReportXlsx } from '../services/cityReportXlsxService.js';
 import { generateCityReportPdf } from '../services/cityReportPdfService.js';
@@ -29,6 +30,21 @@ export const getReportExportMeta = async (req, res, next) => {
       cities: cities.length ? cities : [city],
       filter_options: filterOptions,
     });
+  } catch (error) {
+    if (error.status) return sendError(res, error.message, error.status);
+    next(error);
+  }
+};
+
+export const getReportExportPreview = async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user || !['SUPER_ADMIN', 'CITY_ADMIN'].includes(user.role)) {
+      return sendError(res, 'Forbidden: admin access required', 403);
+    }
+
+    const preview = await previewCityReportExport(buildExportQuery(req), user);
+    sendSuccess(res, 'Report export preview loaded', preview);
   } catch (error) {
     if (error.status) return sendError(res, error.message, error.status);
     next(error);
