@@ -11,6 +11,7 @@ import {
   getPurchaseHistory,
   getRecyclerProfile,
   getPurchaseReceiptHandler,
+  downloadPurchaseReceiptPdfHandler,
 } from '../controllers/recyclerController.js';
 
 const router = Router();
@@ -26,6 +27,7 @@ router.get('/inventory/:batchId', getRecyclerBatchDetails);
 router.post('/purchase-requests', postPurchaseRequest);
 router.get('/purchase-requests', getPurchaseRequests);
 router.get('/purchases', getPurchaseHistory);
+router.get('/purchases/:requestId/receipt/pdf', downloadPurchaseReceiptPdfHandler);
 router.get('/purchases/:requestId/receipt', getPurchaseReceiptHandler);
 router.get('/profile', getRecyclerProfile);
 

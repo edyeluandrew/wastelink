@@ -49,7 +49,8 @@ Recycler (auth + `RECYCLER` role):
 - `POST /api/recycler/purchase-requests`
 - `GET /api/recycler/purchase-requests`
 - `GET /api/recycler/purchases`
-- `GET /api/recycler/purchases/:requestId/receipt`
+- `GET /api/recycler/purchases/:requestId/receipt` — JSON receipt data
+- `GET /api/recycler/purchases/:requestId/receipt/pdf` — downloadable PDF receipt (includes WasteLink logo)
 - `GET /api/recycler/profile`
 
 Admin (auth + admin role):

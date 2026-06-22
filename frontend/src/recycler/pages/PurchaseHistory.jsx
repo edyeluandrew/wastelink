@@ -8,6 +8,7 @@ export default function PurchaseHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [receipt, setReceipt] = useState(null);
+  const [receiptRequestId, setReceiptRequestId] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -26,18 +27,20 @@ export default function PurchaseHistory() {
 
   const viewReceipt = async (requestId) => {
     const res = await api.get(`/recycler/purchases/${requestId}/receipt`);
+    setReceiptRequestId(requestId);
     setReceipt(res.data?.data?.receipt || null);
   };
 
   const downloadReceipt = async (requestId) => {
-    const res = await api.get(`/recycler/purchases/${requestId}/receipt`);
-    const data = res.data?.data?.receipt;
-    if (!data) return;
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const res = await api.get(`/recycler/purchases/${requestId}/receipt/pdf`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([res.data], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${data.receipt_id || 'receipt'}.json`;
+    const receiptId = res.headers['content-disposition']?.match(/filename="(.+)"/)?.[1];
+    link.download = receiptId || `receipt-${requestId}.pdf`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -82,7 +85,7 @@ export default function PurchaseHistory() {
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <Button size="sm" variant="secondary" onClick={() => viewReceipt(p.id)}>View</Button>
-                      <Button size="sm" onClick={() => downloadReceipt(p.id)}>Download</Button>
+                      <Button size="sm" onClick={() => downloadReceipt(p.id)}>Download PDF</Button>
                     </div>
                   </td>
                 </tr>
@@ -92,18 +95,40 @@ export default function PurchaseHistory() {
         </div>
       )}
 
-      <Modal isOpen={Boolean(receipt)} onClose={() => setReceipt(null)} title="Purchase receipt">
+      <Modal
+        isOpen={Boolean(receipt)}
+        onClose={() => {
+          setReceipt(null);
+          setReceiptRequestId(null);
+        }}
+        title="Purchase receipt"
+      >
         {receipt && (
-          <div className="space-y-2 text-sm">
-            <p><strong>Receipt:</strong> {receipt.receipt_id}</p>
-            <p><strong>Company:</strong> {receipt.company_name}</p>
-            <p><strong>Batch:</strong> {receipt.batch_code}</p>
-            <p><strong>Waste type:</strong> {receipt.waste_type}</p>
-            <p><strong>Collection point:</strong> {receipt.collection_point} ({receipt.division})</p>
-            <p><strong>Final kg:</strong> {receipt.final_kg}</p>
-            <p><strong>Amount:</strong> {formatUGX(receipt.final_amount)}</p>
-            <p><strong>Payment:</strong> {receipt.payment_method} · {receipt.payment_reference}</p>
-            <p><strong>Pickup:</strong> {receipt.pickup_date ? new Date(receipt.pickup_date).toLocaleString() : '—'}</p>
+          <div className="space-y-4 text-sm">
+            <div className="flex items-center gap-3 border-b border-[#E5E7EB] pb-4">
+              <img
+                src="/brand/wastelink-logo.png"
+                alt="WasteLink"
+                className="h-12 w-12 object-contain"
+              />
+              <div>
+                <p className="font-semibold text-[#166534]">WasteLink Uganda</p>
+                <p className="text-[#6B7280]">{receipt.receipt_id}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p><strong>Company:</strong> {receipt.company_name}</p>
+              <p><strong>Batch:</strong> {receipt.batch_code}</p>
+              <p><strong>Waste type:</strong> {receipt.waste_type}</p>
+              <p><strong>Collection point:</strong> {receipt.collection_point} ({receipt.division})</p>
+              <p><strong>Final kg:</strong> {receipt.final_kg}</p>
+              <p><strong>Amount:</strong> {formatUGX(receipt.final_amount)}</p>
+              <p><strong>Payment:</strong> {receipt.payment_method} · {receipt.payment_reference}</p>
+              <p><strong>Pickup:</strong> {receipt.pickup_date ? new Date(receipt.pickup_date).toLocaleString() : '—'}</p>
+            </div>
+            {receiptRequestId && (
+              <Button onClick={() => downloadReceipt(receiptRequestId)}>Download PDF</Button>
+            )}
           </div>
         )}
       </Modal>

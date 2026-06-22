@@ -12,6 +12,7 @@ import {
   getCollectionPointsForWasteType,
 } from '../services/recyclerInventoryService.js';
 import { getBatchById } from '../services/wasteSaleBatchService.js';
+import { generatePurchaseReceiptPdf } from '../services/recyclerReceiptPdfService.js';
 
 const requireRecyclerId = (req, res) => {
   const recyclerId = req.user?.recycler_id;
@@ -148,6 +149,24 @@ export const getPurchaseReceiptHandler = async (req, res, next) => {
 
     const receipt = await getPurchaseReceipt(recyclerId, parseInt(req.params.requestId, 10));
     sendSuccess(res, 'Receipt loaded', { receipt });
+  } catch (error) {
+    if (error.message === 'Receipt not found') return sendError(res, error.message, 404);
+    next(error);
+  }
+};
+
+export const downloadPurchaseReceiptPdfHandler = async (req, res, next) => {
+  try {
+    const recyclerId = requireRecyclerId(req, res);
+    if (!recyclerId) return;
+
+    const receipt = await getPurchaseReceipt(recyclerId, parseInt(req.params.requestId, 10));
+    const pdfBuffer = await generatePurchaseReceiptPdf(receipt);
+    const filename = `${receipt.receipt_id || 'receipt'}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdfBuffer);
   } catch (error) {
     if (error.message === 'Receipt not found') return sendError(res, error.message, 404);
     next(error);
