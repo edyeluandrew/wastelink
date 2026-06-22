@@ -10,7 +10,8 @@
     "migrate:withdrawals": "node migrate-withdrawals.mjs",
     "smoke:module13": "node src/scripts/smokeModule13.mjs",
     "migrate:module17": "node migrate-module17-recycler.mjs",
-    "smoke:module17": "node src/scripts/smokeModule17Recycler.mjs"
+    "migrate:module18": "node migrate-module18-recycler-inventory.mjs",
+    "smoke:module18": "node src/scripts/smokeModule18RecyclerInventory.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

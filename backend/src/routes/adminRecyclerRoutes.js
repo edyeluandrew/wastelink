@@ -43,6 +43,7 @@ router.post('/recycler-purchase-requests/:id/schedule-pickup', scheduleRequestPi
 router.post('/recycler-purchase-requests/:id/confirm-pickup', confirmRequestPickup);
 router.post('/recycler-purchase-requests/:id/record-payment', recordRequestPayment);
 router.post('/recycler-purchase-requests/:id/mark-sold', markRequestSold);
+router.post('/recycler-purchase-requests/:id/complete', markRequestSold);
 
 router.get('/recycler-revenue-summary', getRecyclerRevenueSummary);
 

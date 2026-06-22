@@ -36,8 +36,7 @@ import RecyclerPurchaseRequestsAdmin from './pages/RecyclerPurchaseRequestsAdmin
 import RecyclerLayout from './recycler/components/RecyclerLayout'
 import RecyclerDashboard from './recycler/pages/RecyclerDashboard'
 import AvailableInventory from './recycler/pages/AvailableInventory'
-import BatchDetails from './recycler/pages/BatchDetails'
-import PurchaseRequests from './recycler/pages/PurchaseRequests'
+import WasteTypeBreakdown from './recycler/pages/WasteTypeBreakdown'
 import PurchaseHistory from './recycler/pages/PurchaseHistory'
 import RecyclerProfile from './recycler/pages/RecyclerProfile'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -133,7 +132,7 @@ const router = createBrowserRouter([
       { index: true, element: <RecyclerDashboard /> },
       { path: 'dashboard', element: <RecyclerDashboard /> },
       { path: 'inventory', element: <AvailableInventory /> },
-      { path: 'inventory/:batchId', element: <BatchDetails /> },
+      { path: 'inventory/type/:wasteTypeKey', element: <WasteTypeBreakdown /> },
       { path: 'requests', element: <PurchaseRequests /> },
       { path: 'history', element: <PurchaseHistory /> },
       { path: 'profile', element: <RecyclerProfile /> },

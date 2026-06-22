@@ -4,6 +4,12 @@ import { generatePurchaseRequestCode } from '../utils/generateCodes.js';
 import { logRecyclerAudit } from './recyclerAuditService.js';
 import { getBatchById } from './wasteSaleBatchService.js';
 import { isBatchAvailableForPurchase } from '../utils/recyclerStatuses.js';
+import {
+  getRecyclerAccessContext,
+  syncRecyclerAcceptedWasteTypes,
+  getDashboardMetricsForRecycler,
+} from './recyclerInventoryService.js';
+import { normalizeCity } from '../utils/cityScope.js';
 
 const roundMoney = (kg, pricePerKg) => Math.round(Number(kg) * Number(pricePerKg));
 
@@ -94,6 +100,11 @@ export const createRecycler = async (payload, adminId) => {
       details: { company_name },
     });
 
+    await syncRecyclerAcceptedWasteTypes(client, recycler.id, {
+      waste_types_accepted,
+      accepted_waste_type_ids: payload.accepted_waste_type_ids,
+    });
+
     await client.query('COMMIT');
     return { recycler, user };
   } catch (error) {
@@ -123,33 +134,86 @@ export const updateRecycler = async (recyclerId, payload, adminId) => {
     }
   }
 
-  if (fields.length === 0) return existing;
+  if (fields.length === 0) {
+    if (payload.waste_types_accepted !== undefined || payload.accepted_waste_type_ids) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await syncRecyclerAcceptedWasteTypes(client, recyclerId, payload);
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
+    }
+    return existing;
+  }
 
-  values.push(recyclerId);
-  const result = await pool.query(
-    `UPDATE recyclers SET ${fields.join(', ')}, updated_at = NOW()
-     WHERE id = $${values.length} RETURNING *`,
-    values
-  );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    values.push(recyclerId);
+    const result = await client.query(
+      `UPDATE recyclers SET ${fields.join(', ')}, updated_at = NOW()
+       WHERE id = $${values.length} RETURNING *`,
+      values
+    );
 
-  await logRecyclerAudit({
-    action: 'UPDATE_RECYCLER',
-    entityType: 'recycler',
-    entityId: recyclerId,
-    adminId,
-    details: payload,
-  });
+    if (payload.waste_types_accepted !== undefined || payload.accepted_waste_type_ids) {
+      await syncRecyclerAcceptedWasteTypes(client, recyclerId, payload);
+    }
 
-  return result.rows[0];
+    await logRecyclerAudit({
+      action: 'UPDATE_RECYCLER',
+      entityType: 'recycler',
+      entityId: recyclerId,
+      adminId,
+      details: payload,
+    });
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const validateBatchForRecycler = async (recyclerId, batch) => {
+  const ctx = await getRecyclerAccessContext(recyclerId);
+  if (!ctx || ctx.recycler.status !== 'ACTIVE') {
+    throw new Error('Recycler account is not active');
+  }
+  if (normalizeCity(batch.city) !== ctx.approvedCity) {
+    throw new Error('Batch is not in your approved city');
+  }
+  const typeId = batch.city_waste_type_id;
+  const typeName = String(batch.waste_type || '').trim().toLowerCase();
+  const typeOk =
+    (typeId && ctx.acceptedTypeIds.includes(typeId)) ||
+    (typeName && ctx.acceptedNames.includes(typeName));
+  if (!typeOk && (ctx.acceptedTypeIds.length > 0 || ctx.acceptedNames.length > 0)) {
+    throw new Error('This waste type is not in your accepted waste types');
+  }
+  if (ctx.acceptedTypeIds.length === 0 && ctx.acceptedNames.length === 0) {
+    throw new Error('No accepted waste types configured on your profile');
+  }
+  return ctx;
 };
 
 const requestSelect = `
   SELECT pr.*,
-    b.batch_code, b.waste_type, b.recycler_sale_price_per_kg,
-    cp.name AS collection_point_name, cp.division AS collection_point_division
+    b.batch_code, b.waste_type, b.recycler_sale_price_per_kg, b.collection_point_id,
+    cp.name AS collection_point_name, cp.division AS collection_point_division,
+    rc.company_name AS recycler_company_name
   FROM recycler_purchase_requests pr
   JOIN waste_sale_batches b ON b.id = pr.batch_id
   JOIN collection_points cp ON cp.id = b.collection_point_id
+  JOIN recyclers rc ON rc.id = pr.recycler_id
 `;
 
 export const sanitizeRequestForRecycler = (row) => ({
@@ -161,6 +225,7 @@ export const sanitizeRequestForRecycler = (row) => ({
   requested_kg: Number(row.requested_kg),
   expected_amount: row.expected_amount,
   status: row.status,
+  recycler_note: row.recycler_note || null,
   admin_response: row.admin_response,
   rejection_reason: row.rejection_reason,
   pickup_date: row.pickup_date,
@@ -174,58 +239,21 @@ export const sanitizeRequestForRecycler = (row) => ({
   updated_at: row.updated_at,
 });
 
-export const getDashboardStats = async (recyclerId) => {
-  const inventory = await pool.query(
-    `SELECT waste_type, COALESCE(SUM(available_kg), 0) AS available_kg
-     FROM waste_sale_batches
-     WHERE status = 'AVAILABLE' AND available_kg > 0
-     GROUP BY waste_type`
-  );
+export const getDashboardStats = async (recyclerId) => getDashboardMetricsForRecycler(recyclerId);
 
-  const requests = await pool.query(
-    `SELECT status, COUNT(*)::int AS count
-     FROM recycler_purchase_requests WHERE recycler_id = $1 GROUP BY status`,
-    [recyclerId]
-  );
-
-  const purchases = await pool.query(
-    `SELECT COUNT(*)::int AS completed_count,
-            COALESCE(SUM(final_kg), 0) AS total_kg,
-            COALESCE(SUM(final_amount), 0) AS total_spent
-     FROM recycler_purchase_requests
-     WHERE recycler_id = $1 AND status = 'COMPLETED'`,
-    [recyclerId]
-  );
-
-  const byStatus = Object.fromEntries(requests.rows.map((r) => [r.status, r.count]));
-
-  return {
-    available_kg_by_waste_type: inventory.rows,
-    total_purchase_requests: requests.rows.reduce((s, r) => s + r.count, 0),
-    approved_requests: byStatus.APPROVED || 0,
-    pending_requests: byStatus.PENDING || 0,
-    completed_purchases: purchases.rows[0]?.completed_count || 0,
-    total_kg_purchased: Number(purchases.rows[0]?.total_kg || 0),
-    total_amount_spent: Number(purchases.rows[0]?.total_spent || 0),
-  };
-};
-
-export const createPurchaseRequest = async (recyclerId, { batch_id, requested_kg }) => {
+export const createPurchaseRequest = async (recyclerId, { batch_id, requested_kg, recycler_note }) => {
   const batch = await getBatchById(batch_id);
   if (!batch) throw new Error('Batch not found');
-  if (!isBatchAvailableForPurchase(batch.status)) {
+  if (batch.status !== 'AVAILABLE') {
     throw new Error('Batch is not available for purchase');
   }
+
+  await validateBatchForRecycler(recyclerId, batch);
 
   const kg = Number(requested_kg);
   if (!(kg > 0)) throw new Error('requested_kg must be greater than 0');
   if (kg > Number(batch.available_kg)) {
     throw new Error('Requested kg exceeds available kg');
-  }
-
-  const recycler = await getRecyclerById(recyclerId);
-  if (!recycler || recycler.status !== 'ACTIVE') {
-    throw new Error('Recycler account is not active');
   }
 
   const existingPending = await pool.query(
@@ -239,23 +267,60 @@ export const createPurchaseRequest = async (recyclerId, { batch_id, requested_kg
 
   const expectedAmount = roundMoney(kg, batch.recycler_sale_price_per_kg);
   const requestCode = generatePurchaseRequestCode();
+  const newAvailable = Number(batch.available_kg) - kg;
+  const newReserved = Number(batch.reserved_kg || 0) + kg;
+  const newBatchStatus = newAvailable <= 0 ? 'RESERVED_PENDING_APPROVAL' : 'AVAILABLE';
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
+    const batchLock = await client.query(
+      `SELECT available_kg, status FROM waste_sale_batches WHERE id = $1 FOR UPDATE`,
+      [batch_id]
+    );
+    if (batchLock.rows[0]?.status !== 'AVAILABLE') {
+      throw new Error('Batch is no longer available');
+    }
+    if (kg > Number(batchLock.rows[0].available_kg)) {
+      throw new Error('Requested kg exceeds available kg');
+    }
+
     const result = await client.query(
       `INSERT INTO recycler_purchase_requests (
-        request_code, batch_id, recycler_id, requested_kg, expected_amount, status
-      ) VALUES ($1,$2,$3,$4,$5,'PENDING') RETURNING *`,
-      [requestCode, batch_id, recyclerId, kg, expectedAmount]
+        request_code, batch_id, recycler_id, collection_point_id, city_waste_type_id,
+        requested_kg, expected_amount, price_per_kg_snapshot, recycler_note, status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'PENDING') RETURNING *`,
+      [
+        requestCode,
+        batch_id,
+        recyclerId,
+        batch.collection_point_id,
+        batch.city_waste_type_id || null,
+        kg,
+        expectedAmount,
+        batch.recycler_sale_price_per_kg,
+        recycler_note || null,
+      ]
     );
 
     await client.query(
-      `UPDATE waste_sale_batches SET status = 'PURCHASE_REQUESTED', updated_at = NOW()
-       WHERE id = $1 AND status = 'AVAILABLE'`,
-      [batch_id]
+      `UPDATE waste_sale_batches
+       SET available_kg = available_kg - $2,
+           reserved_kg = reserved_kg + $2,
+           status = $3,
+           updated_at = NOW()
+       WHERE id = $1 AND status = 'AVAILABLE' AND available_kg >= $2`,
+      [batch_id, kg, newBatchStatus]
     );
+
+    await logRecyclerAudit({
+      action: 'CREATE_PURCHASE_REQUEST',
+      entityType: 'recycler_purchase_request',
+      entityId: result.rows[0].id,
+      adminId: null,
+      details: { batch_id, requested_kg: kg, recycler_id: recyclerId },
+    });
 
     await client.query('COMMIT');
     return result.rows[0];
@@ -322,11 +387,18 @@ export const approvePurchaseRequest = async (requestId, adminId, { admin_respons
       [requestId, admin_response || null]
     );
 
+    const batchRow = await client.query(
+      `SELECT available_kg, status FROM waste_sale_batches WHERE id = $1`,
+      [request.batch_id]
+    );
+    const available = Number(batchRow.rows[0]?.available_kg || 0);
+    const batchStatus = available > 0 ? 'AVAILABLE' : 'RESERVED';
+
     await client.query(
       `UPDATE waste_sale_batches
-       SET status = 'RESERVED', assigned_recycler_id = $2, updated_at = NOW()
+       SET status = $3, assigned_recycler_id = $2, updated_at = NOW()
        WHERE id = $1`,
-      [request.batch_id, request.recycler_id]
+      [request.batch_id, request.recycler_id, batchStatus]
     );
 
     await logRecyclerAudit({
@@ -362,10 +434,20 @@ export const rejectPurchaseRequest = async (requestId, adminId, { rejection_reas
       [requestId, rejection_reason || null, admin_response || null]
     );
 
-    await client.query(
-      `UPDATE waste_sale_batches SET status = 'AVAILABLE', updated_at = NOW()
-       WHERE id = $1 AND status = 'PURCHASE_REQUESTED'`,
+    const batch = await client.query(
+      `SELECT available_kg, reserved_kg, verified_kg FROM waste_sale_batches WHERE id = $1 FOR UPDATE`,
       [request.batch_id]
+    );
+    const row = batch.rows[0];
+    const returnedKg = Number(request.requested_kg);
+    const newAvailable = Number(row.available_kg) + returnedKg;
+    const newReserved = Math.max(0, Number(row.reserved_kg || 0) - returnedKg);
+
+    await client.query(
+      `UPDATE waste_sale_batches
+       SET available_kg = $2, reserved_kg = $3, status = 'AVAILABLE', updated_at = NOW()
+       WHERE id = $1`,
+      [request.batch_id, newAvailable, newReserved]
     );
 
     await logRecyclerAudit({
@@ -373,7 +455,7 @@ export const rejectPurchaseRequest = async (requestId, adminId, { rejection_reas
       entityType: 'recycler_purchase_request',
       entityId: requestId,
       adminId,
-      details: { rejection_reason },
+      details: { rejection_reason, returned_kg: returnedKg },
     });
 
     await client.query('COMMIT');
@@ -559,9 +641,13 @@ export const markSold = async (requestId, adminId) => {
 
     await client.query(
       `UPDATE waste_sale_batches
-       SET status = 'SOLD', available_kg = 0, updated_at = NOW()
+       SET status = 'SOLD',
+           available_kg = 0,
+           sold_kg = COALESCE(sold_kg, 0) + $2,
+           reserved_kg = GREATEST(0, COALESCE(reserved_kg, 0) - $2),
+           updated_at = NOW()
        WHERE id = $1`,
-      [request.batch_id]
+      [request.batch_id, Number(request.final_kg || request.requested_kg)]
     );
 
     await logRecyclerAudit({

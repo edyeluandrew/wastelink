@@ -8,9 +8,10 @@ import {
   getPurchaseReceipt,
 } from '../services/recyclerService.js';
 import {
-  listAvailableBatches,
-  getBatchById,
-} from '../services/wasteSaleBatchService.js';
+  getInventorySummaryForRecycler,
+  getCollectionPointsForWasteType,
+} from '../services/recyclerInventoryService.js';
+import { getBatchById } from '../services/wasteSaleBatchService.js';
 
 const requireRecyclerId = (req, res) => {
   const recyclerId = req.user?.recycler_id;
@@ -35,14 +36,39 @@ export const getRecyclerDashboard = async (req, res, next) => {
   }
 };
 
+export const getInventorySummary = async (req, res, next) => {
+  try {
+    const recyclerId = requireRecyclerId(req, res);
+    if (!recyclerId) return;
+
+    const { summary } = await getInventorySummaryForRecycler(recyclerId);
+    sendSuccess(res, 'Inventory summary loaded', { summary });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInventoryCollectionPoints = async (req, res, next) => {
+  try {
+    const recyclerId = requireRecyclerId(req, res);
+    if (!recyclerId) return;
+
+    const wasteTypeKey = req.params.wasteTypeId;
+    const collectionPoints = await getCollectionPointsForWasteType(recyclerId, wasteTypeKey);
+    sendSuccess(res, 'Collection point breakdown loaded', { collection_points: collectionPoints });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** @deprecated use inventory-summary */
 export const getRecyclerInventory = async (req, res, next) => {
   try {
     const recyclerId = requireRecyclerId(req, res);
     if (!recyclerId) return;
 
-    const city = req.user?.city || undefined;
-    const batches = await listAvailableBatches({ city });
-    sendSuccess(res, 'Available inventory loaded', { batches });
+    const { summary } = await getInventorySummaryForRecycler(recyclerId);
+    sendSuccess(res, 'Available inventory loaded', { summary });
   } catch (error) {
     next(error);
   }
@@ -55,7 +81,7 @@ export const getRecyclerBatchDetails = async (req, res, next) => {
 
     const batch = await getBatchById(req.params.batchId, { forRecycler: true });
     if (!batch) return sendError(res, 'Batch not found', 404);
-    if (batch.status !== 'AVAILABLE') {
+    if (batch.status !== 'AVAILABLE' || Number(batch.available_kg) <= 0) {
       return sendError(res, 'Batch is not available', 404);
     }
 
@@ -70,7 +96,7 @@ export const postPurchaseRequest = async (req, res, next) => {
     const recyclerId = requireRecyclerId(req, res);
     if (!recyclerId) return;
 
-    const { batch_id, requested_kg } = req.body;
+    const { batch_id, requested_kg, recycler_note } = req.body;
     if (!batch_id || requested_kg === undefined) {
       return sendError(res, 'batch_id and requested_kg are required', 400);
     }
@@ -78,11 +104,13 @@ export const postPurchaseRequest = async (req, res, next) => {
     const request = await createPurchaseRequest(recyclerId, {
       batch_id: parseInt(batch_id, 10),
       requested_kg,
+      recycler_note,
     });
 
     sendSuccess(res, 'Purchase request submitted', { request }, 201);
   } catch (error) {
-    if (error.message.includes('not available') || error.message.includes('exceeds')) {
+    const clientErrors = ['not available', 'exceeds', 'not active', 'not in your', 'accepted waste', 'pending request', 'no longer'];
+    if (clientErrors.some((m) => error.message.toLowerCase().includes(m.toLowerCase()))) {
       return sendError(res, error.message, 400);
     }
     next(error);

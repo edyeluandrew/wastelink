@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 import {
   getRecyclerDashboard,
+  getInventorySummary,
+  getInventoryCollectionPoints,
   getRecyclerInventory,
   getRecyclerBatchDetails,
   postPurchaseRequest,
@@ -17,6 +19,8 @@ const recyclerRole = ['RECYCLER'];
 router.use(requireAuth, requireRole(recyclerRole));
 
 router.get('/dashboard', getRecyclerDashboard);
+router.get('/inventory-summary', getInventorySummary);
+router.get('/inventory-summary/:wasteTypeId/collection-points', getInventoryCollectionPoints);
 router.get('/inventory', getRecyclerInventory);
 router.get('/inventory/:batchId', getRecyclerBatchDetails);
 router.post('/purchase-requests', postPurchaseRequest);
