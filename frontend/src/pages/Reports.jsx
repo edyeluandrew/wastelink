@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Calendar } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Download } from 'lucide-react';
 import {
   StatCard,
   LoadingState,
@@ -17,13 +17,25 @@ import {
   formatStatus,
 } from '../utils/formatters';
 import api from '../api/axios';
+import { getAuthUser, normalizeRole } from '../utils/auth';
+
+const DEFAULT_CITY = 'mbarara';
 
 export default function Reports() {
+  const authUser = getAuthUser();
+  const isSuperAdmin = normalizeRole(authUser?.role) === 'SUPER_ADMIN';
+  const actorCity = authUser?.city ? String(authUser.city).trim().toLowerCase() : DEFAULT_CITY;
+
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [summaryReport, setSummaryReport] = useState(null);
   const [undpReport, setUndpReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [exportMeta, setExportMeta] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef(null);
 
   const [monthFilter, setMonthFilter] = useState(
     new Date().toISOString().slice(0, 7)
@@ -33,9 +45,65 @@ export default function Reports() {
   const [undpEndDate, setUndpEndDate] = useState('');
   const [customDateMode, setCustomDateMode] = useState(false);
 
+  const [cityFilter, setCityFilter] = useState(isSuperAdmin ? DEFAULT_CITY : actorCity);
+  const [collectionPointId, setCollectionPointId] = useState('');
+  const [wasteTypeId, setWasteTypeId] = useState('');
+  const [genderFilter, setGenderFilter] = useState('');
+  const [youthOnly, setYouthOnly] = useState(false);
+
+  const activeCity = isSuperAdmin ? cityFilter : actorCity;
+
+  const exportParams = useMemo(() => {
+    const params = { city: activeCity };
+    if (customDateMode && undpStartDate && undpEndDate) {
+      params.start_date = undpStartDate;
+      params.end_date = undpEndDate;
+    } else if (monthFilter) {
+      params.month = monthFilter;
+    }
+    if (collectionPointId) params.collection_point_id = collectionPointId;
+    if (wasteTypeId) params.city_waste_type_id = wasteTypeId;
+    if (genderFilter) params.gender = genderFilter;
+    if (youthOnly) params.youth_only = 'true';
+    return params;
+  }, [
+    activeCity,
+    customDateMode,
+    undpStartDate,
+    undpEndDate,
+    monthFilter,
+    collectionPointId,
+    wasteTypeId,
+    genderFilter,
+    youthOnly,
+  ]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+        setExportMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     fetchReports();
   }, []);
+
+  useEffect(() => {
+    loadExportMeta(activeCity);
+  }, [activeCity]);
+
+  const loadExportMeta = async (city) => {
+    try {
+      const res = await api.get('/reports/export/meta', { params: { city } });
+      setExportMeta(res.data?.data || null);
+    } catch (err) {
+      console.error('Failed to load export metadata', err);
+    }
+  };
 
   const fetchReports = async (month = monthFilter, startDate = '', endDate = '') => {
     try {
@@ -85,6 +153,44 @@ export default function Reports() {
     }
   };
 
+  const downloadReport = async (format) => {
+    try {
+      setExportLoading(true);
+      setExportError(null);
+      setExportMenuOpen(false);
+
+      const endpoint = format === 'xlsx' ? '/reports/export/xlsx' : '/reports/export/pdf';
+      const res = await api.get(endpoint, {
+        params: exportParams,
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([res.data], {
+        type:
+          format === 'xlsx'
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : 'application/pdf',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const filename =
+        res.headers['content-disposition']?.match(/filename="(.+)"/)?.[1] ||
+        `WasteLink-report.${format === 'xlsx' ? 'xlsx' : 'pdf'}`;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const cityOptions = exportMeta?.cities?.length
+    ? exportMeta.cities
+    : [activeCity];
+
   if (loading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={fetchReports} />;
 
@@ -92,16 +198,156 @@ export default function Reports() {
     <div className="space-y-8">
       {/* Controls */}
       <div className="card space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-wastelink-dark mb-2">
-            Report Month
-          </label>
-          <input
-            type="month"
-            value={monthFilter}
-            onChange={handleMonthChange}
-            className="border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
-          />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-wastelink-dark">City Reports</h2>
+            <p className="text-sm text-wastelink-muted mt-1">
+              Monthly city report and UNDP pilot impact data for {activeCity}.
+            </p>
+          </div>
+
+          <div className="relative" ref={exportMenuRef}>
+            <Button
+              onClick={() => setExportMenuOpen((open) => !open)}
+              disabled={exportLoading}
+              className="inline-flex items-center gap-2"
+            >
+              <Download size={16} />
+              {exportLoading ? 'Preparing…' : 'Download Report Pack'}
+              <ChevronDown size={16} />
+            </Button>
+
+            {exportMenuOpen && (
+              <div className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-xl border border-wastelink-border bg-white shadow-lg">
+                <button
+                  type="button"
+                  className="block w-full px-4 py-3 text-left text-sm hover:bg-gray-50"
+                  onClick={() => downloadReport('xlsx')}
+                >
+                  <span className="font-medium text-wastelink-dark">Excel Workbook (.xlsx)</span>
+                  <span className="mt-1 block text-xs text-wastelink-muted">
+                    Full working report for admins
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="block w-full border-t border-wastelink-border px-4 py-3 text-left text-sm hover:bg-gray-50"
+                  onClick={() => downloadReport('pdf')}
+                >
+                  <span className="font-medium text-wastelink-dark">PDF Summary (.pdf)</span>
+                  <span className="mt-1 block text-xs text-wastelink-muted">
+                    Branded report for UNDP and partners
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {exportError && (
+          <p className="text-sm text-red-600">
+            Export failed. Check your filters and try again.
+          </p>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {isSuperAdmin && (
+            <div>
+              <label className="block text-sm font-medium text-wastelink-dark mb-2">
+                City / Municipality
+              </label>
+              <select
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+                className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+              >
+                {cityOptions.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-wastelink-dark mb-2">
+              Report Month
+            </label>
+            <input
+              type="month"
+              value={monthFilter}
+              onChange={handleMonthChange}
+              disabled={customDateMode}
+              className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary disabled:bg-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-wastelink-dark mb-2">
+              Collection Point
+            </label>
+            <select
+              value={collectionPointId}
+              onChange={(e) => setCollectionPointId(e.target.value)}
+              className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+            >
+              <option value="">All collection points</option>
+              {(exportMeta?.filter_options?.collection_points || []).map((point) => (
+                <option key={point.id} value={point.id}>
+                  {point.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-wastelink-dark mb-2">
+              Waste Type
+            </label>
+            <select
+              value={wasteTypeId}
+              onChange={(e) => setWasteTypeId(e.target.value)}
+              className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+            >
+              <option value="">All waste types</option>
+              {(exportMeta?.filter_options?.waste_types || []).map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-wastelink-dark mb-2">
+              Gender
+            </label>
+            <select
+              value={genderFilter}
+              onChange={(e) => setGenderFilter(e.target.value)}
+              className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+            >
+              <option value="">All genders</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 cursor-pointer pb-2">
+              <input
+                type="checkbox"
+                checked={youthOnly}
+                onChange={(e) => setYouthOnly(e.target.checked)}
+                className="border border-wastelink-border rounded"
+              />
+              <span className="text-sm font-medium text-wastelink-dark">
+                Youth pickers only
+              </span>
+            </label>
+          </div>
         </div>
 
         <div>
@@ -113,7 +359,7 @@ export default function Reports() {
               className="border border-wastelink-border rounded"
             />
             <span className="text-sm font-medium text-wastelink-dark">
-              Use custom date range for UNDP report
+              Use custom date range for UNDP report and exports
             </span>
           </label>
 

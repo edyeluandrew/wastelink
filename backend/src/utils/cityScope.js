@@ -1,5 +1,5 @@
 export const normalizeCity = (city) =>
-  String(city || process.env.DEFAULT_CITY || 'kampala')
+  String(city || process.env.DEFAULT_CITY || 'mbarara')
     .trim()
     .toLowerCase();
 
