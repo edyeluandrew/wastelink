@@ -34,7 +34,12 @@ api.interceptors.response.use(
         }
       }
       // Server responded with error status
-      console.error('API Error:', error.response.status, error.response.data);
+      const apiMessage = error.response.data?.message;
+      console.error(
+        'API Error:',
+        error.response.status,
+        apiMessage || error.response.data
+      );
     } else if (error.request) {
       // Request made but no response received
       console.error('No response received:', error.request);

@@ -91,6 +91,8 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [referenceLoading, setReferenceLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [formError, setFormError] = useState(null);
+  const [resetError, setResetError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -204,6 +206,7 @@ export default function Users() {
   const openCreateModal = () => {
     setIsEditing(false);
     setSelectedUserId(null);
+    setFormError(null);
     const defaultRole = actorRole === 'CITY_ADMIN' ? 'AGENT' : 'CITY_ADMIN';
     setForm({
       ...DEFAULT_FORM,
@@ -233,18 +236,21 @@ export default function Users() {
       picker_id: user.picker_id || '',
       status: user.status || 'ACTIVE',
     });
+    setFormError(null);
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setForm(DEFAULT_FORM);
+    setFormError(null);
     setSelectedUserId(null);
   };
 
   const closeResetModal = () => {
     setResetModalOpen(false);
     setResetForm({ password: '', confirmPassword: '' });
+    setResetError(null);
     setSelectedUserId(null);
   };
 
@@ -256,62 +262,62 @@ export default function Users() {
     event.preventDefault();
 
     if (!form.name.trim()) {
-      setError('Name is required');
+      setFormError('Name is required');
       return;
     }
 
     if (!form.role) {
-      setError('Role is required');
+      setFormError('Role is required');
       return;
     }
 
     const allowedRoles = buildCreateRoleOptions(actorRole, isEditing ? form.role : '');
     if (!allowedRoles.includes(form.role)) {
-      setError('Forbidden');
+      setFormError('Forbidden');
       return;
     }
 
     if (!isEditing && !form.password) {
-      setError('Password is required');
+      setFormError('Password is required');
       return;
     }
 
     if (!form.email && !form.phone) {
-      setError('Either email or phone is required');
+      setFormError('Either email or phone is required');
       return;
     }
 
     if (form.role === 'AGENT' && !form.collection_point_id) {
-      setError('AGENT users must be assigned to a collection point');
+      setFormError('AGENT users must be assigned to a collection point');
       return;
     }
 
     if (form.role === 'CITY_ADMIN' && !form.city.trim()) {
-      setError('CITY_ADMIN users must have a city');
+      setFormError('CITY_ADMIN users must have a city');
       return;
     }
 
     if (form.role === 'PICKER') {
       if (!form.picker_id) {
-        setError('PICKER users must be linked to a picker profile');
+        setFormError('PICKER users must be linked to a picker profile');
         return;
       }
 
       if (!form.phone.trim()) {
-        setError('PICKER users must provide a phone number');
+        setFormError('PICKER users must provide a phone number');
         return;
       }
 
       const pickerExists = pickers.some((picker) => String(picker.id) === String(form.picker_id));
       if (!pickerExists) {
-        setError('Selected picker profile was not found');
+        setFormError('Selected picker profile was not found');
         return;
       }
     }
 
     try {
       setSubmitting(true);
-      setError(null);
+      setFormError(null);
 
       const payload = {
         name: form.name.trim(),
@@ -335,7 +341,7 @@ export default function Users() {
       closeModal();
       await fetchUsers();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save user');
+      setFormError(err.response?.data?.message || 'Failed to save user');
     } finally {
       setSubmitting(false);
     }
@@ -368,6 +374,7 @@ export default function Users() {
 
     setSelectedUserId(user.id);
     setResetForm({ password: '', confirmPassword: '' });
+    setResetError(null);
     setResetModalOpen(true);
   };
 
@@ -375,24 +382,24 @@ export default function Users() {
     event.preventDefault();
 
     if (!resetForm.password) {
-      setError('Password is required');
+      setResetError('Password is required');
       return;
     }
 
     if (resetForm.password !== resetForm.confirmPassword) {
-      setError('Passwords do not match');
+      setResetError('Passwords do not match');
       return;
     }
 
     try {
       setResetSubmitting(true);
-      setError(null);
+      setResetError(null);
       await api.patch(`/users/${selectedUserId}/reset-password`, {
         password: resetForm.password,
       });
       closeResetModal();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reset password');
+      setResetError(err.response?.data?.message || 'Failed to reset password');
     } finally {
       setResetSubmitting(false);
     }
@@ -427,7 +434,7 @@ export default function Users() {
     return <LoadingState message="Loading users..." />;
   }
 
-  if (error && users.length === 0) {
+  if (error && users.length === 0 && !modalOpen) {
     return <ErrorState error={error} onRetry={refreshUsers} />;
   }
 
@@ -495,6 +502,10 @@ export default function Users() {
           </div>
         )}
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+      )}
 
       {visibleUsers.length === 0 ? (
         <EmptyState message="No users found" subtext="Create the first account to get started" />
@@ -699,7 +710,7 @@ export default function Users() {
             <p className="text-xs text-wastelink-muted">Super Admin does not require a city, collection point, or picker link.</p>
           )}
 
-          {error && <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+          {formError && <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">{formError}</div>}
 
           <div className="flex gap-3 pt-2">
             <Button type="submit" disabled={submitting} className="flex-1">
@@ -736,7 +747,7 @@ export default function Users() {
               className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
             />
           </div>
-          {error && <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+          {resetError && <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">{resetError}</div>}
           <div className="flex gap-3 pt-2">
             <Button type="submit" disabled={resetSubmitting} className="flex-1">
               {resetSubmitting ? 'Resetting...' : 'Reset Password'}
