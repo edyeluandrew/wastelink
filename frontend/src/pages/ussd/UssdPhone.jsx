@@ -1,4 +1,5 @@
 import { Delete, Phone, PhoneOff } from 'lucide-react';
+import './ussd-feature-phone.css';
 
 const KEYPAD = [
   { digit: '1', sub: '' },
@@ -39,12 +40,18 @@ export default function UssdPhone({
   const phoneEditable = !connected;
 
   return (
-    <div className="mx-auto w-full max-w-[320px]">
-      <div className="rounded-[2.5rem] border-[6px] border-[#1a1a1a] bg-[#1a1a1a] shadow-2xl overflow-hidden">
-        {/* Notch / status */}
-        <div className="bg-[#111111] px-4 pt-3 pb-2 text-center">
-          <div className="mx-auto mb-2 h-5 w-24 rounded-full bg-black" />
-          <p className="text-[10px] text-gray-400 tracking-wide">WasteLink · Feature Phone</p>
+    <div className="feature-phone-wrap mx-auto w-full max-w-[300px]">
+      <div className="feature-phone-body">
+        <div className="feature-phone-top">
+          <div className="feature-phone-speaker" aria-hidden="true" />
+          <p className="feature-phone-brand">WasteLink</p>
+        </div>
+
+        <div className="feature-phone-screen-bezel">
+          <div className="feature-phone-screen">
+        {/* Status / number */}
+        <div className="bg-[#111111] px-4 pt-2 pb-2 text-center">
+          <p className="text-[10px] text-gray-400 tracking-wide">Feature Phone · USSD</p>
           {phoneEditable ? (
             <div className="mt-2 px-1">
               <label className="text-[9px] text-gray-500 uppercase tracking-wide">Your number (SIM)</label>
@@ -143,9 +150,11 @@ export default function UssdPhone({
             </button>
           </div>
         )}
+          </div>
+        </div>
 
         {/* Keypad */}
-        <div className="bg-[#111111] px-3 pb-3 pt-2">
+        <div className="bg-[#111111] px-3 pb-3 pt-2 mt-1">
           <div className="grid grid-cols-3 gap-1.5">
             {KEYPAD.map(({ digit, sub }) => (
               <button
@@ -190,6 +199,7 @@ export default function UssdPhone({
             </button>
           </div>
         </div>
+        <div className="feature-phone-chin" aria-hidden="true" />
       </div>
     </div>
   );
