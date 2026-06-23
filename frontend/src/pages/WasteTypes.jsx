@@ -386,13 +386,21 @@ export default function WasteTypes() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Reporting Category *</label>
+            <p className="text-xs text-wastelink-muted mb-2">
+              Global UNDP-style material group (e.g. Plastic, Metal) used to roll up city waste types in reports.
+            </p>
             <select
               value={form.reporting_category_id}
               onChange={(e) => setForm({ ...form, reporting_category_id: e.target.value })}
               className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm"
               required
+              disabled={reportingCategories.filter((c) => c.is_active).length === 0}
             >
-              <option value="">Select category</option>
+              <option value="">
+                {reportingCategories.filter((c) => c.is_active).length === 0
+                  ? 'No categories available — refresh the page or contact super admin'
+                  : 'Select category'}
+              </option>
               {reportingCategories.filter((c) => c.is_active).map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}

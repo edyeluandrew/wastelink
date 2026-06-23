@@ -1,6 +1,7 @@
 import pool from '../config/db.js';
 import { normalizeCity, slugify } from '../utils/cityScope.js';
 import { assertCityExists } from './cityService.js';
+import { DEFAULT_REPORTING_CATEGORIES } from '../constants/reportingCategories.js';
 
 const mapCityWasteTypeRow = (row) => ({
   id: row.id,
@@ -55,7 +56,25 @@ export const recordCityWasteTypeHistory = async (client, {
   );
 };
 
+export const ensureDefaultReportingCategories = async () => {
+  const existing = await pool.query('SELECT COUNT(*)::int AS count FROM reporting_categories');
+  if (existing.rows[0]?.count > 0) {
+    return;
+  }
+
+  for (const cat of DEFAULT_REPORTING_CATEGORIES) {
+    await pool.query(
+      `INSERT INTO reporting_categories (name, slug, description, is_active)
+       VALUES ($1, $2, $3, TRUE)
+       ON CONFLICT (slug) DO NOTHING`,
+      [cat.name, cat.slug, cat.description]
+    );
+  }
+};
+
 export const listReportingCategories = async ({ activeOnly = false } = {}) => {
+  await ensureDefaultReportingCategories();
+
   const params = [];
   let query = `SELECT * FROM reporting_categories WHERE 1=1`;
   if (activeOnly) {

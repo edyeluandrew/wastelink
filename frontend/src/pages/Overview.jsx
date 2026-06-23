@@ -66,6 +66,11 @@ export default function Overview() {
   if (loading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={fetchData} />;
 
+  const logsSubmitted = today?.logs_submitted ?? today?.logs_today ?? 0;
+  const logsVerified = today?.logs_verified ?? today?.verified_today ?? 0;
+  const weightToday = today?.weight_today ?? today?.verified_kg_today ?? 0;
+  const earningsToday = today?.earnings_today ?? 0;
+
   return (
     <div className="space-y-5 md:space-y-8">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 md:gap-4">
@@ -137,25 +142,25 @@ export default function Overview() {
             <div>
               <p className="text-wastelink-muted text-sm mb-1">Logs Submitted</p>
               <p className="text-2xl font-bold text-wastelink-dark">
-                {today.logs_submitted || 0}
+                {logsSubmitted}
               </p>
             </div>
             <div>
               <p className="text-wastelink-muted text-sm mb-1">Logs Verified</p>
               <p className="text-2xl font-bold text-wastelink-dark">
-                {today.logs_verified || 0}
+                {logsVerified}
               </p>
             </div>
             <div>
               <p className="text-wastelink-muted text-sm mb-1">Weight Today</p>
               <p className="text-2xl font-bold text-wastelink-dark">
-                {formatKg(today.weight_today)}
+                {formatKg(weightToday)}
               </p>
             </div>
             <div>
               <p className="text-wastelink-muted text-sm mb-1">Earnings Today</p>
               <p className="text-2xl font-bold text-wastelink-dark">
-                {formatCurrencyUGX(today.earnings_today)}
+                {formatCurrencyUGX(earningsToday)}
               </p>
             </div>
           </div>

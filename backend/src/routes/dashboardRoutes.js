@@ -8,8 +8,11 @@ import {
   getDashboardCollectionPointPerformance,
   getDashboardToday,
 } from "../controllers/dashboardController.js";
+import { optionalAuth } from "../middleware/authMiddleware.js";
 
 const router = Router();
+
+router.use(optionalAuth);
 
 router.get("/stats", getDashboardStats);
 router.get("/divisions", getDashboardDivisions);

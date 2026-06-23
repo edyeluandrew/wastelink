@@ -1,5 +1,27 @@
 import pool from "../config/db.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import { normalizeCity, resolveUserCity } from "../utils/cityScope.js";
+
+const UGANDA_TZ = "Africa/Kampala";
+const todayInUganda = `(NOW() AT TIME ZONE '${UGANDA_TZ}')::date`;
+
+const resolveDashboardCity = (req) => {
+  if (req.user?.role === "CITY_ADMIN") {
+    return normalizeCity(resolveUserCity(req.user));
+  }
+  return null;
+};
+
+const buildCityFilterClause = (city, paramIndex) => {
+  if (!city) {
+    return { clause: "", params: [] };
+  }
+
+  return {
+    clause: ` AND LOWER(COALESCE(cp.city, '')) = LOWER($${paramIndex})`,
+    params: [city],
+  };
+};
 
 // GET /api/dashboard/stats - Overall system statistics
 export const getDashboardStats = async (req, res, next) => {
@@ -351,38 +373,72 @@ export const getDashboardCollectionPointPerformance = async (req, res, next) => 
 // GET /api/dashboard/today - Today's activity
 export const getDashboardToday = async (req, res, next) => {
   try {
-    const result = await pool.query(`
+    const city = resolveDashboardCity(req);
+    const cityFilter = buildCityFilterClause(city, 1);
+    const params = [...cityFilter.params];
+
+    const wasteResult = await pool.query(
+      `
       SELECT
-        COUNT(wl.id) as logs_today,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as verified_today,
-        COUNT(CASE WHEN wl.status = 'PENDING' THEN 1 END) as pending_today,
-        COUNT(CASE WHEN wl.status = 'REJECTED' THEN 1 END) as rejected_today,
-        COALESCE(SUM(wl.verified_kg), 0) as verified_kg_today,
-        COALESCE(SUM(e.amount), 0) as earnings_today
+        COUNT(*) FILTER (
+          WHERE (wl.logged_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
+        ) AS logs_submitted,
+        COUNT(*) FILTER (
+          WHERE wl.status IN ('VERIFIED', 'PAID')
+            AND wl.verified_at IS NOT NULL
+            AND (wl.verified_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
+        ) AS logs_verified,
+        COUNT(*) FILTER (
+          WHERE wl.status = 'PENDING'
+            AND (wl.logged_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
+        ) AS pending_today,
+        COUNT(*) FILTER (
+          WHERE wl.status = 'REJECTED'
+            AND (wl.logged_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
+        ) AS rejected_today,
+        COALESCE(SUM(wl.verified_kg) FILTER (
+          WHERE wl.status IN ('VERIFIED', 'PAID')
+            AND wl.verified_at IS NOT NULL
+            AND (wl.verified_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
+        ), 0) AS weight_today,
+        COUNT(DISTINCT wl.picker_id) FILTER (
+          WHERE (wl.logged_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
+        ) AS active_pickers_today
       FROM waste_logs wl
-      LEFT JOIN earnings e ON wl.id = e.waste_log_id
-      WHERE DATE(wl.logged_at) = CURRENT_DATE
-    `);
+      JOIN collection_points cp ON cp.id = wl.collection_point_id
+      WHERE 1=1
+      ${cityFilter.clause}
+      `,
+      params
+    );
 
-    const todayStats = result.rows[0];
+    const earningsResult = await pool.query(
+      `
+      SELECT COALESCE(SUM(e.amount), 0) AS earnings_today
+      FROM earnings e
+      JOIN waste_logs wl ON wl.id = e.waste_log_id
+      JOIN collection_points cp ON cp.id = wl.collection_point_id
+      WHERE (e.created_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
+      ${cityFilter.clause}
+      `,
+      params
+    );
 
-    // Get active pickers today (those who logged waste)
-    const pickersResult = await pool.query(`
-      SELECT COUNT(DISTINCT wl.picker_id) as active_pickers_today
-      FROM waste_logs wl
-      WHERE DATE(wl.logged_at) = CURRENT_DATE
-    `);
-
-    const { active_pickers_today } = pickersResult.rows[0];
+    const todayStats = wasteResult.rows[0];
+    const earningsToday = earningsResult.rows[0]?.earnings_today ?? 0;
 
     sendSuccess(res, "Today's activity fetched successfully", {
-      logs_today: parseInt(todayStats.logs_today),
-      verified_today: parseInt(todayStats.verified_today),
-      pending_today: parseInt(todayStats.pending_today),
-      rejected_today: parseInt(todayStats.rejected_today),
-      verified_kg_today: parseFloat(todayStats.verified_kg_today),
-      earnings_today: parseInt(todayStats.earnings_today),
-      active_pickers_today: parseInt(active_pickers_today),
+      logs_submitted: parseInt(todayStats.logs_submitted, 10) || 0,
+      logs_verified: parseInt(todayStats.logs_verified, 10) || 0,
+      pending_today: parseInt(todayStats.pending_today, 10) || 0,
+      rejected_today: parseInt(todayStats.rejected_today, 10) || 0,
+      weight_today: parseFloat(todayStats.weight_today) || 0,
+      earnings_today: parseInt(earningsToday, 10) || 0,
+      active_pickers_today: parseInt(todayStats.active_pickers_today, 10) || 0,
+      // Legacy aliases kept for older clients
+      logs_today: parseInt(todayStats.logs_submitted, 10) || 0,
+      verified_today: parseInt(todayStats.logs_verified, 10) || 0,
+      verified_kg_today: parseFloat(todayStats.weight_today) || 0,
     });
   } catch (error) {
     console.error("[Dashboard Today Error]", { code: error.code, message: error.message });
