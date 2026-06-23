@@ -1,11 +1,26 @@
 import pool from "../config/db.js";
 import { generateCollectionPointCode } from "../utils/generateCodes.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import { normalizeCity, resolveUserCity } from "../utils/cityScope.js";
+import { assertDivisionExistsForCity } from "../services/divisionService.js";
+
+const defaultCity = () => normalizeCity(process.env.DEFAULT_CITY || 'mbarara');
+
+const resolvePointCity = (req, bodyCity) => {
+  if (req.user?.role === 'CITY_ADMIN') {
+    return resolveUserCity(req.user);
+  }
+  if (req.user?.role === 'SUPER_ADMIN') {
+    return normalizeCity(bodyCity || defaultCity());
+  }
+  return normalizeCity(bodyCity || defaultCity());
+};
 
 // POST /api/collection-points - Create a new collection point
 export const createCollectionPoint = async (req, res, next) => {
   try {
-    const { name, division, agent_name, agent_phone, status } = req.body;
+    const { name, division, agent_name, agent_phone, status, city } = req.body;
+    const pointCity = resolvePointCity(req, city);
 
     // Validate required fields
     if (!name || !division || !agent_name || !agent_phone) {
@@ -15,6 +30,8 @@ export const createCollectionPoint = async (req, res, next) => {
         400
       );
     }
+
+    await assertDivisionExistsForCity(pointCity, division);
 
     // Check for duplicate agent_phone
     const phoneCheck = await pool.query(
@@ -30,10 +47,10 @@ export const createCollectionPoint = async (req, res, next) => {
 
     // Insert collection point
     const result = await pool.query(
-      `INSERT INTO collection_points (point_code, name, division, agent_name, agent_phone, status)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, point_code, name, division, agent_name, agent_phone, status, created_at`,
-      [pointCode, name, division, agent_name, agent_phone, status || "ACTIVE"]
+      `INSERT INTO collection_points (point_code, name, division, city, agent_name, agent_phone, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, point_code, name, division, city, agent_name, agent_phone, status, created_at`,
+      [pointCode, name, division, pointCity, agent_name, agent_phone, status || "ACTIVE"]
     );
 
     sendSuccess(res, "Collection point created successfully", result.rows[0], 201);
@@ -46,10 +63,16 @@ export const createCollectionPoint = async (req, res, next) => {
 // GET /api/collection-points - List all collection points with optional filters
 export const getCollectionPoints = async (req, res, next) => {
   try {
-    const { division, status } = req.query;
+    const { division, status, city } = req.query;
 
-    let query = "SELECT id, point_code, name, division, agent_name, agent_phone, status, created_at FROM collection_points WHERE 1=1";
+    let query = "SELECT id, point_code, name, division, city, agent_name, agent_phone, status, created_at FROM collection_points WHERE 1=1";
     const params = [];
+
+    const scopedCity = city || (req.user?.role === 'CITY_ADMIN' ? resolveUserCity(req.user) : null);
+    if (scopedCity) {
+      params.push(normalizeCity(scopedCity));
+      query += ` AND LOWER(COALESCE(city, '')) = LOWER($${params.length})`;
+    }
 
     if (division) {
       query += ` AND division = $${params.length + 1}`;
@@ -127,12 +150,17 @@ export const getCollectionPointById = async (req, res, next) => {
 export const updateCollectionPoint = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, division, agent_name, agent_phone, status } = req.body;
+    const { name, division, agent_name, agent_phone, status, city } = req.body;
 
     // Check if collection point exists
-    const checkResult = await pool.query("SELECT id FROM collection_points WHERE id = $1", [id]);
+    const checkResult = await pool.query("SELECT id, city FROM collection_points WHERE id = $1", [id]);
     if (checkResult.rows.length === 0) {
       return sendError(res, "Collection point not found", 404);
+    }
+
+    const pointCity = resolvePointCity(req, city || checkResult.rows[0].city);
+    if (division !== undefined) {
+      await assertDivisionExistsForCity(pointCity, division);
     }
 
     // If agent_phone is being updated, check for duplicates
@@ -171,6 +199,10 @@ export const updateCollectionPoint = async (req, res, next) => {
       updates.push(`status = $${paramIndex++}`);
       values.push(status);
     }
+    if (city !== undefined || req.user?.role === 'CITY_ADMIN') {
+      updates.push(`city = $${paramIndex++}`);
+      values.push(pointCity);
+    }
 
     if (updates.length === 0) {
       return sendError(res, "No fields to update", 400);
@@ -180,7 +212,7 @@ export const updateCollectionPoint = async (req, res, next) => {
     values.push(id);
 
     const result = await pool.query(
-      `UPDATE collection_points SET ${updates.join(", ")} WHERE id = $${paramIndex} RETURNING id, point_code, name, division, agent_name, agent_phone, status, updated_at`,
+      `UPDATE collection_points SET ${updates.join(", ")} WHERE id = $${paramIndex} RETURNING id, point_code, name, division, city, agent_name, agent_phone, status, updated_at`,
       values
     );
 

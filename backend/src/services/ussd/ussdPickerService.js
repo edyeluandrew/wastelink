@@ -7,9 +7,23 @@ import {
   getActiveCityWasteTypeForLog,
   calculateEarningFromCityWasteType,
 } from '../wasteTypeGovernanceService.js';
+import { findCityDivisionByName } from '../divisionService.js';
 import { computeEstimatedEarning } from '../../utils/wasteLogPricing.js';
 
-const PILOT_CITY = normalizeCity(process.env.DEFAULT_CITY || 'kampala');
+const PILOT_CITY = normalizeCity(process.env.DEFAULT_CITY || 'mbarara');
+
+const formatCityLabel = (city) =>
+  String(city || PILOT_CITY)
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const CITY_OPTIONS = {
+  '1': { label: formatCityLabel(PILOT_CITY), city: PILOT_CITY },
+};
+
+export const getCityOption = (key) => CITY_OPTIONS[key] || null;
 
 export const findPickerByPhone = async (phoneNumber) => {
   const variants = getPhoneLookupVariants(phoneNumber);
@@ -31,19 +45,10 @@ export const isPickerRegistered = async (phoneNumber) => {
   return Boolean(picker && picker.status === 'ACTIVE');
 };
 
-const CITY_OPTIONS = {
-  '1': { label: 'Kampala', division: 'Kawempe', city: PILOT_CITY },
-  '2': { label: 'Jinja', division: 'Jinja', city: 'jinja' },
-  '3': { label: 'Gulu', division: 'Gulu', city: 'gulu' },
-  '4': { label: 'Other', division: 'Central', city: PILOT_CITY },
-};
-
-export const getCityOption = (key) => CITY_OPTIONS[key] || null;
-
 export const registerPickerFromUssd = async ({
   phoneNumber,
   name,
-  cityKey,
+  divisionName,
   area,
 }) => {
   const existing = await findPickerByPhone(phoneNumber);
@@ -56,7 +61,13 @@ export const registerPickerFromUssd = async ({
     return { error: 'INVALID_NAME' };
   }
 
-  const city = getCityOption(cityKey) || CITY_OPTIONS['1'];
+  const divisionRecord = divisionName
+    ? await findCityDivisionByName(PILOT_CITY, divisionName)
+    : null;
+  if (!divisionRecord) {
+    return { error: 'INVALID_DIVISION' };
+  }
+
   const normalizedPhone = normalizePhoneNumber(phoneNumber);
   const pickerCode = generatePickerCode();
   const areaNote = String(area || '').trim() || 'Not specified';
@@ -72,7 +83,7 @@ export const registerPickerFromUssd = async ({
       normalizedPhone,
       'MALE',
       '25-35',
-      city.division,
+      divisionRecord.name,
       'MIXED_RECYCLABLES',
     ]
   );
@@ -81,7 +92,7 @@ export const registerPickerFromUssd = async ({
 
   return {
     picker,
-    meta: { city: city.label, area: areaNote, pilotFallback: cityKey === '4' },
+    meta: { city: formatCityLabel(PILOT_CITY), division: divisionRecord.name, area: areaNote },
   };
 };
 
@@ -91,14 +102,16 @@ export const getActiveWasteTypesForPicker = async (picker) => {
   return types.slice(0, 7);
 };
 
-export const getCollectionPointsByDivision = async (division) => {
+export const getCollectionPointsByDivision = async (division, city = PILOT_CITY) => {
   const result = await pool.query(
     `SELECT id, name, division, agent_name, agent_phone
      FROM collection_points
-     WHERE division = $1 AND status = 'ACTIVE'
+     WHERE LOWER(division) = LOWER($1)
+       AND LOWER(COALESCE(city, $2)) = LOWER($2)
+       AND status = 'ACTIVE'
      ORDER BY name ASC
      LIMIT 8`,
-    [division]
+    [division, normalizeCity(city)]
   );
   return result.rows;
 };
@@ -167,12 +180,4 @@ export const createUssdWasteLog = async ({
   };
 };
 
-export const DIVISIONS = {
-  '1': 'Kawempe',
-  '2': 'Central',
-  '3': 'Nakawa',
-  '4': 'Makindye',
-  '5': 'Rubaga',
-};
-
-export { CITY_OPTIONS, PILOT_CITY };
+export { CITY_OPTIONS, PILOT_CITY, formatCityLabel };

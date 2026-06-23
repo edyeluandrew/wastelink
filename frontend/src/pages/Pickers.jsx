@@ -11,38 +11,30 @@ import {
 } from '../components';
 import { formatStatus, formatGenderLabel } from '../utils/formatters';
 import api from '../api/axios';
-
-const DIVISIONS = [
-  'Kawempe',
-  'Makindye',
-  'Nakawa',
-  'Rubaga',
-  'Central',
-];
+import { useCityDivisions } from '../hooks/useCityDivisions';
+import { useCityWasteTypes } from '../hooks/useCityWasteTypes';
 
 const GENDERS = [
   { value: 'MALE', label: 'Male' },
   { value: 'FEMALE', label: 'Female' },
 ];
 const AGE_GROUPS = ['Below 18', '18-24', '25-35', 'Above 35'];
-const WASTE_TYPES = [
-  { value: 'PLASTIC', label: 'Plastic' },
-  { value: 'MIXED_RECYCLABLES', label: 'I collect many types / Mixed recyclables' },
-  { value: 'ORGANIC', label: 'Organic' },
-  { value: 'E_WASTE', label: 'E-Waste' },
-  { value: 'METAL_CARDBOARD', label: 'Metal & Cardboard' },
-];
 
-const initialFormState = {
+const buildInitialForm = (defaultDivision = '', defaultWasteType = '') => ({
   name: '',
   phone: '',
   gender: 'MALE',
   age_group: '18-24',
-  division: 'Kawempe',
-  main_waste_type: 'PLASTIC',
-};
+  division: defaultDivision,
+  main_waste_type: defaultWasteType,
+});
 
 export default function Pickers() {
+  const { divisionNames, loading: divisionsLoading } = useCityDivisions();
+  const { wasteTypes, loading: wasteTypesLoading } = useCityWasteTypes();
+  const defaultDivision = divisionNames[0] || '';
+  const defaultWasteType = wasteTypes[0]?.slug || '';
+  const initialFormState = buildInitialForm(defaultDivision, defaultWasteType);
   const [pickers, setPickers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -132,7 +124,7 @@ export default function Pickers() {
     });
   };
 
-  if (loading) return <LoadingState />;
+  if (loading || divisionsLoading || wasteTypesLoading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={fetchPickers} />;
 
   const filteredPickers = getFilteredPickers();
@@ -160,7 +152,7 @@ export default function Pickers() {
             className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
           >
             <option value="">All Divisions</option>
-            {DIVISIONS.map((div) => (
+            {divisionNames.map((div) => (
               <option key={div} value={div}>
                 {div}
               </option>
@@ -325,7 +317,7 @@ export default function Pickers() {
               onChange={(e) => setForm({ ...form, division: e.target.value })}
               className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
             >
-              {DIVISIONS.map((d) => (
+              {divisionNames.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
@@ -341,12 +333,17 @@ export default function Pickers() {
               value={form.main_waste_type}
               onChange={(e) => setForm({ ...form, main_waste_type: e.target.value })}
               className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+              disabled={wasteTypes.length === 0}
             >
-              {WASTE_TYPES.map((wt) => (
-                <option key={wt.value} value={wt.value}>
-                  {wt.label}
-                </option>
-              ))}
+              {wasteTypes.length === 0 ? (
+                <option value="">No waste types — configure under Waste Types first</option>
+              ) : (
+                wasteTypes.map((wt) => (
+                  <option key={wt.id} value={wt.slug}>
+                    {wt.name}
+                  </option>
+                ))
+              )}
             </select>
               <p className="mt-2 text-xs text-wastelink-muted">You can still log any waste type later.</p>
           </div>

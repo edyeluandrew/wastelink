@@ -1,5 +1,6 @@
 import pool from "../config/db.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import { DEFAULT_CITY, formatCityLabel } from "../utils/cityScope.js";
 
 // Helper: Parse month parameter (YYYY-MM format)
 const parseMonth = (monthParam) => {
@@ -398,7 +399,7 @@ export const getUndpPilotReport = async (req, res, next) => {
     `);
 
     const pilot_divisions = divisionsResult.rows.map(row => row.division);
-    const pilot_city = pilot_divisions.length > 0 ? "Kampala" : "N/A";
+    const pilot_city = formatCityLabel(DEFAULT_CITY);
 
     // Get inclusion metrics (all pickers in system)
     const inclusionResult = await pool.query(`

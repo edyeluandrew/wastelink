@@ -1,5 +1,5 @@
 import pool from '../config/db.js';
-import { normalizeCity } from '../utils/cityScope.js';
+import { normalizeCity, DEFAULT_CITY } from '../utils/cityScope.js';
 
 export const getRecyclerAccessContext = async (recyclerId) => {
   const recyclerResult = await pool.query(`SELECT * FROM recyclers WHERE id = $1`, [recyclerId]);
@@ -147,7 +147,7 @@ export const syncRecyclerAcceptedWasteTypes = async (client, recyclerId, { waste
   await client.query(`DELETE FROM recycler_accepted_waste_types WHERE recycler_id = $1`, [recyclerId]);
 
   const recycler = await client.query(`SELECT city FROM recyclers WHERE id = $1`, [recyclerId]);
-  const city = recycler.rows[0]?.city || 'kampala';
+  const city = recycler.rows[0]?.city || DEFAULT_CITY;
 
   const ids = new Set((accepted_waste_type_ids || []).map(Number).filter(Boolean));
 

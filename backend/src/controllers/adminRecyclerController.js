@@ -21,7 +21,7 @@ import {
   getVerifiedInventorySummary,
   listVerifiedWasteLogs,
 } from '../services/wasteSaleBatchService.js';
-import { normalizeCity } from '../utils/cityScope.js';
+import { normalizeCity, DEFAULT_CITY } from '../utils/cityScope.js';
 
 const adminCity = (req) => {
   if (req.user?.role === 'CITY_ADMIN' && req.user?.city) {
@@ -81,7 +81,7 @@ export const getWasteSaleBatches = async (req, res, next) => {
 export const postWasteSaleBatch = async (req, res, next) => {
   try {
     const batch = await createSaleBatch(
-      { ...req.body, city: req.body.city || adminCity(req) || 'kampala' },
+      { ...req.body, city: req.body.city || adminCity(req) || DEFAULT_CITY },
       req.user.id
     );
     sendSuccess(res, 'Sale batch created', { batch }, 201);

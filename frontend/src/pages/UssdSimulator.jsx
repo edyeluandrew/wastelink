@@ -446,12 +446,10 @@ export default function UssdSimulator() {
             <div className="bg-[#238636]/5 rounded-2xl border border-[#238636]/20 p-5">
               <h3 className="font-bold text-[#238636] text-sm mb-2">Quick path example</h3>
               <p className="text-xs text-[#444444] leading-relaxed">
-                Register: <code className="bg-white px-1 rounded">1</code> → name →{' '}
-                <code className="bg-white px-1 rounded">1</code> Kampala → area →{' '}
+                Register: <code className="bg-white px-1 rounded">1</code> → name → division → area →{' '}
                 <code className="bg-white px-1 rounded">1</code> confirm
                 <br />
-                Log waste: <code className="bg-white px-1 rounded">2</code> → type → kg → Kawempe →{' '}
-                <strong>Kawempe Main</strong> (pick the right point from the list)
+                Log waste: <code className="bg-white px-1 rounded">2</code> → type → kg → division → collection point
                 <br />
                 Earnings: <code className="bg-white px-1 rounded">4</code> · Withdraw:{' '}
                 <code className="bg-white px-1 rounded">5</code> → amount → confirm

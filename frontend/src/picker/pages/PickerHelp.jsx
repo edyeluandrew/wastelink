@@ -135,7 +135,7 @@ export default function PickerHelp() {
       </div>
 
       <div className="text-center py-4 text-sm text-gray-600">
-        <p>Thank you for helping clean up Kampala! 🌍</p>
+        <p>Thank you for helping keep your community clean! 🌍</p>
       </div>
     </div>
   );

@@ -8,10 +8,12 @@ import {
   createCityWasteTypeHandler,
   updateCityWasteTypeHandler,
   getCityWasteTypeHistoryHandler,
+  getPublicCityWasteTypes,
 } from '../controllers/cityWasteTypeController.js';
 
 const router = Router();
 
+router.get('/public', getPublicCityWasteTypes);
 router.get('/active', optionalAuth, getActiveCityWasteTypes);
 router.get('/estimate', optionalAuth, estimateCityWasteTypeEarning);
 router.get('/', requireAuth, requireRole(['SUPER_ADMIN', 'CITY_ADMIN']), getCityWasteTypes);

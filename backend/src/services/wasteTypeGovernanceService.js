@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { normalizeCity, slugify } from '../utils/cityScope.js';
+import { assertCityExists } from './cityService.js';
 
 const mapCityWasteTypeRow = (row) => ({
   id: row.id,
@@ -89,6 +90,23 @@ export const listCityWasteTypes = async ({
   return result.rows.map(mapCityWasteTypeRow);
 };
 
+export const resolvePickerMainWasteType = async (city, value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  const types = await listCityWasteTypes({ city, activeOnly: true });
+  const upper = raw.toUpperCase();
+  const lower = raw.toLowerCase();
+
+  return (
+    types.find((type) => String(type.id) === raw) ||
+    types.find((type) => type.slug === lower) ||
+    types.find((type) => type.name.toLowerCase() === lower) ||
+    types.find((type) => type.slug.replace(/-/g, '_').toUpperCase() === upper) ||
+    null
+  );
+};
+
 export const getCityWasteTypeById = async (id, client = pool) => {
   const result = await client.query(`${baseSelect} WHERE cwt.id = $1 LIMIT 1`, [id]);
   return result.rows[0] ? mapCityWasteTypeRow(result.rows[0]) : null;
@@ -117,6 +135,7 @@ export const createCityWasteType = async ({
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await assertCityExists(city);
     const slug = slugify(name);
     const result = await client.query(
       `INSERT INTO city_waste_types (

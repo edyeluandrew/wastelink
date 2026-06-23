@@ -4,16 +4,13 @@ import pool from "../config/db.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import { generatePickerCode } from "../utils/generateCodes.js";
 import { ensureUsersTableSchema, safeUserFromRow } from "../utils/userHelpers.js";
+import { DEFAULT_CITY, formatCityLabel, normalizeCity } from "../utils/cityScope.js";
+import { findCityDivisionByName } from "../services/divisionService.js";
+import { resolvePickerMainWasteType } from "../services/wasteTypeGovernanceService.js";
+import { assertCityExists } from "../services/cityService.js";
 
 const ALLOWED_PICKER_GENDERS = new Set(["MALE", "FEMALE"]);
 const ALLOWED_PICKER_AGE_GROUPS = new Set(["Below 18", "18-24", "25-35", "Above 35"]);
-const ALLOWED_PICKER_WASTE_TYPES = new Set([
-  "PLASTIC",
-  "MIXED_RECYCLABLES",
-  "ORGANIC",
-  "E_WASTE",
-  "METAL_CARDBOARD",
-]);
 
 const pickerAuthSelectQuery = `
   SELECT
@@ -90,10 +87,6 @@ const ensurePickerRegistrationInputs = ({
     return "Age group must be one of: Below 18, 18-24, 25-35, Above 35";
   }
 
-  if (!ALLOWED_PICKER_WASTE_TYPES.has(mainWasteType)) {
-    return "Unsupported main waste type";
-  }
-
   if (password.length < 4) {
     return "Password or PIN must be at least 4 characters";
   }
@@ -111,7 +104,7 @@ export const registerPicker = async (req, res) => {
   const gender = normalizeUpperText(req.body?.gender);
   const ageGroup = normalizeText(req.body?.age_group);
   const division = normalizeText(req.body?.division);
-  const mainWasteType = normalizeUpperText(req.body?.main_waste_type);
+  const mainWasteType = normalizeText(req.body?.main_waste_type);
   const password = String(req.body?.password ?? "");
   const confirmPassword = String(req.body?.confirmPassword ?? req.body?.confirm_password ?? "");
 
@@ -132,6 +125,19 @@ export const registerPicker = async (req, res) => {
 
   try {
     await ensureUsersTableSchema();
+
+    const pickerCitySlug = normalizeCity(req.body?.city || DEFAULT_CITY);
+    await assertCityExists(pickerCitySlug);
+
+    const divisionRecord = await findCityDivisionByName(pickerCitySlug, division);
+    if (!divisionRecord) {
+      return sendError(res, `Division "${division}" is not configured for this city`, 400);
+    }
+
+    const matchedWasteType = await resolvePickerMainWasteType(pickerCitySlug, mainWasteType);
+    if (!matchedWasteType) {
+      return sendError(res, 'Selected waste type is not active for this city', 400);
+    }
 
     const duplicatePicker = await pool.query("SELECT id FROM pickers WHERE phone = $1 LIMIT 1", [phone]);
     if (duplicatePicker.rows.length > 0) {
@@ -154,19 +160,19 @@ export const registerPicker = async (req, res) => {
           picker_code, name, phone, gender, age_group, division, main_waste_type, status
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE')
         RETURNING id, picker_code, name, phone, gender, age_group, division, main_waste_type, status`,
-        [pickerCode, name, phone, gender, ageGroup, division, mainWasteType]
+        [pickerCode, name, phone, gender, ageGroup, divisionRecord.name, matchedWasteType.slug]
       );
 
       const picker = pickerResult.rows[0];
       const passwordHash = await bcrypt.hash(password, 12);
-      const normalizedCity = normalizeText(req.body?.city) || "Kampala";
+      const normalizedCity = formatCityLabel(pickerCitySlug);
 
       const userResult = await client.query(
         `INSERT INTO users (
           name, phone, password_hash, role, picker_id, status, city, division
         ) VALUES ($1, $2, $3, 'PICKER', $4, 'ACTIVE', $5, $6)
         RETURNING id`,
-        [name, phone, passwordHash, picker.id, normalizedCity, division]
+        [name, phone, passwordHash, picker.id, normalizedCity, divisionRecord.name]
       );
 
       const authUserResult = await client.query(

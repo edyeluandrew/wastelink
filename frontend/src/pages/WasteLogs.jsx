@@ -16,18 +16,19 @@ import {
   formatStatus,
 } from '../utils/formatters';
 import api from '../api/axios';
-
-const WASTE_TYPES = ['PLASTIC', 'MIXED_RECYCLABLES', 'ORGANIC', 'E_WASTE', 'METAL_CARDBOARD'];
-const DIVISIONS = ['Kawempe', 'Makindye', 'Nakawa', 'Rubaga', 'Central'];
+import { useCityDivisions } from '../hooks/useCityDivisions';
+import { useCityWasteTypes } from '../hooks/useCityWasteTypes';
 
 const initialFormState = {
   picker_id: '',
   collection_point_id: '',
-  waste_type: 'PLASTIC',
+  city_waste_type_id: '',
   estimated_kg: '',
 };
 
 export default function WasteLogs() {
+  const { divisionNames, loading: divisionsLoading } = useCityDivisions();
+  const { wasteTypes, loading: wasteTypesLoading } = useCityWasteTypes();
   const [logs, setLogs] = useState([]);
   const [pickers, setPickers] = useState([]);
   const [collectionPoints, setCollectionPoints] = useState([]);
@@ -180,7 +181,7 @@ export default function WasteLogs() {
     });
   };
 
-  if (loading) return <LoadingState />;
+  if (loading || divisionsLoading || wasteTypesLoading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={fetchData} />;
 
   const filteredLogs = getFilteredLogs();
@@ -244,9 +245,9 @@ export default function WasteLogs() {
             className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
           >
             <option value="">All Types</option>
-            {WASTE_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {formatStatus(type)}
+            {wasteTypes.map((type) => (
+              <option key={type.id} value={type.name}>
+                {type.name}
               </option>
             ))}
           </select>
@@ -262,7 +263,7 @@ export default function WasteLogs() {
             className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
           >
             <option value="">All Divisions</option>
-            {DIVISIONS.map((div) => (
+            {divisionNames.map((div) => (
               <option key={div} value={div}>
                 {div}
               </option>
@@ -398,15 +399,20 @@ export default function WasteLogs() {
               Waste Type
             </label>
             <select
-              value={createForm.waste_type}
-              onChange={(e) => setCreateForm({ ...createForm, waste_type: e.target.value })}
+              value={createForm.city_waste_type_id}
+              onChange={(e) => setCreateForm({ ...createForm, city_waste_type_id: e.target.value })}
               className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+              disabled={wasteTypes.length === 0}
             >
-              {WASTE_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {formatStatus(type)}
-                </option>
-              ))}
+              {wasteTypes.length === 0 ? (
+                <option value="">No waste types configured</option>
+              ) : (
+                wasteTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

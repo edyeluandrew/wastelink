@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { DEFAULT_CITY } from '../utils/cityScope.js';
 import { generateBatchCode } from '../utils/generateCodes.js';
 import { logRecyclerAudit } from './recyclerAuditService.js';
 import { isBatchAvailableForPurchase } from '../utils/recyclerStatuses.js';
@@ -138,7 +139,7 @@ export const createSaleBatch = async (payload, adminId) => {
   const {
     waste_type,
     city_waste_type_id,
-    city = 'kampala',
+    city = DEFAULT_CITY,
     collection_point_id,
     verified_kg,
     recycler_sale_price_per_kg,

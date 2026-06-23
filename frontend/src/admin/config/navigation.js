@@ -10,6 +10,7 @@ import {
   Recycle,
   Package,
   ClipboardCheck,
+  Building2,
 } from 'lucide-react';
 import { normalizeRole } from '../../utils/auth';
 
@@ -20,6 +21,9 @@ export const getAdminNavItems = (role) => {
 
   const baseMenuItems = [
     { path: '/overview', matchPaths: ['/', '/overview'], label: 'Overview', icon: BarChart3 },
+    ...(normalizedRole === 'SUPER_ADMIN'
+      ? [{ path: '/cities', matchPaths: ['/cities'], label: 'Cities', icon: Building2 }]
+      : []),
     { path: '/pickers', matchPaths: ['/pickers'], label: 'Pickers', icon: Users },
     ...(showUsersLink
       ? [{ path: '/users', matchPaths: ['/users'], label: usersLabel, icon: Users }]

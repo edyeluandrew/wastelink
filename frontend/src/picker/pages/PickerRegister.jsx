@@ -5,6 +5,9 @@ import apiClient from '../../api/axios';
 import { Button, LoadingState } from '../../components';
 import { setAuthSession } from '../../utils/auth';
 import { clearPickerSession } from '../utils/pickerSession';
+import { useCityDivisions } from '../../hooks/useCityDivisions';
+import { useCityWasteTypes } from '../../hooks/useCityWasteTypes';
+import { useCities } from '../../hooks/useCities';
 
 const GENDER_OPTIONS = [
   { value: 'MALE', label: 'Male' },
@@ -12,19 +15,14 @@ const GENDER_OPTIONS = [
 ];
 
 const AGE_GROUP_OPTIONS = ['Below 18', '18-24', '25-35', 'Above 35'];
-const DIVISIONS = ['Kawempe', 'Makindye', 'Nakawa', 'Rubaga', 'Central'];
-const WASTE_TYPES = [
-  { value: 'PLASTIC', label: 'Plastic' },
-  { value: 'MIXED_RECYCLABLES', label: 'I collect many types / Mixed recyclables' },
-  { value: 'ORGANIC', label: 'Organic' },
-  { value: 'E_WASTE', label: 'E-Waste' },
-  { value: 'METAL_CARDBOARD', label: 'Metal & Cardboard' },
-];
 
 const REQUIRED_FIELDS = ['name', 'phone', 'gender', 'age_group', 'division', 'main_waste_type', 'password', 'confirmPassword'];
 
 export default function PickerRegister() {
   const navigate = useNavigate();
+  const { defaultCity } = useCities({ pilotOnly: true });
+  const { divisionNames, loading: divisionsLoading } = useCityDivisions({ usePublic: true, city: defaultCity });
+  const { wasteTypes, loading: wasteTypesLoading } = useCityWasteTypes({ city: defaultCity, usePublic: true });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
@@ -82,6 +80,7 @@ export default function PickerRegister() {
         age_group: form.age_group,
         division: form.division,
         main_waste_type: form.main_waste_type,
+        city: defaultCity,
         password: form.password,
         confirmPassword: form.confirmPassword,
       });
@@ -225,10 +224,10 @@ export default function PickerRegister() {
                 value={form.division}
                 onChange={handleChange}
                 className="w-full rounded-2xl border border-[#D9D9D9] px-4 py-3 text-sm focus:border-[#238636] focus:outline-none"
-                disabled={loading}
+                disabled={loading || divisionsLoading || wasteTypesLoading}
               >
                 <option value="">Select division</option>
-                {DIVISIONS.map((division) => (
+                {divisionNames.map((division) => (
                   <option key={division} value={division}>
                     {division}
                   </option>
@@ -246,9 +245,9 @@ export default function PickerRegister() {
                 disabled={loading}
               >
                 <option value="">Select waste type</option>
-                {WASTE_TYPES.map((wasteType) => (
-                  <option key={wasteType.value} value={wasteType.value}>
-                    {wasteType.label}
+                {wasteTypes.map((wasteType) => (
+                  <option key={wasteType.id} value={wasteType.slug}>
+                    {wasteType.name}
                   </option>
                 ))}
               </select>

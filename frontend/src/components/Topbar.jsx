@@ -2,6 +2,7 @@ import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, ShieldCheck } from 'lucide-react';
 import { logout, getAuthUser, isAuthenticated } from '../utils/auth';
+import { formatCityLabel, resolveAppCity } from '../utils/city';
 import { AdminMenuButton } from './AdminBottomNav';
 import { getAdminNavItems, isAdminNavActive } from '../admin/config/navigation';
 
@@ -9,6 +10,7 @@ export default function Topbar({ onOpenMenu }) {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getAuthUser();
+  const cityLabel = formatCityLabel(resolveAppCity(user));
 
   const activeItem = getAdminNavItems(user?.role).find((item) =>
     isAdminNavActive(location.pathname, item)
@@ -24,7 +26,7 @@ export default function Topbar({ onOpenMenu }) {
           <AdminMenuButton onOpen={onOpenMenu} />
           <div className="min-w-0">
             <h2 className="font-brand text-lg font-bold leading-tight text-[#111111] md:text-2xl">{pageTitle}</h2>
-            <p className="mt-0.5 text-xs text-[#6B7280] md:text-sm">Kampala Pilot Dashboard</p>
+            <p className="mt-0.5 text-xs text-[#6B7280] md:text-sm">{cityLabel} Dashboard</p>
           </div>
         </div>
 

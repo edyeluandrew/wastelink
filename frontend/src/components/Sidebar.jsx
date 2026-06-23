@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { LogOut, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { formatCityLabel, resolveAppCity } from '../utils/city';
 import { getAuthUser, logout } from '../utils/auth';
 import { getAdminNavItems, isAdminNavActive } from '../admin/config/navigation';
 
@@ -9,6 +10,7 @@ function SidebarNav({ onNavigate, showClose = false, onClose }) {
   const navigate = useNavigate();
   const authUser = getAuthUser();
   const menuItems = getAdminNavItems(authUser?.role);
+  const cityLabel = formatCityLabel(resolveAppCity(authUser));
 
   return (
     <>
@@ -17,7 +19,7 @@ function SidebarNav({ onNavigate, showClose = false, onClose }) {
           <img src="/brand/wastelink-icon.png" alt="WasteLink" className="h-10 w-10 object-contain" />
           <div>
             <h1 className="font-brand text-base font-bold text-[#238636]">WasteLink Uganda</h1>
-            <p className="text-xs text-[#6B7280]">Kampala Pilot · Admin</p>
+            <p className="text-xs text-[#6B7280]">{cityLabel} · Admin</p>
           </div>
         </div>
         {showClose && (

@@ -64,7 +64,7 @@ export default function Login() {
               </div>
             </div>
             <p className="mb-6 text-sm leading-relaxed text-[#6B7280]">
-              Track waste collections, manage verifications, and ensure fair earnings across Kampala.
+              Track waste collections, manage verifications, and ensure fair earnings in your city.
             </p>
             <div className="space-y-2 text-sm text-[#6B7280]">
               {['Fast and secure login', 'Track collections in real time', 'Transparent earnings'].map((item) => (

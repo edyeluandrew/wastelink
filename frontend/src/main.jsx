@@ -8,6 +8,7 @@ import Users from './pages/Users'
 import CollectionPoints from './pages/CollectionPoints'
 import WasteLogs from './pages/WasteLogs'
 import Divisions from './pages/Divisions'
+import Cities from './pages/Cities'
 import Earnings from './pages/Earnings'
 import Reports from './pages/Reports'
 import WasteTypes from './pages/WasteTypes'
@@ -65,6 +66,7 @@ const router = createBrowserRouter([
       { path: 'waste-types', element: <WasteTypes /> },
       { path: 'waste-logs', element: <WasteLogs /> },
       { path: 'divisions', element: <Divisions /> },
+      { path: 'cities', element: <Cities /> },
       { path: 'earnings', element: <Earnings /> },
       { path: 'reports', element: <Reports /> },
       { path: 'recyclers', element: <RecyclersAdmin /> },

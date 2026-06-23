@@ -3,11 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { Users, MapPin, CheckCircle, BarChart2, Smartphone } from 'lucide-react'
 import { Button } from '../components'
 import { getAuthToken, getAuthUser, getDefaultRouteForRole } from '../utils/auth'
+import { formatCityLabel } from '../utils/city';
+import { useCities } from '../hooks/useCities';
 
 export default function LandingPage() {
   const navigate = useNavigate()
   const token = getAuthToken()
   const user = getAuthUser()
+  const { defaultCity } = useCities({ pilotOnly: true })
+  const pilotLabel = formatCityLabel(defaultCity)
 
   const dashboardRoute = useMemo(() => {
     if (!user) return null
@@ -75,11 +79,11 @@ export default function LandingPage() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-lg font-semibold">Kampala pilot focus</h2>
+            <h2 className="text-lg font-semibold">{pilotLabel} pilot focus</h2>
             <ul className="list-inside list-disc text-sm text-wastelink-muted">
-              <li>Kawempe</li>
-              <li>Makindye</li>
-              <li>Nakawa</li>
+              <li>City-managed divisions</li>
+              <li>Verified collection points</li>
+              <li>Transparent picker earnings</li>
             </ul>
 
             <h2 className="mt-6 text-lg font-semibold">Impact highlights</h2>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Edit2 } from 'lucide-react';
 import {
   Button,
@@ -10,34 +10,37 @@ import {
   StatusBadge,
 } from '../components';
 import api from '../api/axios';
+import { useCityDivisions } from '../hooks/useCityDivisions';
 
-const DIVISIONS = [
-  'Kawempe',
-  'Makindye',
-  'Nakawa',
-  'Rubaga',
-  'Central',
-];
-
-const initialFormState = {
+const buildInitialForm = (defaultDivision = '') => ({
   name: '',
-  division: 'Kawempe',
+  division: defaultDivision,
   agent_name: '',
   agent_phone: '',
-};
+});
 
 export default function CollectionPoints() {
+  const { divisionNames, loading: divisionsLoading } = useCityDivisions();
+  const defaultDivision = divisionNames[0] || '';
+
   const [points, setPoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(initialFormState);
+  const [form, setForm] = useState(buildInitialForm());
   const [filteredDivision, setFilteredDivision] = useState('');
   const [filteredStatus, setFilteredStatus] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (defaultDivision && !form.division) {
+      setForm((prev) => ({ ...prev, division: defaultDivision }));
+    }
+  }, [defaultDivision]);
+
+  const initialFormState = useMemo(() => buildInitialForm(defaultDivision), [defaultDivision]);
   useEffect(() => {
     fetchPoints();
   }, []);
@@ -126,7 +129,7 @@ export default function CollectionPoints() {
     });
   };
 
-  if (loading) return <LoadingState />;
+  if (loading || divisionsLoading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={fetchPoints} />;
 
   const filteredPoints = getFilteredPoints();
@@ -154,7 +157,7 @@ export default function CollectionPoints() {
             className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
           >
             <option value="">All Divisions</option>
-            {DIVISIONS.map((div) => (
+            {divisionNames.map((div) => (
               <option key={div} value={div}>
                 {div}
               </option>
@@ -254,12 +257,17 @@ export default function CollectionPoints() {
               value={form.division}
               onChange={(e) => setForm({ ...form, division: e.target.value })}
               className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+              disabled={divisionNames.length === 0}
             >
-              {DIVISIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
+              {divisionNames.length === 0 ? (
+                <option value="">No divisions — create one under Divisions first</option>
+              ) : (
+                divisionNames.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

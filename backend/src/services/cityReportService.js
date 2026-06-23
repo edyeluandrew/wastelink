@@ -8,6 +8,7 @@ import {
 } from '../utils/reportQueries.js';
 import { SQL_CONFIRMED_EARNING_STATUSES } from '../utils/paymentStatus.js';
 import { buildScopedLogSql, formatCityLabel, parseReportFilters } from './cityReportFilters.js';
+import { listCitySlugs } from './cityService.js';
 
 const calcPercentage = (value, total) => (total > 0 ? Math.round((value / total) * 100) : 0);
 
@@ -24,6 +25,9 @@ const baseLogJoins = `
 `;
 
 export const listReportCities = async () => {
+  const slugs = await listCitySlugs({ activeOnly: true });
+  if (slugs.length) return slugs;
+
   const result = await pool.query(`
     SELECT DISTINCT city FROM city_waste_types
     WHERE city IS NOT NULL AND TRIM(city) != ''

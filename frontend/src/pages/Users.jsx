@@ -613,7 +613,7 @@ export default function Users() {
                 value={form.city}
                 onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
                 className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
-                placeholder="Kampala"
+                placeholder="Mbarara"
                 readOnly={isCityAdmin}
               />
             </div>
@@ -623,7 +623,7 @@ export default function Users() {
                 value={form.division}
                 onChange={(e) => setForm((prev) => ({ ...prev, division: e.target.value }))}
                 className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
-                placeholder="Kawempe"
+                placeholder="Division name"
               />
             </div>
           </div>

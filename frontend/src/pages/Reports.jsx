@@ -19,13 +19,14 @@ import {
 } from '../utils/formatters';
 import api from '../api/axios';
 import { getAuthUser, normalizeRole } from '../utils/auth';
-
-const DEFAULT_CITY = 'mbarara';
+import { resolveAppCity } from '../utils/city';
+import { useCities } from '../hooks/useCities';
 
 export default function Reports() {
   const authUser = getAuthUser();
   const isSuperAdmin = normalizeRole(authUser?.role) === 'SUPER_ADMIN';
-  const actorCity = authUser?.city ? String(authUser.city).trim().toLowerCase() : DEFAULT_CITY;
+  const { defaultCity } = useCities({ pilotOnly: true });
+  const actorCity = authUser?.city ? String(authUser.city).trim().toLowerCase() : defaultCity;
 
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [summaryReport, setSummaryReport] = useState(null);
@@ -49,7 +50,13 @@ export default function Reports() {
   const [undpEndDate, setUndpEndDate] = useState('');
   const [customDateMode, setCustomDateMode] = useState(false);
 
-  const [cityFilter, setCityFilter] = useState(isSuperAdmin ? DEFAULT_CITY : actorCity);
+  const [cityFilter, setCityFilter] = useState(isSuperAdmin ? defaultCity : actorCity);
+
+  useEffect(() => {
+    if (isSuperAdmin && defaultCity && !cityFilter) {
+      setCityFilter(defaultCity);
+    }
+  }, [isSuperAdmin, defaultCity, cityFilter]);
   const [collectionPointId, setCollectionPointId] = useState('');
   const [wasteTypeId, setWasteTypeId] = useState('');
   const [genderFilter, setGenderFilter] = useState('');

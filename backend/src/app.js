@@ -14,6 +14,8 @@ import ussdRoutes from "./routes/ussdRoutes.js";
 import withdrawalRoutes from "./routes/withdrawalRoutes.js";
 import recyclerRoutes from "./routes/recyclerRoutes.js";
 import adminRecyclerRoutes from "./routes/adminRecyclerRoutes.js";
+import divisionRoutes from "./routes/divisionRoutes.js";
+import cityRoutes from "./routes/cityRoutes.js";
 import { sendSuccess, sendError } from "./utils/apiResponse.js";
 import errorHandler from "./middleware/errorHandler.js";
 
@@ -192,6 +194,8 @@ CREATE TABLE IF NOT EXISTS withdrawal_request_earnings (
   }
 });
 
+app.use("/api/divisions", divisionRoutes);
+app.use("/api/cities", cityRoutes);
 app.use("/api/pickers", pickerRoutes);
 app.use("/api/collection-points", collectionPointRoutes);
 app.use("/api/waste-logs", wasteLogRoutes);

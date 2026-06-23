@@ -7,8 +7,10 @@ import {
   getCollectionPointsByDivision,
   getRecentWasteLogsForPicker,
   createUssdWasteLog,
-  DIVISIONS,
+  PILOT_CITY,
+  formatCityLabel,
 } from './ussdPickerService.js';
+import { getUssdDivisions, buildDivisionMenu } from './ussdDivisionMenu.js';
 import { getWithdrawalBalance, createPickerWithdrawal } from '../payment/withdrawalService.js';
 import { detectMobileProvider } from '../../utils/mobileMoney.js';
 
@@ -63,21 +65,28 @@ const handleRegister = async (parts, phoneNumber) => {
     if (!name || name.length < 2) {
       return 'END Name is required. Please dial again and register.';
     }
-    return `CON Select city/division:
-1. Kampala
-2. Jinja
-3. Gulu
-4. Other`;
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    const menu = buildDivisionMenu(map);
+    if (!menu) {
+      return `END No divisions configured for ${formatCityLabel(PILOT_CITY)} yet. Contact your city admin.`;
+    }
+    return menu;
   }
 
   if (parts.length === 3) {
-    if (!['1', '2', '3', '4'].includes(parts[2])) {
-      return 'END Invalid city option. Please dial again.';
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    const division = map[parts[2]];
+    if (!division) {
+      return 'END Invalid division. Please dial again.';
     }
     return 'CON Enter your area/location:';
   }
 
   if (parts.length === 4) {
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    if (!map[parts[2]]) {
+      return 'END Invalid division. Please dial again.';
+    }
     const area = parts[3]?.trim();
     if (!area) {
       return 'END Area/location is required. Please dial again.';
@@ -96,10 +105,16 @@ const handleRegister = async (parts, phoneNumber) => {
       return 'END Invalid option. Please dial again.';
     }
 
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    const divisionName = map[parts[2]];
+    if (!divisionName) {
+      return 'END Invalid division. Please dial again.';
+    }
+
     const result = await registerPickerFromUssd({
       phoneNumber,
       name: parts[1],
-      cityKey: parts[2],
+      divisionName,
       area: parts[3],
     });
 
@@ -108,6 +123,9 @@ const handleRegister = async (parts, phoneNumber) => {
     }
     if (result.error === 'INVALID_NAME') {
       return 'END Name is required. Please dial again.';
+    }
+    if (result.error === 'INVALID_DIVISION') {
+      return 'END Invalid division. Please dial again.';
     }
 
     return 'END Registration successful. You can now log waste with WasteLink.';
@@ -162,16 +180,17 @@ const handleLogWaste = async (parts, phoneNumber) => {
     if (!Number.isFinite(kg) || kg <= 0) {
       return 'END Weight must be greater than 0 kg.';
     }
-    return `CON Select division:
-1. Kawempe
-2. Central
-3. Nakawa
-4. Makindye
-5. Rubaga`;
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    const menu = buildDivisionMenu(map);
+    if (!menu) {
+      return `END No divisions configured for ${formatCityLabel(PILOT_CITY)} yet. Contact your city admin.`;
+    }
+    return menu;
   }
 
   if (parts.length === 4) {
-    const division = DIVISIONS[parts[3]];
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    const division = map[parts[3]];
     if (!division) {
       return 'END Invalid division. Please dial again.';
     }
@@ -185,7 +204,8 @@ const handleLogWaste = async (parts, phoneNumber) => {
   if (parts.length === 5) {
     const kg = parseFloat(parts[2]);
     const typeIndexVal = parseInt(parts[1], 10) - 1;
-    const division = DIVISIONS[parts[3]];
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    const division = map[parts[3]];
     const pointIndex = parseInt(parts[4], 10) - 1;
 
     if (!division) return 'END Invalid division.';
@@ -341,16 +361,17 @@ Enter amount to withdraw:`;
 
 const handleCollectionPoints = async (parts) => {
   if (parts.length === 1) {
-    return `CON Select division:
-1. Kawempe
-2. Central
-3. Nakawa
-4. Makindye
-5. Rubaga`;
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    const menu = buildDivisionMenu(map);
+    if (!menu) {
+      return `END No divisions configured for ${formatCityLabel(PILOT_CITY)} yet.`;
+    }
+    return menu;
   }
 
   if (parts.length === 2) {
-    const division = DIVISIONS[parts[1]];
+    const { map } = await getUssdDivisions(PILOT_CITY);
+    const division = map[parts[1]];
     if (!division) {
       return 'END Invalid division. Please dial again.';
     }

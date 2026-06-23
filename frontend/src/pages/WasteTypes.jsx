@@ -11,6 +11,8 @@ import {
 } from '../components';
 import api from '../api/axios';
 import { getAuthUser, normalizeRole } from '../utils/auth';
+import { resolveAppCity, DEFAULT_CITY } from '../utils/city';
+import { useCities } from '../hooks/useCities';
 import { formatCurrencyUGX } from '../utils/formatters';
 
 const initialFormState = {
@@ -20,7 +22,7 @@ const initialFormState = {
   price_per_kg: '0',
   is_payable: true,
   is_active: true,
-  city: 'kampala',
+  city: DEFAULT_CITY,
   reason: '',
 };
 
@@ -40,8 +42,15 @@ export default function WasteTypes() {
   const [form, setForm] = useState(initialFormState);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const { cities, defaultCity } = useCities({ usePublic: false });
   const [cityFilter, setCityFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!cityFilter && defaultCity) {
+      setCityFilter(defaultCity);
+    }
+  }, [defaultCity, cityFilter]);
 
   useEffect(() => {
     fetchData();
@@ -74,7 +83,7 @@ export default function WasteTypes() {
     setEditingId(null);
     setForm({
       ...initialFormState,
-      city: cityFilter || authUser?.city || 'kampala',
+      city: cityFilter || resolveAppCity(authUser),
       reporting_category_id: reportingCategories[0]?.id?.toString() || '',
     });
     setModalOpen(true);
@@ -247,9 +256,9 @@ export default function WasteTypes() {
                 className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm"
               >
                 <option value="">All cities</option>
-                {uniqueCities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
+                {cities.map((city) => (
+                  <option key={city.id} value={city.slug}>
+                    {city.name}
                   </option>
                 ))}
               </select>
@@ -343,13 +352,17 @@ export default function WasteTypes() {
           {isSuperAdmin && !isEditing && (
             <div>
               <label className="block text-sm font-medium mb-1">City</label>
-              <input
-                type="text"
+              <select
                 value={form.city}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
                 className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm"
-                placeholder="kampala"
-              />
+              >
+                {cities.map((city) => (
+                  <option key={city.id} value={city.slug}>
+                    {city.name}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
           <div>

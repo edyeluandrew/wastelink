@@ -18,6 +18,28 @@ const resolveListCity = (req) => {
   return resolveUserCity(req.user);
 };
 
+export const getPublicCityWasteTypes = async (req, res) => {
+  try {
+    const city = req.query.city
+      ? normalizeCity(req.query.city)
+      : normalizeCity(process.env.DEFAULT_CITY || 'mbarara');
+
+    const items = await listCityWasteTypes({ city, activeOnly: true });
+    sendSuccess(res, 'Active city waste types loaded', {
+      city,
+      waste_types: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        is_payable: item.is_payable,
+      })),
+    });
+  } catch (error) {
+    console.error('[Public City Waste Types]', error);
+    sendError(res, error.message || 'Failed to load waste types', error.status || 500);
+  }
+};
+
 export const getCityWasteTypes = async (req, res) => {
   try {
     const city = resolveListCity(req);

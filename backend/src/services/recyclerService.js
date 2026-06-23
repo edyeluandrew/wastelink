@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import bcrypt from 'bcryptjs';
+import { DEFAULT_CITY } from '../utils/cityScope.js';
 import { generatePurchaseRequestCode } from '../utils/generateCodes.js';
 import { logRecyclerAudit } from './recyclerAuditService.js';
 import { getBatchById } from './wasteSaleBatchService.js';
@@ -44,7 +45,7 @@ export const createRecycler = async (payload, adminId) => {
     waste_types_accepted,
     buying_capacity_kg_week,
     buying_capacity_kg_month,
-    city = 'kampala',
+    city = DEFAULT_CITY,
     status = 'ACTIVE',
     create_user_account,
     user_email,

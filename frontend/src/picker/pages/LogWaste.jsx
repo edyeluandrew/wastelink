@@ -5,8 +5,10 @@ import apiClient from '../../api/axios';
 import { getCurrentPickerId } from '../utils/pickerSession';
 import { Recycle, MapPin, Scale } from 'lucide-react';
 import { formatUGX } from '../../utils/formatters';
+import { DEFAULT_CITY } from '../../utils/city';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
+const PILOT_CITY = DEFAULT_CITY;
 
 export default function LogWaste() {
   const navigate = useNavigate();
@@ -59,7 +61,7 @@ export default function LogWaste() {
       try {
         const response = await apiClient.get('/city-waste-types/estimate', {
           params: {
-            city: 'kampala',
+            city: PILOT_CITY,
             city_waste_type_id: form.city_waste_type_id,
             estimated_kg: kg,
           },
@@ -87,7 +89,7 @@ export default function LogWaste() {
     try {
       const [pointsRes, typesRes] = await Promise.all([
         apiClient.get('/collection-points'),
-        apiClient.get('/city-waste-types/active', { params: { city: 'kampala' } }),
+        apiClient.get('/city-waste-types/active', { params: { city: PILOT_CITY } }),
       ]);
 
       if (pointsRes.data?.success) {
