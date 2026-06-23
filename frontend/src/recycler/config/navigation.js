@@ -12,5 +12,5 @@ export const isRecyclerNavActive = (pathname, item) =>
   item.matchPaths?.includes(pathname) ?? pathname === item.path;
 
 export const RECYCLER_MOBILE_NAV_ITEMS = RECYCLER_NAV_ITEMS.filter((item) =>
-  ['/recycler/dashboard', '/recycler/inventory', '/recycler/requests', '/recycler/history'].includes(item.path)
+  ['/recycler/inventory', '/recycler/requests', '/recycler/history'].includes(item.path)
 );

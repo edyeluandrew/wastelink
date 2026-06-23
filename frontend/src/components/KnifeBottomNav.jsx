@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import './knife-bottom-nav.css';
 
 const STORAGE_KEY = 'wastelink-bottom-nav-offset';
@@ -21,15 +21,34 @@ const loadSavedOffset = () => {
 
 const snapOffset = (value) => Math.round(value / SNAP_STEP) * SNAP_STEP;
 
+const matchesHomePath = (pathname, home) => {
+  const paths = home.matchPaths?.length ? home.matchPaths : [home.path];
+  return paths.some((entry) => pathname === entry);
+};
+
 /**
  * Skeuomorphic knife-shaped bottom navigation (mobile only).
- * Drag the handle up/down when it covers page buttons; double-tap handle to reset.
+ * WasteLink logo tip = home. Drag the handle up/down when it covers page buttons.
  */
-export default function KnifeBottomNav({ items = [], isActive, extraActions = [] }) {
+export default function KnifeBottomNav({
+  items = [],
+  isActive,
+  extraActions = [],
+  home,
+}) {
+  const location = useLocation();
   const checkActive = (item) => (typeof isActive === 'function' ? isActive(item) : false);
   const [bottomOffset, setBottomOffset] = useState(loadSavedOffset);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef({ startY: 0, startOffset: 0, dragging: false });
+
+  const bladeItems = useMemo(() => {
+    if (!home) return items;
+    const homePaths = new Set([home.path, ...(home.matchPaths || [])]);
+    return items.filter((item) => !homePaths.has(item.path));
+  }, [home, items]);
+
+  const isHomeActive = home ? matchesHomePath(location.pathname, home) : false;
 
   useEffect(() => {
     try {
@@ -92,13 +111,26 @@ export default function KnifeBottomNav({ items = [], isActive, extraActions = []
       style={{ '--knife-nav-offset': `${bottomOffset}px` }}
     >
       <nav className="knife-nav" aria-label="Main navigation">
-        <div className="knife-tip" aria-hidden="true">
-          <img src="/brand/wastelink-icon.png" alt="" />
-        </div>
+        {home ? (
+          <div className={`knife-tip${isHomeActive ? ' is-active' : ''}`}>
+            <Link
+              to={home.path}
+              className="knife-tip-home"
+              aria-label={home.label || 'Home'}
+              aria-current={isHomeActive ? 'page' : undefined}
+            >
+              <img src="/brand/wastelink-icon.png" alt="" />
+            </Link>
+          </div>
+        ) : (
+          <div className="knife-tip" aria-hidden="true">
+            <img src="/brand/wastelink-icon.png" alt="" />
+          </div>
+        )}
 
         <div className="knife-blade">
           <div className="knife-blade-inner">
-            {items.map((item) => {
+            {bladeItems.map((item) => {
               const active = checkActive(item);
               const Icon = item.icon;
               const label = item.shortLabel || item.label;

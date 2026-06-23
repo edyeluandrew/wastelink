@@ -11,6 +11,7 @@ export default function AdminBottomNav({ onOpenMenu }) {
 
   return (
     <KnifeBottomNav
+      home={{ path: '/overview', matchPaths: ['/', '/overview'], label: 'Overview' }}
       items={items}
       isActive={(item) => isAdminNavActive(location.pathname, item)}
       extraActions={[

@@ -52,5 +52,5 @@ export const ADMIN_MOBILE_NAV_ITEMS = (role) => {
     return item ? { ...item, shortLabel } : null;
   };
 
-  return [pick('/overview', 'Home'), pick('/pickers', 'Pickers'), pick('/waste-logs', 'Logs'), pick('/earnings', 'Pay')].filter(Boolean);
+  return [pick('/pickers', 'Pickers'), pick('/waste-logs', 'Logs'), pick('/earnings', 'Pay')].filter(Boolean);
 };

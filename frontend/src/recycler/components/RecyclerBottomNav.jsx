@@ -7,6 +7,7 @@ export default function RecyclerBottomNav() {
 
   return (
     <KnifeBottomNav
+      home={{ path: '/recycler/dashboard', matchPaths: ['/recycler', '/recycler/dashboard'], label: 'Overview' }}
       items={RECYCLER_MOBILE_NAV_ITEMS}
       isActive={(item) => isRecyclerNavActive(location.pathname, item)}
     />

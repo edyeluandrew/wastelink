@@ -7,6 +7,7 @@ export default function AgentBottomNav() {
 
   return (
     <KnifeBottomNav
+      home={{ path: '/agent/dashboard', matchPaths: ['/agent', '/agent/dashboard'], label: 'Home' }}
       items={AGENT_NAV_ITEMS}
       isActive={(item) => isAgentNavActive(location.pathname, item)}
     />
