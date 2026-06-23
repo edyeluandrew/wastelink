@@ -1,10 +1,11 @@
 /**
- * Wipe operational + config data; keep SUPER_ADMIN users only.
+ * Wipe operational + config data; keep SUPER_ADMIN users and reporting categories.
  * Run: node src/scripts/resetDbKeepSuperAdmin.mjs
  * Requires DATABASE_URL in backend/.env
  */
 import dotenv from 'dotenv';
 import pool from '../config/db.js';
+import { ensureDefaultReportingCategories } from '../services/wasteTypeGovernanceService.js';
 
 dotenv.config();
 
@@ -60,7 +61,10 @@ const run = async () => {
 
     await optionalDelete(client, 'DELETE FROM city_waste_type_history');
     await optionalDelete(client, 'DELETE FROM city_waste_types');
-    await optionalDelete(client, 'DELETE FROM reporting_categories');
+    // reporting_categories kept — default waste categories for demo setup
+
+    await optionalDelete(client, 'DELETE FROM city_divisions');
+    await optionalDelete(client, 'DELETE FROM cities');
 
     await client.query(`
       UPDATE users
@@ -82,6 +86,11 @@ const run = async () => {
 
     await client.query('COMMIT');
 
+    await ensureDefaultReportingCategories();
+    const categories = await pool.query(
+      'SELECT id, name, slug FROM reporting_categories ORDER BY name'
+    );
+
     const after = await client.query(
       `SELECT id, email, name, role, status FROM users ORDER BY id`
     );
@@ -91,7 +100,9 @@ const run = async () => {
       console.log(`  - [${row.role}] ${row.email || row.name} (id ${row.id}, ${row.status})`
       )
     );
-    console.log('\nRe-seed next: reporting categories, Mbarara waste types, collection points, city admin, agents.');
+    console.log(`\nReporting categories (${categories.rows.length}):`);
+    categories.rows.forEach((row) => console.log(`  - ${row.name} (${row.slug})`));
+    console.log('\nReady for demo: log in as super admin, add city, waste types, collection points, users.');
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Reset failed — rolled back:', error.message);
