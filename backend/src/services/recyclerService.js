@@ -9,6 +9,7 @@ import {
   getRecyclerAccessContext,
   syncRecyclerAcceptedWasteTypes,
   getDashboardMetricsForRecycler,
+  resolveBatchCityWasteType,
 } from './recyclerInventoryService.js';
 import { normalizeCity } from '../utils/cityScope.js';
 
@@ -16,7 +17,24 @@ const roundMoney = (kg, pricePerKg) => Math.round(Number(kg) * Number(pricePerKg
 
 export const getRecyclerById = async (recyclerId) => {
   const result = await pool.query(`SELECT * FROM recyclers WHERE id = $1`, [recyclerId]);
-  return result.rows[0] || null;
+  const recycler = result.rows[0] || null;
+  if (!recycler) return null;
+
+  const accepted = await pool.query(
+    `SELECT raw.city_waste_type_id, raw.waste_type_name, cwt.name AS city_waste_type_name
+     FROM recycler_accepted_waste_types raw
+     LEFT JOIN city_waste_types cwt ON cwt.id = raw.city_waste_type_id
+     WHERE raw.recycler_id = $1`,
+    [recyclerId]
+  );
+
+  return {
+    ...recycler,
+    accepted_waste_type_ids: accepted.rows.map((row) => row.city_waste_type_id).filter(Boolean),
+    accepted_waste_type_labels: accepted.rows.map(
+      (row) => row.city_waste_type_name || row.waste_type_name
+    ).filter(Boolean),
+  };
 };
 
 export const listRecyclers = async ({ status, city } = {}) => {
@@ -192,11 +210,18 @@ const validateBatchForRecycler = async (recyclerId, batch) => {
   if (normalizeCity(batch.city) !== ctx.approvedCity) {
     throw new Error('Batch is not in your approved city');
   }
-  const typeId = batch.city_waste_type_id;
-  const typeName = String(batch.waste_type || '').trim().toLowerCase();
+
+  const resolvedType = await resolveBatchCityWasteType(batch);
+  const typeId = resolvedType?.id || batch.city_waste_type_id;
+  const typeName = String(resolvedType?.name || batch.waste_type || '').trim().toLowerCase();
+  const typeSlug = String(resolvedType?.slug || '').trim().toLowerCase();
+
   const typeOk =
     (typeId && ctx.acceptedTypeIds.includes(typeId)) ||
-    (typeName && ctx.acceptedNames.includes(typeName));
+    (typeName && ctx.acceptedNames.includes(typeName)) ||
+    (typeSlug && ctx.acceptedNames.includes(typeSlug)) ||
+    (typeName && ctx.acceptedNames.includes(String(batch.waste_type || '').trim().toLowerCase()));
+
   if (!typeOk && (ctx.acceptedTypeIds.length > 0 || ctx.acceptedNames.length > 0)) {
     throw new Error('This waste type is not in your accepted waste types');
   }

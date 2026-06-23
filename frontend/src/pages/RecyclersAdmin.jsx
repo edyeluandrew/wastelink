@@ -4,6 +4,7 @@ import api from '../api/axios';
 import {
   Button, LoadingState, ErrorState, EmptyState, DataTable, Modal, StatusBadge,
 } from '../components';
+import { useCityWasteTypes } from '../hooks/useCityWasteTypes';
 
 const initialForm = {
   company_name: '',
@@ -12,6 +13,7 @@ const initialForm = {
   email: '',
   location: '',
   waste_types_accepted: '',
+  accepted_waste_type_ids: [],
   buying_capacity_kg_week: '',
   buying_capacity_kg_month: '',
   status: 'ACTIVE',
@@ -29,6 +31,7 @@ export default function RecyclersAdmin() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
+  const { wasteTypes, loading: wasteTypesLoading } = useCityWasteTypes({ activeOnly: true });
 
   const fetchRecyclers = async () => {
     try {
@@ -51,32 +54,55 @@ export default function RecyclersAdmin() {
     setModalOpen(true);
   };
 
-  const openEdit = (recycler) => {
+  const openEdit = async (recycler) => {
     setEditingId(recycler.id);
-    setForm({
-      ...initialForm,
-      company_name: recycler.company_name,
-      contact_person: recycler.contact_person,
-      phone: recycler.phone,
-      email: recycler.email || '',
-      location: recycler.location || '',
-      waste_types_accepted: recycler.waste_types_accepted || '',
-      buying_capacity_kg_week: recycler.buying_capacity_kg_week || '',
-      buying_capacity_kg_month: recycler.buying_capacity_kg_month || '',
-      status: recycler.status,
-      create_user_account: false,
-    });
-    setModalOpen(true);
+    try {
+      const res = await api.get(`/admin/recyclers/${recycler.id}`);
+      const detail = res.data?.data?.recycler || recycler;
+      setForm({
+        ...initialForm,
+        company_name: detail.company_name,
+        contact_person: detail.contact_person,
+        phone: detail.phone,
+        email: detail.email || '',
+        location: detail.location || '',
+        waste_types_accepted: detail.waste_types_accepted || '',
+        accepted_waste_type_ids: detail.accepted_waste_type_ids || [],
+        buying_capacity_kg_week: detail.buying_capacity_kg_week || '',
+        buying_capacity_kg_month: detail.buying_capacity_kg_month || '',
+        status: detail.status,
+        create_user_account: false,
+      });
+      setModalOpen(true);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to load recycler details');
+    }
+  };
+
+  const toggleAcceptedType = (typeId) => {
+    const id = Number(typeId);
+    const current = new Set(form.accepted_waste_type_ids.map(Number));
+    if (current.has(id)) current.delete(id);
+    else current.add(id);
+    setForm({ ...form, accepted_waste_type_ids: [...current] });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (form.accepted_waste_type_ids.length === 0) {
+      alert('Select at least one city waste type this recycler buys.');
+      return;
+    }
     setSubmitting(true);
     try {
+      const payload = {
+        ...form,
+        accepted_waste_type_ids: form.accepted_waste_type_ids.map(Number),
+      };
       if (editingId) {
-        await api.patch(`/admin/recyclers/${editingId}`, form);
+        await api.patch(`/admin/recyclers/${editingId}`, payload);
       } else {
-        await api.post('/admin/recyclers', form);
+        await api.post('/admin/recyclers', payload);
       }
       setModalOpen(false);
       fetchRecyclers();
@@ -101,7 +127,7 @@ export default function RecyclersAdmin() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Recycler Management</h1>
-          <p className="text-sm text-[#6B7280]">Approve and manage recovery buyers.</p>
+          <p className="text-sm text-[#6B7280]">Approve recyclers and link them to city waste types they purchase.</p>
         </div>
         <Button onClick={openAdd}><Plus size={16} className="mr-1 inline" /> Add recycler</Button>
       </div>
@@ -136,7 +162,7 @@ export default function RecyclersAdmin() {
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit recycler' : 'Add recycler'}>
         <form onSubmit={handleSubmit} className="space-y-3">
-          {['company_name', 'contact_person', 'phone', 'email', 'location', 'waste_types_accepted'].map((field) => (
+          {['company_name', 'contact_person', 'phone', 'email', 'location'].map((field) => (
             <div key={field}>
               <label className="text-sm capitalize">{field.replace(/_/g, ' ')}</label>
               <input
@@ -147,6 +173,33 @@ export default function RecyclersAdmin() {
               />
             </div>
           ))}
+
+          <div>
+            <label className="text-sm font-medium">Accepted city waste types *</label>
+            <p className="text-xs text-[#6B7280] mb-2">
+              Recyclers only see published batches that match these types.
+            </p>
+            {wasteTypesLoading ? (
+              <p className="text-sm text-[#6B7280]">Loading waste types...</p>
+            ) : wasteTypes.length === 0 ? (
+              <p className="text-sm text-amber-700">Create city waste types first under Waste Types.</p>
+            ) : (
+              <div className="max-h-40 overflow-y-auto rounded-lg border p-2 space-y-1">
+                {wasteTypes.map((type) => (
+                  <label key={type.id} className="flex items-center gap-2 text-sm py-1">
+                    <input
+                      type="checkbox"
+                      checked={form.accepted_waste_type_ids.map(Number).includes(Number(type.id))}
+                      onChange={() => toggleAcceptedType(type.id)}
+                    />
+                    {type.name}
+                    {type.reporting_category_name ? ` (${type.reporting_category_name})` : ''}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm">Weekly capacity (kg)</label>

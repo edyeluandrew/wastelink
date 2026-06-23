@@ -159,17 +159,56 @@ export const createSaleBatch = async (payload, adminId) => {
     throw new Error('Invalid batch fields');
   }
 
+  let resolvedCityWasteTypeId = city_waste_type_id ? Number(city_waste_type_id) : null;
+  let resolvedWasteTypeName = String(waste_type).trim();
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    if (!resolvedCityWasteTypeId && Array.isArray(waste_log_ids) && waste_log_ids.length > 0) {
+      const logTypeResult = await client.query(
+        `SELECT city_waste_type_id, waste_type
+         FROM waste_logs
+         WHERE id = ANY($1::int[]) AND city_waste_type_id IS NOT NULL
+         ORDER BY id
+         LIMIT 1`,
+        [waste_log_ids]
+      );
+      if (logTypeResult.rows[0]?.city_waste_type_id) {
+        resolvedCityWasteTypeId = logTypeResult.rows[0].city_waste_type_id;
+        resolvedWasteTypeName = logTypeResult.rows[0].waste_type || resolvedWasteTypeName;
+      }
+    }
+
+    if (!resolvedCityWasteTypeId) {
+      const lookup = await client.query(
+        `SELECT id, name FROM city_waste_types
+         WHERE LOWER(city) = LOWER($1)
+           AND (LOWER(name) = LOWER($2) OR LOWER(slug) = LOWER($2))
+         LIMIT 1`,
+        [city, resolvedWasteTypeName]
+      );
+      if (lookup.rows[0]) {
+        resolvedCityWasteTypeId = lookup.rows[0].id;
+        resolvedWasteTypeName = lookup.rows[0].name;
+      }
+    } else {
+      const nameLookup = await client.query(
+        `SELECT name FROM city_waste_types WHERE id = $1 LIMIT 1`,
+        [resolvedCityWasteTypeId]
+      );
+      if (nameLookup.rows[0]?.name) {
+        resolvedWasteTypeName = nameLookup.rows[0].name;
+      }
+    }
+
   if (salePrice < pickerPrice && !price_override_reason) {
     throw new Error('Recycler sale price must be >= picker price or provide override reason');
   }
 
   const batchCode = generateBatchCode();
   const expectedTotal = roundMoney(kg, salePrice);
-
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
     const insert = await client.query(
       `INSERT INTO waste_sale_batches (
         batch_code, waste_type, city_waste_type_id, city, collection_point_id,
@@ -181,8 +220,8 @@ export const createSaleBatch = async (payload, adminId) => {
       RETURNING *`,
       [
         batchCode,
-        waste_type,
-        city_waste_type_id || null,
+        resolvedWasteTypeName,
+        resolvedCityWasteTypeId,
         city,
         collection_point_id,
         kg,

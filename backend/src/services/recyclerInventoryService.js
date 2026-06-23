@@ -27,27 +27,67 @@ export const getRecyclerAccessContext = async (recyclerId) => {
   };
 };
 
+const batchTypeResolutionJoin = `
+  LEFT JOIN city_waste_types cwt_batch ON cwt_batch.id = b.city_waste_type_id
+  LEFT JOIN city_waste_types cwt_by_name ON b.city_waste_type_id IS NULL
+    AND LOWER(cwt_by_name.city) = LOWER(b.city)
+    AND (
+      LOWER(cwt_by_name.name) = LOWER(b.waste_type)
+      OR LOWER(cwt_by_name.slug) = LOWER(b.waste_type)
+    )
+`;
+
+const resolvedBatchTypeIdSql = 'COALESCE(b.city_waste_type_id, cwt_by_name.id)';
+const resolvedBatchTypeNameSql = 'LOWER(COALESCE(cwt_batch.name, cwt_by_name.name, b.waste_type))';
+const resolvedBatchTypeSlugSql = 'LOWER(COALESCE(cwt_batch.slug, cwt_by_name.slug, \'\'))';
+
+export const resolveBatchCityWasteType = async (batch) => {
+  if (batch.city_waste_type_id) {
+    const result = await pool.query(
+      `SELECT id, name, slug, city FROM city_waste_types WHERE id = $1 LIMIT 1`,
+      [batch.city_waste_type_id]
+    );
+    return result.rows[0] || null;
+  }
+
+  if (!batch.waste_type || !batch.city) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `SELECT id, name, slug, city FROM city_waste_types
+     WHERE LOWER(city) = LOWER($1)
+       AND (LOWER(name) = LOWER($2) OR LOWER(slug) = LOWER($2))
+     LIMIT 1`,
+    [batch.city, batch.waste_type]
+  );
+  return result.rows[0] || null;
+};
+
 const batchMatchesRecycler = (ctx) => {
   const params = [ctx.approvedCity];
   let idx = 1;
-  const typeClauses = [];
+  const matchParts = [];
 
   if (ctx.acceptedTypeIds.length > 0) {
     idx += 1;
     params.push(ctx.acceptedTypeIds);
-    typeClauses.push(`b.city_waste_type_id = ANY($${idx})`);
+    matchParts.push(`${resolvedBatchTypeIdSql} = ANY($${idx})`);
   }
+
   if (ctx.acceptedNames.length > 0) {
     idx += 1;
     params.push(ctx.acceptedNames);
-    typeClauses.push(`LOWER(b.waste_type) = ANY($${idx})`);
+    matchParts.push(`${resolvedBatchTypeNameSql} = ANY($${idx})`);
+    matchParts.push(`${resolvedBatchTypeSlugSql} = ANY($${idx})`);
+    matchParts.push(`LOWER(b.waste_type) = ANY($${idx})`);
   }
 
-  const typeFilter = typeClauses.length
-    ? `AND (${typeClauses.join(' OR ')})`
+  const typeFilter = matchParts.length
+    ? `AND (${matchParts.join(' OR ')})`
     : 'AND FALSE';
 
-  return { params, typeFilter, cityParam: '$1' };
+  return { params, typeFilter, cityParam: '$1', typeJoin: batchTypeResolutionJoin };
 };
 
 export const getInventorySummaryForRecycler = async (recyclerId) => {
@@ -56,24 +96,24 @@ export const getInventorySummaryForRecycler = async (recyclerId) => {
     return { summary: [], context: ctx };
   }
 
-  const { params, typeFilter, cityParam } = batchMatchesRecycler(ctx);
+  const { params, typeFilter, cityParam, typeJoin } = batchMatchesRecycler(ctx);
 
   const result = await pool.query(
     `SELECT
-       COALESCE(b.city_waste_type_id::text, LOWER(b.waste_type)) AS waste_type_key,
-       b.city_waste_type_id,
-       COALESCE(cwt.name, b.waste_type) AS waste_type_name,
+       COALESCE(${resolvedBatchTypeIdSql}::text, ${resolvedBatchTypeNameSql}) AS waste_type_key,
+       ${resolvedBatchTypeIdSql} AS city_waste_type_id,
+       COALESCE(cwt_batch.name, cwt_by_name.name, b.waste_type) AS waste_type_name,
        COALESCE(SUM(b.available_kg), 0)::numeric AS total_available_kg,
        COUNT(DISTINCT b.collection_point_id)::int AS collection_point_count,
        MIN(b.recycler_sale_price_per_kg)::numeric AS min_price_per_kg,
        MAX(b.recycler_sale_price_per_kg)::numeric AS max_price_per_kg
      FROM waste_sale_batches b
-     LEFT JOIN city_waste_types cwt ON cwt.id = b.city_waste_type_id
+     ${typeJoin}
      WHERE b.status = 'AVAILABLE'
        AND b.available_kg > 0
        AND LOWER(b.city) = LOWER(${cityParam})
        ${typeFilter}
-     GROUP BY COALESCE(b.city_waste_type_id::text, LOWER(b.waste_type)), b.city_waste_type_id, COALESCE(cwt.name, b.waste_type)
+     GROUP BY ${resolvedBatchTypeIdSql}, COALESCE(cwt_batch.name, cwt_by_name.name, b.waste_type)
      ORDER BY waste_type_name`,
     params
   );
@@ -96,25 +136,30 @@ export const getCollectionPointsForWasteType = async (recyclerId, wasteTypeKey) 
   const ctx = await getRecyclerAccessContext(recyclerId);
   if (!ctx || ctx.recycler.status !== 'ACTIVE') return [];
 
-  const { params, typeFilter, cityParam } = batchMatchesRecycler(ctx);
+  const { params, typeFilter, cityParam, typeJoin } = batchMatchesRecycler(ctx);
 
   let wasteFilter = '';
   if (/^\d+$/.test(String(wasteTypeKey))) {
     params.push(Number(wasteTypeKey));
-    wasteFilter = `AND b.city_waste_type_id = $${params.length}`;
+    wasteFilter = `AND ${resolvedBatchTypeIdSql} = $${params.length}`;
   } else {
     params.push(String(wasteTypeKey).toLowerCase());
-    wasteFilter = `AND LOWER(b.waste_type) = $${params.length}`;
+    wasteFilter = `AND (
+      ${resolvedBatchTypeNameSql} = $${params.length}
+      OR ${resolvedBatchTypeSlugSql} = $${params.length}
+      OR LOWER(b.waste_type) = $${params.length}
+    )`;
   }
 
   const result = await pool.query(
-    `SELECT b.id, b.batch_code, b.waste_type, b.city_waste_type_id, b.city,
+    `SELECT b.id, b.batch_code, b.waste_type, ${resolvedBatchTypeIdSql} AS city_waste_type_id, b.city,
             b.collection_point_id, b.available_kg, b.reserved_kg,
             b.recycler_sale_price_per_kg, b.expected_total_amount, b.status,
             b.quality_notes, b.pickup_instructions, b.updated_at,
             cp.name AS collection_point_name, cp.division AS collection_point_division
      FROM waste_sale_batches b
      JOIN collection_points cp ON cp.id = b.collection_point_id
+     ${typeJoin}
      WHERE b.status = 'AVAILABLE'
        AND b.available_kg > 0
        AND LOWER(b.city) = LOWER(${cityParam})
@@ -155,9 +200,18 @@ export const syncRecyclerAcceptedWasteTypes = async (client, recyclerId, { waste
     const parts = String(waste_types_accepted).split(/[,;|]/).map((s) => s.trim()).filter(Boolean);
     for (const part of parts) {
       const match = await client.query(
-        `SELECT id FROM city_waste_types
+        `SELECT id, name FROM city_waste_types
          WHERE LOWER(city) = LOWER($1)
-           AND (LOWER(name) = LOWER($2) OR LOWER(slug) = LOWER($2))
+           AND (
+             LOWER(name) = LOWER($2)
+             OR LOWER(slug) = LOWER($2)
+             OR LOWER(name) LIKE LOWER($2) || '%'
+             OR LOWER(slug) LIKE LOWER($2) || '%'
+           )
+         ORDER BY CASE
+           WHEN LOWER(name) = LOWER($2) OR LOWER(slug) = LOWER($2) THEN 0
+           ELSE 1
+         END
          LIMIT 1`,
         [city, part]
       );
@@ -176,6 +230,22 @@ export const syncRecyclerAcceptedWasteTypes = async (client, recyclerId, { waste
       `INSERT INTO recycler_accepted_waste_types (recycler_id, city_waste_type_id)
        VALUES ($1, $2) ON CONFLICT (recycler_id, city_waste_type_id) DO NOTHING`,
       [recyclerId, typeId]
+    );
+  }
+
+  const labelResult = await client.query(
+    `SELECT COALESCE(cwt.name, raw.waste_type_name) AS label
+     FROM recycler_accepted_waste_types raw
+     LEFT JOIN city_waste_types cwt ON cwt.id = raw.city_waste_type_id
+     WHERE raw.recycler_id = $1
+     ORDER BY label`,
+    [recyclerId]
+  );
+  const labels = labelResult.rows.map((row) => row.label).filter(Boolean);
+  if (labels.length > 0) {
+    await client.query(
+      `UPDATE recyclers SET waste_types_accepted = $1, updated_at = NOW() WHERE id = $2`,
+      [labels.join(', '), recyclerId]
     );
   }
 };
@@ -208,10 +278,11 @@ export const getDashboardMetricsForRecycler = async (recyclerId) => {
   let matchedPointCount = 0;
   if (summary.length > 0) {
     const ctx = await getRecyclerAccessContext(recyclerId);
-    const { params, typeFilter, cityParam } = batchMatchesRecycler(ctx);
+    const { params, typeFilter, cityParam, typeJoin } = batchMatchesRecycler(ctx);
     const cpCount = await pool.query(
       `SELECT COUNT(DISTINCT b.collection_point_id)::int AS count
        FROM waste_sale_batches b
+       ${typeJoin}
        WHERE b.status = 'AVAILABLE' AND b.available_kg > 0
          AND LOWER(b.city) = LOWER(${cityParam}) ${typeFilter}`,
       params
@@ -234,6 +305,7 @@ export const getDashboardMetricsForRecycler = async (recyclerId) => {
 
 export default {
   getRecyclerAccessContext,
+  resolveBatchCityWasteType,
   getInventorySummaryForRecycler,
   getCollectionPointsForWasteType,
   syncRecyclerAcceptedWasteTypes,

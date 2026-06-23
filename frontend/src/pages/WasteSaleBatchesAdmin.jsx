@@ -7,7 +7,8 @@ import {
 import { formatUGX } from '../utils/formatters';
 
 const initialForm = {
-  waste_type: 'PLASTIC',
+  waste_type: '',
+  city_waste_type_id: '',
   collection_point_id: '',
   verified_kg: '',
   picker_price_per_kg_snapshot: '',
@@ -83,6 +84,9 @@ export default function WasteSaleBatchesAdmin() {
       ...form,
       waste_log_ids: ids,
       waste_type: selectedLogs[0]?.waste_type || form.waste_type,
+      city_waste_type_id: selectedLogs[0]?.city_waste_type_id
+        ? String(selectedLogs[0].city_waste_type_id)
+        : form.city_waste_type_id,
       verified_kg: totalKg ? String(totalKg) : form.verified_kg,
       picker_price_per_kg_snapshot: avgPickerPrice ? String(avgPickerPrice) : form.picker_price_per_kg_snapshot,
     });
@@ -95,6 +99,7 @@ export default function WasteSaleBatchesAdmin() {
       await api.post('/admin/waste-sale-batches', {
         ...form,
         collection_point_id: Number(form.collection_point_id),
+        city_waste_type_id: form.city_waste_type_id ? Number(form.city_waste_type_id) : undefined,
         verified_kg: Number(form.verified_kg),
         picker_price_per_kg_snapshot: Number(form.picker_price_per_kg_snapshot),
         recycler_sale_price_per_kg: Number(form.recycler_sale_price_per_kg),
@@ -215,7 +220,10 @@ export default function WasteSaleBatchesAdmin() {
             </div>
           )}
 
-          <input className="w-full rounded-lg border px-3 py-2" placeholder="Waste type" value={form.waste_type} onChange={(e) => setForm({ ...form, waste_type: e.target.value })} required />
+          <input className="w-full rounded-lg border px-3 py-2" placeholder="Waste type (auto-filled from logs)" value={form.waste_type} onChange={(e) => setForm({ ...form, waste_type: e.target.value })} required />
+          {form.city_waste_type_id && (
+            <p className="text-xs text-[#6B7280]">Linked city waste type ID: {form.city_waste_type_id}</p>
+          )}
           <input type="number" step="0.1" className="w-full rounded-lg border px-3 py-2" placeholder="Verified kg" value={form.verified_kg} onChange={(e) => setForm({ ...form, verified_kg: e.target.value })} required />
           <input type="number" className="w-full rounded-lg border px-3 py-2" placeholder="Picker price/kg snapshot" value={form.picker_price_per_kg_snapshot} onChange={(e) => setForm({ ...form, picker_price_per_kg_snapshot: e.target.value })} required />
           <input type="number" className="w-full rounded-lg border px-3 py-2" placeholder="Recycler sale price/kg" value={form.recycler_sale_price_per_kg} onChange={(e) => setForm({ ...form, recycler_sale_price_per_kg: e.target.value })} required />
