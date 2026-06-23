@@ -35,13 +35,13 @@ export default function RecyclerDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-[#111111]">Recycler Overview</h1>
         <p className="mt-1 text-sm text-[#6B7280]">
-          Matched verified waste in {data?.profile?.city || 'your city'} for your accepted types.
+          All verified waste for sale in {data?.profile?.city || 'your city'}. Browse batches and submit purchase requests.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Matched available kg" value={`${Number(stats.total_matched_available_kg || 0).toFixed(1)} kg`} icon={Package} shortTitle="Available" />
-        <StatCard title="Matched waste types" value={stats.matched_waste_type_count || 0} icon={Layers} shortTitle="Types" />
+        <StatCard title="Available kg" value={`${Number(stats.total_matched_available_kg || 0).toFixed(1)} kg`} icon={Package} shortTitle="Available" />
+        <StatCard title="Waste types listed" value={stats.matched_waste_type_count || 0} icon={Layers} shortTitle="Types" />
         <StatCard title="Collection points" value={stats.matched_collection_point_count || 0} icon={MapPin} shortTitle="Points" />
         <StatCard title="Pending requests" value={stats.pending_requests || 0} icon={Clock3} shortTitle="Pending" />
         <StatCard title="Approved requests" value={stats.approved_requests || 0} icon={CheckCircle2} shortTitle="Approved" />

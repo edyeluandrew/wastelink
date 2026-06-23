@@ -9,7 +9,6 @@ import {
   getRecyclerAccessContext,
   syncRecyclerAcceptedWasteTypes,
   getDashboardMetricsForRecycler,
-  resolveBatchCityWasteType,
 } from './recyclerInventoryService.js';
 import { normalizeCity } from '../utils/cityScope.js';
 
@@ -209,24 +208,6 @@ const validateBatchForRecycler = async (recyclerId, batch) => {
   }
   if (normalizeCity(batch.city) !== ctx.approvedCity) {
     throw new Error('Batch is not in your approved city');
-  }
-
-  const resolvedType = await resolveBatchCityWasteType(batch);
-  const typeId = resolvedType?.id || batch.city_waste_type_id;
-  const typeName = String(resolvedType?.name || batch.waste_type || '').trim().toLowerCase();
-  const typeSlug = String(resolvedType?.slug || '').trim().toLowerCase();
-
-  const typeOk =
-    (typeId && ctx.acceptedTypeIds.includes(typeId)) ||
-    (typeName && ctx.acceptedNames.includes(typeName)) ||
-    (typeSlug && ctx.acceptedNames.includes(typeSlug)) ||
-    (typeName && ctx.acceptedNames.includes(String(batch.waste_type || '').trim().toLowerCase()));
-
-  if (!typeOk && (ctx.acceptedTypeIds.length > 0 || ctx.acceptedNames.length > 0)) {
-    throw new Error('This waste type is not in your accepted waste types');
-  }
-  if (ctx.acceptedTypeIds.length === 0 && ctx.acceptedNames.length === 0) {
-    throw new Error('No accepted waste types configured on your profile');
   }
   return ctx;
 };

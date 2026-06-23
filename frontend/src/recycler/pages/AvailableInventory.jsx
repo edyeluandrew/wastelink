@@ -32,14 +32,14 @@ export default function AvailableInventory() {
       <div>
         <h1 className="text-2xl font-bold text-[#111111]">Available Waste</h1>
         <p className="mt-1 text-sm text-[#6B7280]">
-          Verified waste matching your accepted types and approved city, grouped by waste type.
+          All verified waste published for sale in your city. Submit a request — the city admin approves before pickup.
         </p>
       </div>
 
       {summary.length === 0 ? (
         <EmptyState
-          title="No matching waste available"
-          description="No verified batches match your accepted waste types and city yet."
+          title="No waste available yet"
+          description="When the city admin publishes verified batches, they will appear here."
         />
       ) : (
         <div className="overflow-x-auto rounded-3xl border border-[#D9D9D9] bg-white shadow-sm">

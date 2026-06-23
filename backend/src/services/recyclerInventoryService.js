@@ -64,31 +64,11 @@ export const resolveBatchCityWasteType = async (batch) => {
   return result.rows[0] || null;
 };
 
-const batchMatchesRecycler = (ctx) => {
-  const params = [ctx.approvedCity];
-  let idx = 1;
-  const matchParts = [];
-
-  if (ctx.acceptedTypeIds.length > 0) {
-    idx += 1;
-    params.push(ctx.acceptedTypeIds);
-    matchParts.push(`${resolvedBatchTypeIdSql} = ANY($${idx})`);
-  }
-
-  if (ctx.acceptedNames.length > 0) {
-    idx += 1;
-    params.push(ctx.acceptedNames);
-    matchParts.push(`${resolvedBatchTypeNameSql} = ANY($${idx})`);
-    matchParts.push(`${resolvedBatchTypeSlugSql} = ANY($${idx})`);
-    matchParts.push(`LOWER(b.waste_type) = ANY($${idx})`);
-  }
-
-  const typeFilter = matchParts.length
-    ? `AND (${matchParts.join(' OR ')})`
-    : 'AND FALSE';
-
-  return { params, typeFilter, cityParam: '$1', typeJoin: batchTypeResolutionJoin };
-};
+const buildRecyclerBatchScope = (ctx) => ({
+  params: [ctx.approvedCity],
+  cityParam: '$1',
+  typeJoin: batchTypeResolutionJoin,
+});
 
 export const getInventorySummaryForRecycler = async (recyclerId) => {
   const ctx = await getRecyclerAccessContext(recyclerId);
@@ -96,7 +76,7 @@ export const getInventorySummaryForRecycler = async (recyclerId) => {
     return { summary: [], context: ctx };
   }
 
-  const { params, typeFilter, cityParam, typeJoin } = batchMatchesRecycler(ctx);
+  const { params, cityParam, typeJoin } = buildRecyclerBatchScope(ctx);
 
   const result = await pool.query(
     `SELECT
@@ -112,7 +92,6 @@ export const getInventorySummaryForRecycler = async (recyclerId) => {
      WHERE b.status = 'AVAILABLE'
        AND b.available_kg > 0
        AND LOWER(b.city) = LOWER(${cityParam})
-       ${typeFilter}
      GROUP BY ${resolvedBatchTypeIdSql}, COALESCE(cwt_batch.name, cwt_by_name.name, b.waste_type)
      ORDER BY waste_type_name`,
     params
@@ -136,7 +115,7 @@ export const getCollectionPointsForWasteType = async (recyclerId, wasteTypeKey) 
   const ctx = await getRecyclerAccessContext(recyclerId);
   if (!ctx || ctx.recycler.status !== 'ACTIVE') return [];
 
-  const { params, typeFilter, cityParam, typeJoin } = batchMatchesRecycler(ctx);
+  const { params, cityParam, typeJoin } = buildRecyclerBatchScope(ctx);
 
   let wasteFilter = '';
   if (/^\d+$/.test(String(wasteTypeKey))) {
@@ -163,7 +142,6 @@ export const getCollectionPointsForWasteType = async (recyclerId, wasteTypeKey) 
      WHERE b.status = 'AVAILABLE'
        AND b.available_kg > 0
        AND LOWER(b.city) = LOWER(${cityParam})
-       ${typeFilter}
        ${wasteFilter}
      ORDER BY cp.name, b.updated_at DESC`,
     params
@@ -278,13 +256,13 @@ export const getDashboardMetricsForRecycler = async (recyclerId) => {
   let matchedPointCount = 0;
   if (summary.length > 0) {
     const ctx = await getRecyclerAccessContext(recyclerId);
-    const { params, typeFilter, cityParam, typeJoin } = batchMatchesRecycler(ctx);
+    const { params, cityParam, typeJoin } = buildRecyclerBatchScope(ctx);
     const cpCount = await pool.query(
       `SELECT COUNT(DISTINCT b.collection_point_id)::int AS count
        FROM waste_sale_batches b
        ${typeJoin}
        WHERE b.status = 'AVAILABLE' AND b.available_kg > 0
-         AND LOWER(b.city) = LOWER(${cityParam}) ${typeFilter}`,
+         AND LOWER(b.city) = LOWER(${cityParam})`,
       params
     );
     matchedPointCount = cpCount.rows[0]?.count || 0;

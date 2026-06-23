@@ -89,10 +89,6 @@ export default function RecyclersAdmin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.accepted_waste_type_ids.length === 0) {
-      alert('Select at least one city waste type this recycler buys.');
-      return;
-    }
     setSubmitting(true);
     try {
       const payload = {
@@ -175,9 +171,9 @@ export default function RecyclersAdmin() {
           ))}
 
           <div>
-            <label className="text-sm font-medium">Accepted city waste types *</label>
+            <label className="text-sm font-medium">Preferred waste types (optional)</label>
             <p className="text-xs text-[#6B7280] mb-2">
-              Recyclers only see published batches that match these types.
+              For your records only. Recyclers can browse all published batches in their city; purchase requests still need admin approval.
             </p>
             {wasteTypesLoading ? (
               <p className="text-sm text-[#6B7280]">Loading waste types...</p>
