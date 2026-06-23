@@ -398,6 +398,26 @@ export default function Users() {
     }
   };
 
+  const assignableCollectionPoints = useMemo(() => {
+    const takenPointIds = new Set(
+      users
+        .filter(
+          (user) =>
+            normalizeRole(user.role) === 'AGENT' &&
+            user.status === 'ACTIVE' &&
+            String(user.id) !== String(selectedUserId || '')
+        )
+        .map((user) => String(user.collection_point_id))
+        .filter(Boolean)
+    );
+
+    return collectionPoints.filter((point) => {
+      if (point.status !== 'ACTIVE') return false;
+      if (String(point.id) === String(form.collection_point_id)) return true;
+      return !takenPointIds.has(String(point.id));
+    });
+  }, [collectionPoints, users, selectedUserId, form.collection_point_id]);
+
   const isAgent = form.role === 'AGENT';
   const isPicker = form.role === 'PICKER';
   const isFormCityAdmin = form.role === 'CITY_ADMIN';
@@ -631,7 +651,7 @@ export default function Users() {
           {isAgent && (
             <div className="rounded-xl border border-green-200 bg-green-50 p-4">
               <p className="text-sm font-semibold text-green-900">
-                Agents can only verify waste for their assigned collection point after role protection is enabled.
+                Every agent must be linked to a collection point. Create the point first under Collection Points, then assign it here.
               </p>
               <div className="mt-3">
                 <label className="block text-sm font-medium text-wastelink-dark mb-2">Collection Point *</label>
@@ -639,14 +659,20 @@ export default function Users() {
                   value={form.collection_point_id}
                   onChange={(e) => setForm((prev) => ({ ...prev, collection_point_id: e.target.value }))}
                   className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+                  required
                 >
                   <option value="">Select collection point</option>
-                  {collectionPoints.map((point) => (
+                  {assignableCollectionPoints.map((point) => (
                     <option key={point.id} value={point.id}>
-                      {point.name} ({point.division || 'No division'})
+                      {point.point_code} — {point.name} ({point.division || 'No division'})
                     </option>
                   ))}
                 </select>
+                {assignableCollectionPoints.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    No unassigned active collection points. Add one under Collection Points first.
+                  </p>
+                )}
               </div>
             </div>
           )}

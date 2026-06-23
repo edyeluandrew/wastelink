@@ -23,23 +23,28 @@ export const createCollectionPoint = async (req, res, next) => {
     const pointCity = resolvePointCity(req, city);
 
     // Validate required fields
-    if (!name || !division || !agent_name || !agent_phone) {
+    if (!name || !division) {
       return sendError(
         res,
-        "Missing required fields: name, division, agent_name, agent_phone",
+        "Missing required fields: name, division",
         400
       );
     }
 
     await assertDivisionExistsForCity(pointCity, division);
 
-    // Check for duplicate agent_phone
-    const phoneCheck = await pool.query(
-      "SELECT id FROM collection_points WHERE agent_phone = $1",
-      [agent_phone]
-    );
-    if (phoneCheck.rows.length > 0) {
-      return sendError(res, "Agent phone number already registered", 400);
+    const resolvedAgentName = agent_name ? String(agent_name).trim() : null;
+    const resolvedAgentPhone = agent_phone ? String(agent_phone).trim() : null;
+
+    // Check for duplicate agent_phone only when provided
+    if (resolvedAgentPhone) {
+      const phoneCheck = await pool.query(
+        "SELECT id FROM collection_points WHERE agent_phone = $1",
+        [resolvedAgentPhone]
+      );
+      if (phoneCheck.rows.length > 0) {
+        return sendError(res, "Agent phone number already registered", 400);
+      }
     }
 
     // Generate point code
@@ -50,7 +55,7 @@ export const createCollectionPoint = async (req, res, next) => {
       `INSERT INTO collection_points (point_code, name, division, city, agent_name, agent_phone, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, point_code, name, division, city, agent_name, agent_phone, status, created_at`,
-      [pointCode, name, division, pointCity, agent_name, agent_phone, status || "ACTIVE"]
+      [pointCode, name, division, pointCity, resolvedAgentName, resolvedAgentPhone, status || "ACTIVE"]
     );
 
     sendSuccess(res, "Collection point created successfully", result.rows[0], 201);

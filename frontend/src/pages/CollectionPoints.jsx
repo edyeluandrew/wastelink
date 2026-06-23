@@ -15,8 +15,6 @@ import { useCityDivisions } from '../hooks/useCityDivisions';
 const buildInitialForm = (defaultDivision = '') => ({
   name: '',
   division: defaultDivision,
-  agent_name: '',
-  agent_phone: '',
 });
 
 export default function CollectionPoints() {
@@ -70,8 +68,6 @@ export default function CollectionPoints() {
     setForm({
       name: point.name,
       division: point.division,
-      agent_name: point.agent_name,
-      agent_phone: point.agent_phone,
     });
     setModalOpen(true);
   };
@@ -84,8 +80,8 @@ export default function CollectionPoints() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.name || !form.agent_name || !form.agent_phone) {
-      alert('Please fill in all required fields');
+    if (!form.name || !form.division) {
+      alert('Please fill in name and division');
       return;
     }
 
@@ -203,8 +199,8 @@ export default function CollectionPoints() {
               </td>
               <td className="table-cell">{point.name}</td>
               <td className="table-cell text-sm">{point.division}</td>
-              <td className="table-cell text-sm">{point.agent_name}</td>
-              <td className="table-cell text-sm">{point.agent_phone}</td>
+              <td className="table-cell text-sm">{point.agent_name || '—'}</td>
+              <td className="table-cell text-sm">{point.agent_phone || '—'}</td>
               <td className="table-cell">
                 <StatusBadge status={point.status} />
               </td>
@@ -251,7 +247,7 @@ export default function CollectionPoints() {
 
           <div>
             <label className="block text-sm font-medium text-wastelink-dark mb-2">
-              Division
+              Division *
             </label>
             <select
               value={form.division}
@@ -271,31 +267,11 @@ export default function CollectionPoints() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-wastelink-dark mb-2">
-              Agent Name *
-            </label>
-            <input
-              type="text"
-              value={form.agent_name}
-              onChange={(e) => setForm({ ...form, agent_name: e.target.value })}
-              className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
-              placeholder="Agent name"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-wastelink-dark mb-2">
-              Agent Phone *
-            </label>
-            <input
-              type="tel"
-              value={form.agent_phone}
-              onChange={(e) => setForm({ ...form, agent_phone: e.target.value })}
-              className="w-full border border-wastelink-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
-              placeholder="Agent phone number"
-            />
-          </div>
+          {!isEditing && (
+            <p className="text-sm text-wastelink-muted">
+              Assign an agent later under Users & Agents after the collection point is created.
+            </p>
+          )}
 
           <div className="flex gap-3 pt-4">
             <Button

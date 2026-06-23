@@ -81,6 +81,63 @@ const getCollectionPoint = async (collectionPointId) => {
   return result.rows[0] || null;
 };
 
+const assertNoActiveAgentOnPoint = async (collectionPointId, excludeUserId = null) => {
+  const params = [collectionPointId];
+  let query = `
+    SELECT id FROM users
+    WHERE role = 'AGENT' AND status = 'ACTIVE' AND collection_point_id = $1
+  `;
+  if (excludeUserId) {
+    params.push(excludeUserId);
+    query += ' AND id != $2';
+  }
+  const result = await pool.query(`${query} LIMIT 1`, params);
+  if (result.rows.length > 0) {
+    throw Object.assign(new Error('This collection point already has an assigned agent'), { status: 400 });
+  }
+};
+
+const syncCollectionPointAgent = async (collectionPointId, agentName, agentPhone) => {
+  if (!collectionPointId) return;
+  await pool.query(
+    `UPDATE collection_points
+     SET agent_name = $1, agent_phone = $2, updated_at = NOW()
+     WHERE id = $3`,
+    [agentName || null, agentPhone || null, collectionPointId]
+  );
+};
+
+const clearCollectionPointAgent = async (collectionPointId) => {
+  if (!collectionPointId) return;
+  await pool.query(
+    `UPDATE collection_points
+     SET agent_name = NULL, agent_phone = NULL, updated_at = NOW()
+     WHERE id = $1`,
+    [collectionPointId]
+  );
+};
+
+const handleAgentCollectionPointLink = async ({
+  role,
+  collectionPointId,
+  agentName,
+  agentPhone,
+  previousCollectionPointId,
+}) => {
+  if (previousCollectionPointId && previousCollectionPointId !== collectionPointId) {
+    await clearCollectionPointAgent(previousCollectionPointId);
+  }
+
+  if (role === 'AGENT' && collectionPointId) {
+    await syncCollectionPointAgent(collectionPointId, agentName, agentPhone);
+    return;
+  }
+
+  if (previousCollectionPointId && role !== 'AGENT') {
+    await clearCollectionPointAgent(previousCollectionPointId);
+  }
+};
+
 const getPicker = async (pickerId) => {
   const result = await pool.query(
     'SELECT id, picker_code, name, phone, status FROM pickers WHERE id = $1 LIMIT 1',
@@ -258,6 +315,12 @@ export const createUser = async (req, res) => {
       if (!collectionPoint) {
         return sendError(res, 'Collection point not found', 404);
       }
+
+      try {
+        await assertNoActiveAgentOnPoint(collection_point_id);
+      } catch (error) {
+        return sendError(res, error.message, error.status || 400);
+      }
     }
 
     if (normalizedRole === 'PICKER') {
@@ -310,9 +373,22 @@ export const createUser = async (req, res) => {
       ]
     );
 
-    return sendSuccess(res, 'User created successfully', safeUserFromRow(result.rows[0]), 201);
+    const createdUser = result.rows[0];
+
+    if (normalizedRole === 'AGENT') {
+      await syncCollectionPointAgent(
+        collection_point_id,
+        String(name).trim(),
+        normalizedPhone
+      );
+    }
+
+    return sendSuccess(res, 'User created successfully', safeUserFromRow(createdUser), 201);
   } catch (error) {
     console.error('[Create User Error]', { code: error.code, message: error.message });
+    if (error.status) {
+      return sendError(res, error.message, error.status);
+    }
     return sendError(res, 'Failed to create user', 500);
   }
 };
@@ -530,6 +606,14 @@ export const updateUser = async (req, res) => {
       return sendError(res, 'AGENT users must be assigned to a collection point', 400);
     }
 
+    if (normalizedRole === 'AGENT' && finalCollectionPointId) {
+      try {
+        await assertNoActiveAgentOnPoint(finalCollectionPointId, id);
+      } catch (error) {
+        return sendError(res, error.message, error.status || 400);
+      }
+    }
+
     if (normalizedRole === 'PICKER' && !finalPickerId) {
       return sendError(res, 'PICKER users must be linked to a picker profile', 400);
     }
@@ -556,9 +640,21 @@ export const updateUser = async (req, res) => {
       values
     );
 
-    return sendSuccess(res, 'User updated successfully', safeUserFromRow(result.rows[0]));
+    const updatedUser = result.rows[0];
+    await handleAgentCollectionPointLink({
+      role: updatedUser.role,
+      collectionPointId: updatedUser.collection_point_id,
+      agentName: updatedUser.name,
+      agentPhone: updatedUser.phone,
+      previousCollectionPointId: existingUser.collection_point_id,
+    });
+
+    return sendSuccess(res, 'User updated successfully', safeUserFromRow(updatedUser));
   } catch (error) {
     console.error('[Update User Error]', { code: error.code, message: error.message });
+    if (error.status) {
+      return sendError(res, error.message, error.status);
+    }
     return sendError(res, 'Failed to update user', 500);
   }
 };
@@ -595,7 +691,12 @@ export const deactivateUser = async (req, res) => {
       [id]
     );
 
-    return sendSuccess(res, 'User deactivated successfully', safeUserFromRow(result.rows[0]));
+    const deactivatedUser = result.rows[0];
+    if (normalizeUserRole(deactivatedUser.role) === 'AGENT') {
+      await clearCollectionPointAgent(deactivatedUser.collection_point_id);
+    }
+
+    return sendSuccess(res, 'User deactivated successfully', safeUserFromRow(deactivatedUser));
   } catch (error) {
     console.error('[Deactivate User Error]', { code: error.code, message: error.message });
     return sendError(res, 'Failed to deactivate user', 500);
@@ -629,7 +730,21 @@ export const activateUser = async (req, res) => {
       [id]
     );
 
-    return sendSuccess(res, 'User activated successfully', safeUserFromRow(result.rows[0]));
+    const activatedUser = result.rows[0];
+    if (normalizeUserRole(activatedUser.role) === 'AGENT' && activatedUser.collection_point_id) {
+      try {
+        await assertNoActiveAgentOnPoint(activatedUser.collection_point_id, activatedUser.id);
+        await syncCollectionPointAgent(
+          activatedUser.collection_point_id,
+          activatedUser.name,
+          activatedUser.phone
+        );
+      } catch (error) {
+        return sendError(res, error.message, error.status || 400);
+      }
+    }
+
+    return sendSuccess(res, 'User activated successfully', safeUserFromRow(activatedUser));
   } catch (error) {
     console.error('[Activate User Error]', { code: error.code, message: error.message });
     return sendError(res, 'Failed to activate user', 500);
