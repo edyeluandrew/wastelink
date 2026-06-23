@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/axios';
 import { LoadingState, ErrorState, EmptyState, StatusBadge } from '../../components';
-import { formatUGX } from '../../utils/formatters';
+import { formatUGX, formatDateTime } from '../../utils/formatters';
 
 export default function PurchaseRequests() {
   const [requests, setRequests] = useState([]);
@@ -50,7 +50,17 @@ export default function PurchaseRequests() {
                 <div><span className="text-[#6B7280]">Requested kg:</span> {Number(req.requested_kg).toFixed(1)}</div>
                 <div><span className="text-[#6B7280]">Expected:</span> {formatUGX(req.expected_amount)}</div>
                 <div><span className="text-[#6B7280]">Location:</span> {req.collection_point_name}</div>
-                {req.pickup_date && <div><span className="text-[#6B7280]">Pickup:</span> {new Date(req.pickup_date).toLocaleString()}</div>}
+                {req.pickup_date && (
+                  <div>
+                    <span className="text-[#6B7280]">
+                      {req.status === 'PENDING' ? 'Preferred pickup:' : 'Pickup:'}
+                    </span>{' '}
+                    {formatDateTime(req.pickup_date)}
+                  </div>
+                )}
+                {req.recycler_note && (
+                  <div className="col-span-2"><span className="text-[#6B7280]">Note:</span> {req.recycler_note}</div>
+                )}
               </div>
               {req.admin_response && (
                 <p className="mt-3 rounded-xl bg-[#F9FAFB] px-3 py-2 text-sm text-[#374151]">{req.admin_response}</p>

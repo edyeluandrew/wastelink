@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { LoadingState, ErrorState, Button, StatusBadge } from '../../components';
-import { formatUGX } from '../../utils/formatters';
+import { formatUGX, buildPickupIso } from '../../utils/formatters';
 
 export default function BatchDetails() {
   const { batchId } = useParams();
@@ -11,6 +11,9 @@ export default function BatchDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [requestedKg, setRequestedKg] = useState('');
+  const [pickupDate, setPickupDate] = useState('');
+  const [pickupTime, setPickupTime] = useState('');
+  const [recyclerNote, setRecyclerNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -38,6 +41,8 @@ export default function BatchDetails() {
       await api.post('/recycler/purchase-requests', {
         batch_id: Number(batchId),
         requested_kg: Number(requestedKg),
+        recycler_note: recyclerNote || undefined,
+        pickup_date: buildPickupIso(pickupDate, pickupTime),
       });
       setMessage('Purchase request submitted successfully.');
       setTimeout(() => navigate('/recycler/requests'), 1200);
@@ -85,19 +90,51 @@ export default function BatchDetails() {
           </div>
         )}
 
-        <div className="border-t border-[#E5E7EB] pt-4">
-          <label className="block text-sm font-medium text-[#374151]">Requested kg</label>
-          <input
-            type="number"
-            min="0.1"
-            step="0.1"
-            max={batch.available_kg}
-            value={requestedKg}
-            onChange={(e) => setRequestedKg(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-[#D1D5DB] px-3 py-2"
-          />
-          {message && <p className="mt-2 text-sm text-[#374151]">{message}</p>}
-          <div className="mt-4 flex gap-3">
+        <div className="border-t border-[#E5E7EB] pt-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[#374151]">Requested kg</label>
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              max={batch.available_kg}
+              value={requestedKg}
+              onChange={(e) => setRequestedKg(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-[#D1D5DB] px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#374151]">Preferred pickup date (optional)</label>
+            <input
+              type="date"
+              value={pickupDate}
+              onChange={(e) => setPickupDate(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-[#D1D5DB] px-3 py-2"
+            />
+          </div>
+          {pickupDate && (
+            <div>
+              <label className="block text-sm font-medium text-[#374151]">Preferred pickup time (optional)</label>
+              <input
+                type="time"
+                value={pickupTime}
+                onChange={(e) => setPickupTime(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-[#D1D5DB] px-3 py-2"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-[#374151]">Note (optional)</label>
+            <textarea
+              value={recyclerNote}
+              onChange={(e) => setRecyclerNote(e.target.value)}
+              rows={2}
+              className="mt-1 w-full rounded-xl border border-[#D1D5DB] px-3 py-2"
+              placeholder="Any extra pickup instructions"
+            />
+          </div>
+          {message && <p className="text-sm text-[#374151]">{message}</p>}
+          <div className="flex gap-3">
             <Button onClick={handleRequest} disabled={submitting}>Request purchase</Button>
             <Button variant="secondary" onClick={() => navigate('/recycler/inventory')}>Back</Button>
           </div>

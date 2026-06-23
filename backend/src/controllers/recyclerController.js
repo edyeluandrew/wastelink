@@ -97,7 +97,7 @@ export const postPurchaseRequest = async (req, res, next) => {
     const recyclerId = requireRecyclerId(req, res);
     if (!recyclerId) return;
 
-    const { batch_id, requested_kg, recycler_note } = req.body;
+    const { batch_id, requested_kg, recycler_note, pickup_date } = req.body;
     if (!batch_id || requested_kg === undefined) {
       return sendError(res, 'batch_id and requested_kg are required', 400);
     }
@@ -106,11 +106,12 @@ export const postPurchaseRequest = async (req, res, next) => {
       batch_id: parseInt(batch_id, 10),
       requested_kg,
       recycler_note,
+      pickup_date,
     });
 
     sendSuccess(res, 'Purchase request submitted', { request }, 201);
   } catch (error) {
-    const clientErrors = ['not available', 'exceeds', 'not active', 'not in your', 'accepted waste', 'pending request', 'no longer'];
+    const clientErrors = ['not available', 'exceeds', 'not active', 'not in your', 'accepted waste', 'pending request', 'no longer', 'invalid pickup'];
     if (clientErrors.some((m) => error.message.toLowerCase().includes(m.toLowerCase()))) {
       return sendError(res, error.message, 400);
     }

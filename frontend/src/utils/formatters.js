@@ -150,3 +150,35 @@ export const formatGenderLabel = (gender) => {
  * @returns {string}
  */
 export const formatUGX = formatCurrencyUGX;
+
+/**
+ * Combine optional date (YYYY-MM-DD) and time (HH:MM) into an ISO string for API.
+ * Returns undefined when no date is provided.
+ * @param {string} dateStr
+ * @param {string} [timeStr]
+ * @returns {string|undefined}
+ */
+export const buildPickupIso = (dateStr, timeStr) => {
+  if (!dateStr) return undefined;
+  const time = timeStr || '09:00';
+  const parsed = new Date(`${dateStr}T${time}`);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
+};
+
+/**
+ * Split a pickup datetime into date and time strings for form inputs.
+ * @param {string|Date|null|undefined} value
+ * @returns {{ date: string, time: string }}
+ */
+export const splitPickupDateTime = (value) => {
+  if (!value) return { date: '', time: '' };
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return { date: '', time: '' };
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const hours = String(parsed.getHours()).padStart(2, '0');
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+  return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
+};

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { LoadingState, ErrorState, EmptyState, Button, Modal } from '../../components';
-import { formatUGX } from '../../utils/formatters';
+import { formatUGX, buildPickupIso } from '../../utils/formatters';
 
 export default function WasteTypeBreakdown() {
   const { wasteTypeKey } = useParams();
@@ -12,6 +12,8 @@ export default function WasteTypeBreakdown() {
   const [requestTarget, setRequestTarget] = useState(null);
   const [requestedKg, setRequestedKg] = useState('');
   const [recyclerNote, setRecyclerNote] = useState('');
+  const [pickupDate, setPickupDate] = useState('');
+  const [pickupTime, setPickupTime] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -36,6 +38,8 @@ export default function WasteTypeBreakdown() {
     setRequestTarget(point);
     setRequestedKg(String(point.available_kg));
     setRecyclerNote('');
+    setPickupDate('');
+    setPickupTime('');
     setMessage('');
   };
 
@@ -49,6 +53,7 @@ export default function WasteTypeBreakdown() {
         batch_id: requestTarget.batch_id,
         requested_kg: Number(requestedKg),
         recycler_note: recyclerNote || undefined,
+        pickup_date: buildPickupIso(pickupDate, pickupTime),
       });
       setMessage('Request submitted successfully.');
       setRequestTarget(null);
@@ -135,13 +140,34 @@ export default function WasteTypeBreakdown() {
               Expected total: {formatUGX(Math.round(Number(requestedKg || 0) * requestTarget.recycler_sale_price_per_kg))}
             </p>
             <div>
-              <label className="text-sm font-medium">Pickup note (optional)</label>
+              <label className="text-sm font-medium">Preferred pickup date (optional)</label>
+              <input
+                type="date"
+                value={pickupDate}
+                onChange={(e) => setPickupDate(e.target.value)}
+                className="mt-1 w-full rounded-lg border px-3 py-2"
+              />
+            </div>
+            {pickupDate && (
+              <div>
+                <label className="text-sm font-medium">Preferred pickup time (optional)</label>
+                <input
+                  type="time"
+                  value={pickupTime}
+                  onChange={(e) => setPickupTime(e.target.value)}
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                />
+                <p className="mt-1 text-xs text-[#6B7280]">Leave time blank to default to 9:00 AM.</p>
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium">Note (optional)</label>
               <textarea
                 value={recyclerNote}
                 onChange={(e) => setRecyclerNote(e.target.value)}
                 className="mt-1 w-full rounded-lg border px-3 py-2"
                 rows={2}
-                placeholder="Preferred pickup time or instructions"
+                placeholder="Any extra pickup instructions"
               />
             </div>
             {message && <p className="text-sm">{message}</p>}

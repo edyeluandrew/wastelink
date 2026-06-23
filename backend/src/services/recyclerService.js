@@ -14,6 +14,15 @@ import { normalizeCity } from '../utils/cityScope.js';
 
 const roundMoney = (kg, pricePerKg) => Math.round(Number(kg) * Number(pricePerKg));
 
+const parseOptionalPickupDate = (value) => {
+  if (value == null || value === '') return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error('Invalid pickup date or time');
+  }
+  return parsed;
+};
+
 export const getRecyclerById = async (recyclerId) => {
   const result = await pool.query(`SELECT * FROM recyclers WHERE id = $1`, [recyclerId]);
   const recycler = result.rows[0] || null;
@@ -248,7 +257,9 @@ export const sanitizeRequestForRecycler = (row) => ({
 
 export const getDashboardStats = async (recyclerId) => getDashboardMetricsForRecycler(recyclerId);
 
-export const createPurchaseRequest = async (recyclerId, { batch_id, requested_kg, recycler_note }) => {
+export const createPurchaseRequest = async (recyclerId, {
+  batch_id, requested_kg, recycler_note, pickup_date,
+}) => {
   const batch = await getBatchById(batch_id);
   if (!batch) throw new Error('Batch not found');
   if (batch.status !== 'AVAILABLE') {
@@ -273,6 +284,7 @@ export const createPurchaseRequest = async (recyclerId, { batch_id, requested_kg
   }
 
   const expectedAmount = roundMoney(kg, batch.recycler_sale_price_per_kg);
+  const preferredPickupDate = parseOptionalPickupDate(pickup_date);
   const requestCode = generatePurchaseRequestCode();
   const newAvailable = Number(batch.available_kg) - kg;
   const newReserved = Number(batch.reserved_kg || 0) + kg;
@@ -296,8 +308,8 @@ export const createPurchaseRequest = async (recyclerId, { batch_id, requested_kg
     const result = await client.query(
       `INSERT INTO recycler_purchase_requests (
         request_code, batch_id, recycler_id, collection_point_id, city_waste_type_id,
-        requested_kg, expected_amount, price_per_kg_snapshot, recycler_note, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'PENDING') RETURNING *`,
+        requested_kg, expected_amount, price_per_kg_snapshot, recycler_note, pickup_date, status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'PENDING') RETURNING *`,
       [
         requestCode,
         batch_id,
@@ -308,6 +320,7 @@ export const createPurchaseRequest = async (recyclerId, { batch_id, requested_kg
         expectedAmount,
         batch.recycler_sale_price_per_kg,
         recycler_note || null,
+        preferredPickupDate,
       ]
     );
 
@@ -326,7 +339,9 @@ export const createPurchaseRequest = async (recyclerId, { batch_id, requested_kg
       entityType: 'recycler_purchase_request',
       entityId: result.rows[0].id,
       adminId: null,
-      details: { batch_id, requested_kg: kg, recycler_id: recyclerId },
+      details: {
+        batch_id, requested_kg: kg, recycler_id: recyclerId, pickup_date: preferredPickupDate,
+      },
     });
 
     await client.query('COMMIT');
@@ -482,17 +497,22 @@ export const schedulePickup = async (requestId, adminId, { pickup_date } = {}) =
     throw new Error('Request must be approved before scheduling pickup');
   }
 
+  const scheduledPickup = parseOptionalPickupDate(pickup_date ?? request.pickup_date);
+  if (!scheduledPickup) {
+    throw new Error('Pickup date and time are required');
+  }
+
   const updated = await pool.query(
     `UPDATE recycler_purchase_requests
      SET pickup_date = $2, updated_at = NOW()
      WHERE id = $1 RETURNING *`,
-    [requestId, pickup_date || new Date()]
+    [requestId, scheduledPickup]
   );
 
   await pool.query(
     `UPDATE waste_sale_batches SET status = 'PICKUP_SCHEDULED', pickup_date = $2, updated_at = NOW()
      WHERE id = $1`,
-    [request.batch_id, pickup_date || new Date()]
+    [request.batch_id, scheduledPickup]
   );
 
   await logRecyclerAudit({
@@ -500,7 +520,7 @@ export const schedulePickup = async (requestId, adminId, { pickup_date } = {}) =
     entityType: 'recycler_purchase_request',
     entityId: requestId,
     adminId,
-    details: { pickup_date },
+    details: { pickup_date: scheduledPickup },
   });
 
   return updated.rows[0];

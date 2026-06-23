@@ -165,7 +165,7 @@ export const scheduleRequestPickup = async (req, res, next) => {
     const request = await schedulePickup(parseInt(req.params.id, 10), req.user.id, req.body);
     sendSuccess(res, 'Pickup scheduled', { request });
   } catch (error) {
-    if (error.message.includes('not found') || error.message.includes('approved')) {
+    if (error.message.includes('not found') || error.message.includes('approved') || error.message.includes('Pickup date')) {
       return sendError(res, error.message, 400);
     }
     next(error);

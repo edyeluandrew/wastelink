@@ -3,7 +3,7 @@ import api from '../api/axios';
 import {
   Button, LoadingState, ErrorState, EmptyState, StatusBadge,
 } from '../components';
-import { formatUGX } from '../utils/formatters';
+import { formatUGX, formatDateTime, splitPickupDateTime, buildPickupIso } from '../utils/formatters';
 
 export default function RecyclerPurchaseRequestsAdmin() {
   const [requests, setRequests] = useState([]);
@@ -29,6 +29,23 @@ export default function RecyclerPurchaseRequestsAdmin() {
     const key = `${id}:${action}`;
     setBusyKey(key);
     try {
+      if (action === 'schedule-pickup') {
+        const defaults = splitPickupDateTime(body.defaultPickup);
+        const dateStr = window.prompt('Pickup date (YYYY-MM-DD)', defaults.date || '');
+        if (dateStr === null) return;
+        if (!dateStr.trim()) {
+          alert('Pickup date is required');
+          return;
+        }
+        const timeStr = window.prompt('Pickup time (HH:MM)', defaults.time || '09:00');
+        if (timeStr === null) return;
+        const pickupIso = buildPickupIso(dateStr.trim(), timeStr.trim());
+        if (!pickupIso) {
+          alert('Invalid pickup date or time');
+          return;
+        }
+        body = { pickup_date: pickupIso };
+      }
       if (action === 'confirm-pickup') {
         const finalKg = window.prompt('Final pickup kg', String(body.defaultKg || ''));
         if (!finalKg) return;
@@ -82,6 +99,11 @@ export default function RecyclerPurchaseRequestsAdmin() {
                 <div>Requested: {Number(req.requested_kg).toFixed(1)} kg</div>
                 <div>Expected: {formatUGX(req.expected_amount)}</div>
                 {req.recycler_note && <div className="col-span-2">Note: {req.recycler_note}</div>}
+                {req.pickup_date && (
+                  <div className="col-span-2">
+                    Preferred pickup: {formatDateTime(req.pickup_date)}
+                  </div>
+                )}
                 {req.final_kg != null && <div>Final kg: {Number(req.final_kg).toFixed(1)}</div>}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -97,8 +119,12 @@ export default function RecyclerPurchaseRequestsAdmin() {
                 )}
                 {req.status === 'APPROVED' && req.final_kg == null && (
                   <>
-                    <Button size="sm" disabled={Boolean(busyKey)} onClick={() => runAction(req.id, 'schedule-pickup', { pickup_date: new Date().toISOString() })}>
-                      {isBusy(req.id, 'schedule-pickup') ? 'Working...' : 'Schedule pickup'}
+                    <Button
+                      size="sm"
+                      disabled={Boolean(busyKey)}
+                      onClick={() => runAction(req.id, 'schedule-pickup', { defaultPickup: req.pickup_date })}
+                    >
+                      {isBusy(req.id, 'schedule-pickup') ? 'Working...' : req.pickup_date ? 'Confirm pickup schedule' : 'Schedule pickup'}
                     </Button>
                     <Button size="sm" variant="secondary" disabled={Boolean(busyKey)} onClick={() => runAction(req.id, 'confirm-pickup', { defaultKg: req.requested_kg })}>
                       {isBusy(req.id, 'confirm-pickup') ? 'Working...' : 'Confirm pickup kg'}
