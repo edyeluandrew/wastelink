@@ -271,6 +271,9 @@ export const createPickerWithdrawal = async ({
   }
 
   const client = await pool.connect();
+  let withdrawal;
+  let totalAmount;
+  let allocations;
   try {
     await client.query('BEGIN');
     await ensureWithdrawalTables(client);
@@ -303,14 +306,14 @@ export const createPickerWithdrawal = async ({
       throw error;
     }
 
-    const allocations = allocateEarningsForAmount(eligible, requestedAmount);
+    allocations = allocateEarningsForAmount(eligible, requestedAmount);
     if (!allocations?.length) {
       const error = new Error('Unable to allocate that amount from your earnings. Try a lower amount.');
       error.status = 400;
       throw error;
     }
 
-    const totalAmount = allocations.reduce((sum, row) => sum + row.withdraw_amount, 0);
+    totalAmount = allocations.reduce((sum, row) => sum + row.withdraw_amount, 0);
     const paymentReference = `WD-${pickerId}-${Date.now()}`;
 
     const withdrawalInsert = await client.query(
@@ -328,7 +331,7 @@ export const createPickerWithdrawal = async ({
       ]
     );
 
-    const withdrawal = withdrawalInsert.rows[0];
+    withdrawal = withdrawalInsert.rows[0];
 
     for (const allocation of allocations) {
       await reserveEarningForWithdrawal(client, {
@@ -342,29 +345,44 @@ export const createPickerWithdrawal = async ({
     }
 
     await client.query('COMMIT');
-
-    const items = await pool.query(
-      `SELECT wre.earning_id, wre.waste_log_id, wre.amount, wl.job_code
-       FROM withdrawal_request_earnings wre
-       JOIN waste_logs wl ON wre.waste_log_id = wl.id
-       WHERE wre.withdrawal_request_id = $1`,
-      [withdrawal.id]
-    );
-
-    return {
-      withdrawal,
-      items: items.rows,
-      total_amount: totalAmount,
-      jobs_count: allocations.length,
-      demo_notice:
-        'Withdrawal submitted. Funds are processing — admin or provider will confirm payment.',
-    };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
   } finally {
     client.release();
   }
+
+  let finalWithdrawal = withdrawal;
+  if (withdrawal.is_simulated) {
+    try {
+      finalWithdrawal = await confirmWithdrawal(withdrawal.id, {
+        changedBy,
+        notes: 'Demo: auto-confirmed on submit',
+      });
+    } catch (confirmError) {
+      console.error('[Withdrawal Auto-Confirm]', confirmError);
+    }
+  }
+
+  const items = await pool.query(
+    `SELECT wre.earning_id, wre.waste_log_id, wre.amount, wl.job_code
+     FROM withdrawal_request_earnings wre
+     JOIN waste_logs wl ON wre.waste_log_id = wl.id
+     WHERE wre.withdrawal_request_id = $1`,
+    [withdrawal.id]
+  );
+
+  const autoConfirmed = finalWithdrawal.status === 'SUCCESS';
+
+  return {
+    withdrawal: finalWithdrawal,
+    items: items.rows,
+    total_amount: totalAmount,
+    jobs_count: allocations.length,
+    demo_notice: autoConfirmed
+      ? 'Withdrawal sent and confirmed (demo). Check your Paid jobs and withdrawal history.'
+      : 'Withdrawal submitted. Funds are processing — admin or provider will confirm payment.',
+  };
 };
 
 const loadWithdrawalWithItems = async (client, withdrawalId, { forUpdate = false } = {}) => {

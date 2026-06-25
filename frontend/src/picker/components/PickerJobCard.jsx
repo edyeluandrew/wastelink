@@ -1,11 +1,12 @@
 import { formatDate, formatUGX } from '../../utils/formatters';
-import { getEarningAmount, getWalletAmount, getWithdrawnAmount } from '../../utils/earningsHelper';
+import { getEarningAmount, getJobPaymentDisplayStatus, getWalletAmount, getWithdrawnAmount } from '../../utils/earningsHelper';
 import { MapPin, Clock, CheckCircle, XCircle, CreditCard } from 'lucide-react';
 
 export default function PickerJobCard({ job }) {
   const earned = job.earning ? getEarningAmount(job) : 0;
   const withdrawn = job.earning ? getWithdrawnAmount(job) : 0;
   const inWallet = job.earning ? getWalletAmount(job) : 0;
+  const displayStatus = getJobPaymentDisplayStatus(job);
   return (
     <div className="border border-gray-300 rounded-lg p-4 bg-white hover:shadow-md transition">
       <div className="flex justify-between items-start mb-3">
@@ -16,12 +17,12 @@ export default function PickerJobCard({ job }) {
         <div className="text-right">
           <p className="text-xs font-medium text-gray-500">Status</p>
           <p className={`text-sm font-semibold ${
-            job.status === 'PENDING' ? 'text-amber-700' :
-            job.status === 'VERIFIED' ? 'text-green-700' :
-            job.status === 'REJECTED' ? 'text-red-700' :
+            displayStatus === 'PENDING' ? 'text-amber-700' :
+            displayStatus === 'VERIFIED' || displayStatus === 'AVAILABLE' ? 'text-green-700' :
+            displayStatus === 'REJECTED' ? 'text-red-700' :
             'text-blue-700'
           }`}>
-            {job.status}
+            {displayStatus}
           </p>
         </div>
       </div>
@@ -80,7 +81,7 @@ export default function PickerJobCard({ job }) {
             <XCircle className="w-3 h-3" /> Not accepted - {job.rejection_reason || 'See agent for details'}
           </p>
         )}
-        {job.status === 'PAID' && (
+        {(displayStatus === 'PAID' || job.status === 'PAID') && (
           <p className="text-xs text-blue-700 mt-2 flex items-center gap-1">
             <CreditCard className="w-3 h-3" /> Payment completed
           </p>

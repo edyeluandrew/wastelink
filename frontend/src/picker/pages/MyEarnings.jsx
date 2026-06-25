@@ -5,7 +5,7 @@ import apiClient from '../../api/axios';
 import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX, formatDate, formatDateTime } from '../../utils/formatters';
 import { Wallet, Scale, CreditCard, Hourglass, TrendingUp, Smartphone, ShieldAlert } from 'lucide-react';
-import { getEarningAmount, getEarningStatus, getWalletAmount, getWithdrawnAmount, sumSuccessfulWithdrawals, sumProcessingWithdrawals } from '../../utils/earningsHelper';
+import { getEarningAmount, getEarningStatus, getJobPaymentDisplayStatus, getWalletAmount, getWithdrawnAmount, sumSuccessfulWithdrawals, sumProcessingWithdrawals } from '../../utils/earningsHelper';
 import MobileMoneyProviderIcon from '../components/MobileMoneyProviderIcon';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
@@ -345,7 +345,7 @@ export default function MyEarnings() {
               const earned = getEarningAmount(job);
               const withdrawn = getWithdrawnAmount(job);
               const inWallet = getWalletAmount(job);
-              const status = getEarningStatus(job);
+              const status = getJobPaymentDisplayStatus(job);
 
               return (
                 <div key={job.id} className="rounded-2xl border border-[#D9D9D9] bg-[#F8F9FA] p-4">

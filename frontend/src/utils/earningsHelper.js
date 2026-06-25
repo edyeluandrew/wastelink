@@ -124,6 +124,24 @@ export const getRemainingEarningAmount = (log) => {
   return 0;
 };
 
+/** Demo-friendly badge: fully withdrawn jobs read as PAID, not Payout Processing. */
+export const getJobPaymentDisplayStatus = (log) => {
+  const earned = getEarningAmount(log);
+  const withdrawn = getWithdrawnAmount(log);
+  const wallet = getWalletAmount(log);
+  const status = getEarningStatus(log);
+
+  if (status === 'PAID' || (earned > 0 && wallet <= 0 && withdrawn > 0)) {
+    return 'PAID';
+  }
+
+  if (status !== 'NONE') {
+    return status;
+  }
+
+  return log?.status || 'NONE';
+};
+
 export const sumRemainingEarnings = (logs = []) =>
   logs.reduce((sum, log) => sum + getRemainingEarningAmount(log), 0);
 
