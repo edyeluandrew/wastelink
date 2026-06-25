@@ -2,7 +2,11 @@ import { AlertCircle } from 'lucide-react';
 import Button from './Button';
 
 export default function ErrorState({ error, onRetry }) {
-  const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred while loading data.';
+  const errorMessage =
+    (typeof error === 'string' ? error : null)
+    || error?.response?.data?.message
+    || error?.message
+    || 'An error occurred while loading data.';
   
   return (
     <div className="flex flex-col items-center justify-center py-12">

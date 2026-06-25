@@ -1,3 +1,15 @@
+import {
+  Zap,
+  BarChart3,
+  FileText,
+  Trash2,
+  Recycle,
+  Package,
+  Leaf,
+  Cpu,
+  Wallet,
+} from 'lucide-react';
+
 export default function PickerHelp() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">

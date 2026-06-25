@@ -88,13 +88,12 @@ export default function LogWaste() {
 
     try {
       const [pointsRes, typesRes] = await Promise.all([
-        apiClient.get('/collection-points'),
+        apiClient.get('/collection-points', { params: { city: PILOT_CITY, status: 'ACTIVE' } }),
         apiClient.get('/city-waste-types/active', { params: { city: PILOT_CITY } }),
       ]);
 
       if (pointsRes.data?.success) {
-        const points = pointsRes.data.data || [];
-        setCollectionPoints(points.filter(p => p.status === 'ACTIVE'));
+        setCollectionPoints(pointsRes.data.data || []);
       }
 
       if (typesRes.data?.success) {
@@ -181,7 +180,7 @@ export default function LogWaste() {
   if (collectionPoints.length === 0) {
     return (
       <ErrorState
-        error="No active collection points available"
+        error={`No active collection points in ${PILOT_CITY}. Ask your city admin to add one.`}
         onRetry={fetchInitialData}
       />
     );
