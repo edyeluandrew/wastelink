@@ -165,7 +165,11 @@ export const getWasteLogs = async (req, res, next) => {
         cp.point_code, cp.name as collection_point_name, cp.division,
         cwt.name as city_waste_type_name, cwt.price_per_kg as city_price_per_kg, cwt.is_payable as city_is_payable,
         rc.name as reporting_category_name,
-        e.id as earning_id, e.rate_per_kg, e.amount, e.status as earning_status, e.paid_at
+        e.id as earning_id, e.rate_per_kg, e.amount, e.original_amount, e.status as earning_status, e.paid_at,
+        (SELECT COALESCE(SUM(wre.amount), 0)
+         FROM withdrawal_request_earnings wre
+         JOIN withdrawal_requests wr ON wr.id = wre.withdrawal_request_id
+         WHERE wre.waste_log_id = wl.id AND wr.status = 'SUCCESS') AS withdrawn_amount
       FROM waste_logs wl
       JOIN pickers p ON wl.picker_id = p.id
       JOIN collection_points cp ON wl.collection_point_id = cp.id
@@ -230,6 +234,8 @@ export const getWasteLogs = async (req, res, next) => {
         // Flat earning fields for convenience
         earning_id: row.earning_id,
         amount: row.amount !== null ? parseInt(row.amount) : null,
+        original_amount: row.original_amount !== null ? parseInt(row.original_amount) : null,
+        withdrawn_amount: row.withdrawn_amount !== null ? parseInt(row.withdrawn_amount) : 0,
         rate_per_kg: row.rate_per_kg,
         earning_status: row.earning_status,
         paid_at: row.paid_at,
@@ -241,6 +247,9 @@ export const getWasteLogs = async (req, res, next) => {
           id: row.earning_id,
           rate_per_kg: row.rate_per_kg,
           amount: parseInt(row.amount),
+          original_amount: row.original_amount != null ? parseInt(row.original_amount) : parseInt(row.amount),
+          withdrawn_amount: parseInt(row.withdrawn_amount || 0),
+          in_wallet: parseInt(row.amount),
           status: row.earning_status,
           paid_at: row.paid_at,
         };
@@ -445,6 +454,7 @@ export const verifyWasteLog = async (req, res, next) => {
 
     // Start transaction
     await client.query("BEGIN");
+    await client.query(`ALTER TABLE earnings ADD COLUMN IF NOT EXISTS original_amount INT`);
 
     try {
       // Check if waste log exists and is PENDING
@@ -540,11 +550,11 @@ export const verifyWasteLog = async (req, res, next) => {
 
       const earningResult = await client.query(
         `INSERT INTO earnings (
-          picker_id, waste_log_id, rate_per_kg, amount, status,
+          picker_id, waste_log_id, rate_per_kg, amount, original_amount, status,
           city_waste_type_id, reporting_category_id
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, rate_per_kg, amount, status, created_at, paid_at,
+         VALUES ($1, $2, $3, $4, $4, $5, $6, $7)
+         RETURNING id, rate_per_kg, amount, original_amount, status, created_at, paid_at,
            city_waste_type_id, reporting_category_id`,
         [wasteLog.picker_id, id, ratePerKg, amount, PAYMENT_STATUS.AVAILABLE, cityWasteTypeId, reportingCategoryId]
       );
@@ -584,6 +594,7 @@ export const verifyWasteLog = async (req, res, next) => {
           id: earning.id,
           rate_per_kg: earning.rate_per_kg,
           amount: earning.amount,
+          original_amount: earning.original_amount ?? earning.amount,
           status: earning.status,
           created_at: earning.created_at,
           paid_at: earning.paid_at,

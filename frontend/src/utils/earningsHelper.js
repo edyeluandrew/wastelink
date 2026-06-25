@@ -17,6 +17,14 @@ export const normalizeEarningStatus = (status) => {
 export const getEarningAmount = (log) => {
   if (!log) return 0;
 
+  if (log.earning?.original_amount !== undefined && log.earning?.original_amount !== null) {
+    return Number(log.earning.original_amount) || 0;
+  }
+
+  if (log.original_amount !== undefined && log.original_amount !== null) {
+    return Number(log.original_amount) || 0;
+  }
+
   if (log.earning?.amount !== undefined && log.earning?.amount !== null) {
     return Number(log.earning.amount) || 0;
   }
@@ -26,6 +34,36 @@ export const getEarningAmount = (log) => {
   }
 
   return 0;
+};
+
+export const getWalletAmount = (log) => {
+  if (!log) return 0;
+
+  if (log.earning?.amount !== undefined && log.earning?.amount !== null) {
+    return Number(log.earning.amount) || 0;
+  }
+
+  if (log.earning?.in_wallet !== undefined && log.earning?.in_wallet !== null) {
+    return Number(log.earning.in_wallet) || 0;
+  }
+
+  return getEarningAmount(log);
+};
+
+export const getWithdrawnAmount = (log) => {
+  if (!log) return 0;
+
+  if (log.earning?.withdrawn_amount !== undefined && log.earning?.withdrawn_amount !== null) {
+    return Number(log.earning.withdrawn_amount) || 0;
+  }
+
+  if (log.withdrawn_amount !== undefined && log.withdrawn_amount !== null) {
+    return Number(log.withdrawn_amount) || 0;
+  }
+
+  const earned = getEarningAmount(log);
+  const wallet = getWalletAmount(log);
+  return Math.max(0, earned - wallet);
 };
 
 export const getEarningStatus = (log) => {
@@ -78,10 +116,10 @@ export const hasEarning = (log) => getEarningAmount(log) > 0 || getEarningStatus
 
 export const getRemainingEarningAmount = (log) => {
   const status = getEarningStatus(log);
-  if (status === 'PAID') return 0;
+  if (status === 'PAID' && getWalletAmount(log) <= 0) return 0;
   if (!log || !['VERIFIED', 'PAID'].includes(String(log.status || '').toUpperCase())) return 0;
-  if (['AVAILABLE', 'PAYOUT_PROCESSING', 'FAILED'].includes(status)) {
-    return getEarningAmount(log);
+  if (['AVAILABLE', 'PAYOUT_PROCESSING', 'FAILED', 'PAID'].includes(status)) {
+    return getWalletAmount(log);
   }
   return 0;
 };

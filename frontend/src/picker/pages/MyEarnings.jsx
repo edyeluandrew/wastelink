@@ -5,7 +5,7 @@ import apiClient from '../../api/axios';
 import { getCurrentPicker, getCurrentPickerId } from '../utils/pickerSession';
 import { formatUGX, formatDate, formatDateTime } from '../../utils/formatters';
 import { Wallet, Scale, CreditCard, Hourglass, TrendingUp, Smartphone, ShieldAlert } from 'lucide-react';
-import { getEarningAmount, getEarningStatus, sumSuccessfulWithdrawals, sumProcessingWithdrawals } from '../../utils/earningsHelper';
+import { getEarningAmount, getEarningStatus, getWalletAmount, getWithdrawnAmount, sumSuccessfulWithdrawals, sumProcessingWithdrawals } from '../../utils/earningsHelper';
 import MobileMoneyProviderIcon from '../components/MobileMoneyProviderIcon';
 
 const AUTH_ENFORCED = import.meta.env.VITE_AUTH_ENFORCED !== 'false';
@@ -151,9 +151,10 @@ export default function MyEarnings() {
   const averageEarning = earnings.totalKg > 0 && jobs.length > 0
     ? jobs.reduce((sum, j) => sum + getEarningAmount(j), 0) / jobs.length
     : 0;
-  const availableToWithdraw = balance?.available_balance ?? balance?.available_to_withdraw ?? 0;
+  const availableToWithdraw = balance?.available_balance ?? balance?.available_to_withdraw ?? balance?.in_wallet ?? 0;
   const payoutProcessing = balance?.payout_processing_balance ?? earnings.processing ?? 0;
-  const totalPaid = balance?.total_paid ?? earnings.paid ?? 0;
+  const totalEarned = balance?.total_earned ?? 0;
+  const totalWithdrawn = balance?.total_withdrawn ?? balance?.total_paid ?? earnings.paid ?? 0;
   const failedBalance = balance?.failed_balance ?? 0;
   const pendingVerification = balance?.pending_logs_count ?? earnings.pendingVerification ?? 0;
   const pendingEstimated = balance?.pending_estimated_total ?? 0;
@@ -245,6 +246,21 @@ export default function MyEarnings() {
       <div className="rounded-3xl border border-[#BDE5BF] bg-[linear-gradient(135deg,#EAF6EA_0%,#FFFFFF_70%)] p-5 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Total Earned</p>
+            <p className="mt-2 text-3xl font-bold text-[#238636]">{formatUGX(totalEarned)}</p>
+            <p className="mt-1 text-sm text-[#6B7280]">Verified by agents</p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Withdrawn</p>
+            <p className="mt-2 text-3xl font-bold text-[#111111]">{formatUGX(totalWithdrawn)}</p>
+            <p className="mt-1 text-sm text-[#6B7280]">Sent to mobile money</p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">In Wallet</p>
+            <p className="mt-2 text-3xl font-bold text-[#111111]">{formatUGX(availableToWithdraw)}</p>
+            <p className="mt-1 text-sm text-[#6B7280]">Ready to withdraw</p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Pending Verification</p>
             <p className="mt-2 text-3xl font-bold text-[#B45309]">{pendingVerification}</p>
             <p className="mt-1 text-sm text-[#6B7280]">Jobs awaiting agent</p>
@@ -252,22 +268,12 @@ export default function MyEarnings() {
               <p className="mt-2 text-sm font-semibold text-amber-700">Est. ~{formatUGX(pendingEstimated)}</p>
             )}
           </div>
-          <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Withdrawable Balance</p>
-            <p className="mt-2 text-3xl font-bold text-[#111111]">{formatUGX(availableToWithdraw)}</p>
-            <p className="mt-1 text-sm text-[#6B7280]">Ready to withdraw</p>
-          </div>
-          <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Payout Processing</p>
-            <p className="mt-2 text-3xl font-bold text-[#7C3AED]">{formatUGX(payoutProcessing)}</p>
-            <p className="mt-1 text-sm text-[#6B7280]">In-flight to mobile money</p>
-          </div>
-          <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Total Paid</p>
-            <p className="mt-2 text-3xl font-bold text-[#238636]">{formatUGX(totalPaid)}</p>
-            <p className="mt-1 text-sm text-[#6B7280]">{earnings.paidJobs} completed jobs</p>
-          </div>
         </div>
+        {payoutProcessing > 0 && (
+          <p className="mt-4 rounded-2xl bg-white/80 p-3 text-sm text-[#6B7280]">
+            {formatUGX(payoutProcessing)} is being processed to your mobile money.
+          </p>
+        )}
         {failedBalance > 0 && (
           <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
             {formatUGX(failedBalance)} in failed payouts — contact support or retry from admin.
@@ -336,7 +342,9 @@ export default function MyEarnings() {
 
           <div className="space-y-3">
             {jobs.map(job => {
-              const amount = getEarningAmount(job);
+              const earned = getEarningAmount(job);
+              const withdrawn = getWithdrawnAmount(job);
+              const inWallet = getWalletAmount(job);
               const status = getEarningStatus(job);
 
               return (
@@ -356,18 +364,19 @@ export default function MyEarnings() {
                       <p className="mt-1 text-base font-bold text-[#111111]">{job.verified_kg || 0} kg</p>
                     </div>
                     <div className="rounded-2xl bg-white p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Amount</p>
-                      <p className="mt-1 text-base font-bold text-[#111111]">{formatUGX(amount)}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Earned</p>
+                      <p className="mt-1 text-base font-bold text-[#238636]">{formatUGX(earned)}</p>
                     </div>
                     <div className="rounded-2xl bg-white p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Payment Status</p>
-                      <p className="mt-1 text-base font-bold text-[#111111]">{status}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Withdrawn</p>
+                      <p className="mt-1 text-base font-bold text-[#111111]">{formatUGX(withdrawn)}</p>
                     </div>
                     <div className="rounded-2xl bg-white p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Date</p>
-                      <p className="mt-1 text-base font-bold text-[#111111]">{formatDate(job.verified_at || job.logged_at)}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">In Wallet</p>
+                      <p className="mt-1 text-base font-bold text-[#111111]">{formatUGX(inWallet)}</p>
                     </div>
                   </div>
+                  <p className="mt-3 text-xs text-[#6B7280]">{formatDate(job.verified_at || job.logged_at)}</p>
                 </div>
               );
             })}

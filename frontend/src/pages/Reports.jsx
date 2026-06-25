@@ -497,8 +497,8 @@ export default function Reports() {
               value={formatKg(summaryReport.total_verified_kg)}
             />
             <StatCard
-              title="Total Earnings"
-              value={formatCurrencyUGX(summaryReport.total_earnings)}
+              title="Verified Earnings (All Time)"
+              value={formatCurrencyUGX(summaryReport.verified_earnings ?? summaryReport.total_earnings)}
             />
             <StatCard
               title="Verified Jobs"
@@ -571,14 +571,35 @@ export default function Reports() {
                 value={formatKg(monthlyReport.pending_unverified_kg || 0)}
               />
               <StatCard
-                title="Total Earnings"
-                value={formatCurrencyUGX(monthlyReport.total_earnings)}
+                title="Verified Earnings"
+                value={formatCurrencyUGX(monthlyReport.verified_earnings ?? monthlyReport.total_earnings)}
               />
               <StatCard
-                title="Paid Earnings"
-                value={formatCurrencyUGX(monthlyReport.paid_earnings)}
+                title="Disbursed (Withdrawn)"
+                value={formatCurrencyUGX(monthlyReport.disbursed_earnings ?? monthlyReport.paid_earnings)}
+              />
+              <StatCard
+                title="In Wallet (Outstanding)"
+                value={formatCurrencyUGX(monthlyReport.in_wallet_earnings ?? 0)}
               />
             </div>
+
+            {monthlyReport.daily_disbursements?.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-base font-semibold text-wastelink-dark mb-3">
+                  Daily Disbursements
+                </h4>
+                <DataTable columns={['Date', 'Withdrawals', 'Amount Disbursed']}>
+                  {monthlyReport.daily_disbursements.map((row) => (
+                    <tr key={row.date} className="border-b border-wastelink-border hover:bg-gray-50">
+                      <td className="table-cell">{row.date}</td>
+                      <td className="table-cell">{formatNumber(row.withdrawal_count)}</td>
+                      <td className="table-cell">{formatCurrencyUGX(row.amount)}</td>
+                    </tr>
+                  ))}
+                </DataTable>
+              </div>
+            )}
           </div>
 
           {/* Waste Type Breakdown */}
@@ -759,7 +780,7 @@ export default function Reports() {
               {undpReport.environmental_impact.reporting_category_breakdown?.length > 0 && (
                 <div className="card mb-4">
                   <h5 className="font-medium text-wastelink-dark mb-3">UNDP Reporting Categories</h5>
-                  <DataTable columns={['Category', 'Estimated KG', 'Verified KG', 'Pending KG', 'Rejected KG', 'Paid Earnings']}>
+                  <DataTable columns={['Category', 'Estimated KG', 'Verified KG', 'Pending KG', 'Rejected KG', 'Verified Earnings']}>
                     {undpReport.environmental_impact.reporting_category_breakdown.map((item, idx) => (
                       <tr key={idx} className="border-b border-wastelink-border">
                         <td className="table-cell font-medium">{item.reporting_category_name}</td>
@@ -767,7 +788,7 @@ export default function Reports() {
                         <td className="table-cell">{formatKg(item.verified_kg)}</td>
                         <td className="table-cell">{formatKg(item.pending_kg || 0)}</td>
                         <td className="table-cell">{formatKg(item.rejected_kg || 0)}</td>
-                        <td className="table-cell">{formatCurrencyUGX(item.paid_earnings || 0)}</td>
+                        <td className="table-cell">{formatCurrencyUGX(item.verified_earnings ?? item.paid_earnings || 0)}</td>
                       </tr>
                     ))}
                   </DataTable>
@@ -818,16 +839,26 @@ export default function Reports() {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <StatCard
-                  title="Total Earnings"
-                  value={formatCurrencyUGX(undpReport.livelihood_impact.total_earnings_generated)}
+                  title="Verified Earnings"
+                  value={formatCurrencyUGX(
+                    undpReport.livelihood_impact.verified_earnings
+                      ?? undpReport.livelihood_impact.total_earnings_generated
+                  )}
                 />
                 <StatCard
-                  title="Paid Earnings"
-                  value={formatCurrencyUGX(undpReport.livelihood_impact.paid_earnings)}
+                  title="Disbursed (Withdrawn)"
+                  value={formatCurrencyUGX(
+                    undpReport.livelihood_impact.disbursed_earnings
+                      ?? undpReport.livelihood_impact.paid_earnings
+                  )}
                 />
                 <StatCard
-                  title="Pending Earnings"
-                  value={formatCurrencyUGX(undpReport.livelihood_impact.pending_earnings)}
+                  title="In Wallet (Not Yet Withdrawn)"
+                  value={formatCurrencyUGX(undpReport.livelihood_impact.in_wallet_earnings ?? 0)}
+                />
+                <StatCard
+                  title="Processing Payouts"
+                  value={formatCurrencyUGX(undpReport.livelihood_impact.in_flight_earnings ?? 0)}
                 />
                 <StatCard
                   title="Avg Earning/Picker"
@@ -836,6 +867,21 @@ export default function Reports() {
                   )}
                 />
               </div>
+
+              {undpReport.livelihood_impact.daily_disbursements?.length > 0 && (
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-wastelink-dark mb-2">Daily Disbursements</h5>
+                  <DataTable columns={['Date', 'Withdrawals', 'Amount Disbursed']}>
+                    {undpReport.livelihood_impact.daily_disbursements.map((row) => (
+                      <tr key={row.date} className="border-b border-wastelink-border">
+                        <td className="table-cell">{row.date}</td>
+                        <td className="table-cell">{formatNumber(row.withdrawal_count)}</td>
+                        <td className="table-cell">{formatCurrencyUGX(row.amount)}</td>
+                      </tr>
+                    ))}
+                  </DataTable>
+                </div>
+              )}
             </div>
           )}
 

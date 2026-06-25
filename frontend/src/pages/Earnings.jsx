@@ -9,7 +9,7 @@ import {
   Button,
 } from '../components';
 import { formatCurrencyUGX, formatKg, formatDateTime, formatStatus } from '../utils/formatters';
-import { getEarningAmount, getEarningStatus, hasEarning, normalizeEarningStatus } from '../utils/earningsHelper';
+import { getEarningAmount, getEarningStatus, getWalletAmount, getWithdrawnAmount, hasEarning, normalizeEarningStatus, sumSuccessfulWithdrawals, sumProcessingWithdrawals } from '../utils/earningsHelper';
 import api from '../api/axios';
 
 const EARNING_ACTIONS = {
@@ -126,16 +126,12 @@ export default function Earnings() {
 
   const filteredLogs = getFilteredLogs();
 
-  const totalConfirmed = logs.reduce((sum, log) => sum + (log.amount || 0), 0);
-  const totalPaid = logs
-    .filter((log) => normalizeEarningStatus(getEarningStatus(log)) === 'PAID')
-    .reduce((sum, log) => sum + (log.amount || 0), 0);
+  const totalVerified = logs.reduce((sum, log) => sum + getEarningAmount(log), 0);
+  const totalWithdrawn = sumSuccessfulWithdrawals(withdrawals);
   const totalAvailable = logs
     .filter((log) => normalizeEarningStatus(getEarningStatus(log)) === 'AVAILABLE')
-    .reduce((sum, log) => sum + (log.amount || 0), 0);
-  const totalProcessing = logs
-    .filter((log) => normalizeEarningStatus(getEarningStatus(log)) === 'PAYOUT_PROCESSING')
-    .reduce((sum, log) => sum + (log.amount || 0), 0);
+    .reduce((sum, log) => sum + getWalletAmount(log), 0);
+  const totalProcessing = sumProcessingWithdrawals(withdrawals);
 
   return (
     <div className="space-y-8">
@@ -145,10 +141,10 @@ export default function Earnings() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Confirmed Earnings" value={formatCurrencyUGX(totalConfirmed)} subtitle="Verified by agents" icon={DollarSign} />
-        <StatCard title="Withdrawable (Available)" value={formatCurrencyUGX(totalAvailable)} subtitle="Picker can withdraw" />
-        <StatCard title="Payout Processing" value={formatCurrencyUGX(totalProcessing)} subtitle="In-flight withdrawals" />
-        <StatCard title="Paid Out" value={formatCurrencyUGX(totalPaid)} subtitle="Completed payouts" />
+        <StatCard title="Verified Earnings" value={formatCurrencyUGX(totalVerified)} subtitle="Locked at agent verify" icon={DollarSign} />
+        <StatCard title="Disbursed (Withdrawn)" value={formatCurrencyUGX(totalWithdrawn)} subtitle="Successful withdrawals" />
+        <StatCard title="In Wallet" value={formatCurrencyUGX(totalAvailable)} subtitle="Available to withdraw" />
+        <StatCard title="Processing Payouts" value={formatCurrencyUGX(totalProcessing)} subtitle="In-flight withdrawals" />
       </div>
 
       <div className="flex gap-2 border-b border-wastelink-border">
@@ -189,7 +185,7 @@ export default function Earnings() {
             <EmptyState message="No earnings records found" />
           ) : (
             <DataTable
-              columns={['Job Code', 'Picker', 'Verified KG', 'Amount', 'Payment Status', 'Log Status', 'Date', 'Action']}
+              columns={['Job Code', 'Picker', 'Verified KG', 'Earned', 'Withdrawn', 'In Wallet', 'Payment Status', 'Log Status', 'Date', 'Action']}
             >
               {filteredLogs.map((log) => {
                 const earningStatus = normalizeEarningStatus(getEarningStatus(log));
@@ -201,6 +197,8 @@ export default function Earnings() {
                     <td className="table-cell text-sm">{log.picker_name}</td>
                     <td className="table-cell">{formatKg(log.verified_kg || 0)}</td>
                     <td className="table-cell font-semibold">{formatCurrencyUGX(getEarningAmount(log))}</td>
+                    <td className="table-cell">{formatCurrencyUGX(getWithdrawnAmount(log))}</td>
+                    <td className="table-cell">{formatCurrencyUGX(getWalletAmount(log))}</td>
                     <td className="table-cell">
                       <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusBadgeClass(earningStatus)}`}>
                         {formatStatus(earningStatus)}

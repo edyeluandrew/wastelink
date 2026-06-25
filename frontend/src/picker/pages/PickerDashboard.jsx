@@ -83,9 +83,10 @@ export default function PickerDashboard() {
   const verified = logs.filter(l => l.status === 'VERIFIED').length;
   const paid = logs.filter(l => l.status === 'PAID').length;
   const totalKg = logs.reduce((sum, l) => sum + (l.verified_kg || 0), 0);
-  const availableBalance = balance?.available_balance ?? balance?.available_to_withdraw ?? 0;
+  const availableBalance = balance?.available_balance ?? balance?.available_to_withdraw ?? balance?.in_wallet ?? 0;
   const processingBalance = balance?.payout_processing_balance ?? 0;
-  const totalPaid = balance?.total_paid ?? 0;
+  const totalEarned = balance?.total_earned ?? 0;
+  const totalWithdrawn = balance?.total_withdrawn ?? balance?.total_paid ?? 0;
   const pendingVerification = balance?.pending_logs_count ?? pending;
   const pendingEstimated = balance?.pending_estimated_total ?? 0;
 
@@ -125,16 +126,20 @@ export default function PickerDashboard() {
       {/* Earnings Cards */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-green-100 border border-green-300 rounded-lg p-4">
-          <p className="text-xs text-green-700 font-medium mb-1">Withdrawable</p>
+          <p className="text-xs text-green-700 font-medium mb-1">Total Earned</p>
+          <p className="text-2xl font-bold text-green-900">{formatUGX(totalEarned)}</p>
+        </div>
+        <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
+          <p className="text-xs text-blue-700 font-medium mb-1">Withdrawn</p>
+          <p className="text-2xl font-bold text-blue-900">{formatUGX(totalWithdrawn)}</p>
+        </div>
+        <div className="bg-green-100 border border-green-300 rounded-lg p-4">
+          <p className="text-xs text-green-700 font-medium mb-1">In Wallet</p>
           <p className="text-2xl font-bold text-green-900">{formatUGX(availableBalance)}</p>
         </div>
         <div className="bg-purple-100 border border-purple-300 rounded-lg p-4">
           <p className="text-xs text-purple-700 font-medium mb-1">Processing</p>
           <p className="text-2xl font-bold text-purple-900">{formatUGX(processingBalance)}</p>
-        </div>
-        <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
-          <p className="text-xs text-blue-700 font-medium mb-1">Total Paid</p>
-          <p className="text-2xl font-bold text-blue-900">{formatUGX(totalPaid)}</p>
         </div>
         {pendingVerification > 0 && (
           <div className="bg-amber-100 border border-amber-300 rounded-lg p-4 col-span-2 sm:col-span-1">

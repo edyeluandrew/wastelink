@@ -7,6 +7,14 @@ import {
   VERIFIED_LOG_STATUSES,
 } from '../utils/reportQueries.js';
 import { SQL_CONFIRMED_EARNING_STATUSES } from '../utils/paymentStatus.js';
+import {
+  sqlOriginalEarningAmount,
+  sqlVerifiedEarningsSum,
+} from '../utils/earningReportQueries.js';
+import {
+  getDisbursementSummaryForPeriod,
+  getVerifiedEarningsForPeriod,
+} from './payment/disbursementReportService.js';
 import { buildScopedLogSql, formatCityLabel, parseReportFilters } from './cityReportFilters.js';
 import { listCitySlugs } from './cityService.js';
 
@@ -88,7 +96,6 @@ export const buildCityReportPack = async (query, user) => {
     wasteByTypeResult,
     wasteByCpResult,
     pickerParticipationResult,
-    earningsResult,
     withdrawalsResult,
     agentVerificationResult,
     reportingCategoryResult,
@@ -109,9 +116,9 @@ export const buildCityReportPack = async (query, user) => {
          ${sqlVerifiedKgSum('wl')} AS total_verified_kg,
          ${sqlPendingEstimatedKgSum('wl')} AS pending_unverified_kg,
          COALESCE(SUM(CASE WHEN wl.status = 'REJECTED' THEN COALESCE(wl.estimated_kg, 0) ELSE 0 END), 0) AS rejected_estimated_kg,
-         COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) AS confirmed_earnings,
-         COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) AS paid_earnings,
-         COALESCE(SUM(CASE WHEN e.status IN ('AVAILABLE','PAYOUT_PROCESSING') THEN e.amount ELSE 0 END), 0) AS in_flight_earnings,
+         ${sqlVerifiedEarningsSum('e', 'wl')} AS confirmed_earnings,
+         COALESCE(SUM(CASE WHEN e.status = 'AVAILABLE' THEN e.amount ELSE 0 END), 0) AS in_wallet_earnings,
+         COALESCE(SUM(CASE WHEN e.status = 'PAYOUT_PROCESSING' THEN e.amount ELSE 0 END), 0) AS payout_processing_earnings,
          COUNT(DISTINCT cp.id) AS active_collection_points
        ${baseLogJoins}
        WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
@@ -128,7 +135,7 @@ export const buildCityReportPack = async (query, user) => {
          COUNT(CASE WHEN wl.status = 'REJECTED' THEN 1 END) AS rejected_logs,
          COALESCE(SUM(CASE WHEN wl.status != 'REJECTED' THEN wl.estimated_kg ELSE 0 END), 0) AS estimated_kg,
          ${sqlVerifiedKgSum('wl')} AS verified_kg,
-         COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) AS total_earnings
+         COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN ${sqlOriginalEarningAmount('e')} ELSE 0 END), 0) AS total_earnings
        ${baseLogJoins}
        WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
        ${scopeWhere}
@@ -149,7 +156,7 @@ export const buildCityReportPack = async (query, user) => {
          COUNT(CASE WHEN wl.status = 'REJECTED' THEN 1 END) AS rejected_logs,
          COALESCE(SUM(CASE WHEN wl.status != 'REJECTED' THEN wl.estimated_kg ELSE 0 END), 0) AS estimated_kg,
          ${sqlVerifiedKgSum('wl')} AS verified_kg,
-         COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) AS total_earnings
+         COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN ${sqlOriginalEarningAmount('e')} ELSE 0 END), 0) AS total_earnings
        ${baseLogJoins}
        WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
        ${scopeWhere}
@@ -165,23 +172,12 @@ export const buildCityReportPack = async (query, user) => {
          COUNT(wl.id) AS total_logs,
          COUNT(CASE WHEN wl.status IN ${VERIFIED_LOG_STATUSES} THEN 1 END) AS verified_logs,
          ${sqlVerifiedKgSum('wl')} AS verified_kg,
-         COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) AS total_earnings
+         COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN ${sqlOriginalEarningAmount('e')} ELSE 0 END), 0) AS total_earnings
        ${baseLogJoins}
        WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
        ${scopeWhere}
        GROUP BY COALESCE(NULLIF(TRIM(p.gender), ''), 'Unknown'), COALESCE(NULLIF(TRIM(p.age_group), ''), 'Unknown')
        ORDER BY verified_kg DESC`,
-      baseParams
-    ),
-    pool.query(
-      `SELECT
-         COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) AS confirmed_earnings,
-         COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) AS paid_earnings,
-         COALESCE(SUM(CASE WHEN e.status IN ('AVAILABLE','PAYOUT_PROCESSING') THEN e.amount ELSE 0 END), 0) AS in_flight_earnings,
-         COUNT(DISTINCT CASE WHEN e.id IS NOT NULL THEN e.id END) AS earning_records
-       ${baseLogJoins}
-       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
-       ${scopeWhere}`,
       baseParams
     ),
     pool.query(
@@ -200,7 +196,7 @@ export const buildCityReportPack = async (query, user) => {
          wr.completed_at
        FROM withdrawal_requests wr
        JOIN pickers p ON wr.picker_id = p.id
-       WHERE DATE(wr.created_at) >= $1 AND DATE(wr.created_at) <= $2
+       WHERE DATE(COALESCE(wr.completed_at, wr.created_at)) >= $1 AND DATE(COALESCE(wr.completed_at, wr.created_at)) <= $2
          AND EXISTS (
            SELECT 1
            FROM waste_logs wl
@@ -246,7 +242,7 @@ export const buildCityReportPack = async (query, user) => {
          ${sqlVerifiedKgSum('wl')} AS verified_kg,
          COALESCE(SUM(CASE WHEN wl.status = 'PENDING' THEN wl.estimated_kg ELSE 0 END), 0) AS pending_kg,
          COALESCE(SUM(CASE WHEN wl.status = 'REJECTED' THEN COALESCE(wl.estimated_kg, 0) ELSE 0 END), 0) AS rejected_kg,
-         COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) AS paid_earnings
+         ${sqlVerifiedEarningsSum('e', 'wl')} AS verified_earnings
        ${baseLogJoins}
        WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
        ${scopeWhere}
@@ -274,8 +270,9 @@ export const buildCityReportPack = async (query, user) => {
          cp.name AS collection_point_name,
          cp.division,
          cp.agent_name,
-         COALESCE(e.amount, 0) AS earning_amount,
-         COALESCE(e.status, 'NONE') AS earning_status
+         COALESCE(e.status, 'NONE') AS earning_status,
+         COALESCE(e.original_amount, e.amount, 0) AS earning_original_amount,
+         COALESCE(e.amount, 0) AS earning_wallet_amount
        ${baseLogJoins}
        WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
        ${scopeWhere}
@@ -294,6 +291,17 @@ export const buildCityReportPack = async (query, user) => {
     ),
   ]);
 
+  const [verifiedEarningsByVerifyDate, disbursementSummary] = await Promise.all([
+    getVerifiedEarningsForPeriod(startDate, endDate, {
+      scopeSql: scope.whereSql,
+      scopeParams: scope.params,
+    }),
+    getDisbursementSummaryForPeriod(startDate, endDate, {
+      scopeSql: scope.whereSql,
+      scopeParams: scope.params,
+    }),
+  ]);
+
   const summary = summaryResult.rows[0] || {};
   const registeredPickers = int(summary.registered_pickers);
   const womenPickers = int(summary.women_pickers);
@@ -302,9 +310,9 @@ export const buildCityReportPack = async (query, user) => {
   const totalEstimatedKg = num(summary.total_estimated_kg);
   const pendingUnverifiedKg = num(summary.pending_unverified_kg);
   const rejectedEstimatedKg = num(summary.rejected_estimated_kg);
-  const confirmedEarnings = int(summary.confirmed_earnings);
-  const paidEarnings = int(summary.paid_earnings);
-  const inFlightEarnings = int(summary.in_flight_earnings);
+  const confirmedEarnings = verifiedEarningsByVerifyDate;
+  const paidEarnings = disbursementSummary.total_disbursed;
+  const inFlightEarnings = disbursementSummary.processing_disbursements;
 
   const withdrawalRows = withdrawalsResult.rows.map((row) => ({
     id: row.id,
@@ -321,17 +329,16 @@ export const buildCityReportPack = async (query, user) => {
     completed_at: row.completed_at,
   }));
 
-  const withdrawalTotals = withdrawalRows.reduce(
-    (acc, row) => {
-      acc.total_amount += row.amount;
-      if (row.status === 'SUCCESS') acc.success_amount += row.amount;
-      if (row.status === 'PROCESSING') acc.processing_amount += row.amount;
-      if (row.status === 'FAILED') acc.failed_amount += row.amount;
-      acc.count += 1;
-      return acc;
-    },
-    { count: 0, total_amount: 0, success_amount: 0, processing_amount: 0, failed_amount: 0 }
-  );
+  const withdrawalTotals = {
+    count: disbursementSummary.successful_withdrawal_count,
+    total_amount: disbursementSummary.total_disbursed,
+    success_amount: disbursementSummary.total_disbursed,
+    processing_amount: disbursementSummary.processing_disbursements,
+    failed_amount: withdrawalRows.reduce(
+      (sum, row) => sum + (row.status === 'FAILED' ? row.amount : 0),
+      0
+    ),
+  };
 
   const wasteByType = wasteByTypeResult.rows.map((row) => ({
     waste_type_name: row.waste_type_name,
@@ -390,7 +397,8 @@ export const buildCityReportPack = async (query, user) => {
     verified_kg: num(row.verified_kg),
     pending_kg: num(row.pending_kg),
     rejected_kg: num(row.rejected_kg),
-    paid_earnings: int(row.paid_earnings),
+    verified_earnings: int(row.verified_earnings),
+    paid_earnings: int(row.verified_earnings),
   }));
 
   const rawData = rawDataResult.rows.map((row) => ({
@@ -412,7 +420,8 @@ export const buildCityReportPack = async (query, user) => {
     collection_point_name: row.collection_point_name,
     division: row.division,
     agent_name: row.agent_name,
-    earning_amount: int(row.earning_amount),
+    earning_amount: int(row.earning_original_amount),
+    earning_wallet_amount: int(row.earning_wallet_amount),
     earning_status: row.earning_status,
   }));
 
@@ -475,8 +484,12 @@ export const buildCityReportPack = async (query, user) => {
       pending_unverified_kg: pendingUnverifiedKg,
       rejected_estimated_kg: rejectedEstimatedKg,
       confirmed_earnings: confirmedEarnings,
+      verified_earnings: confirmedEarnings,
       paid_earnings: paidEarnings,
+      disbursed_earnings: paidEarnings,
       in_flight_earnings: inFlightEarnings,
+      in_wallet_earnings: int(summary.in_wallet_earnings),
+      daily_disbursements: disbursementSummary.daily_disbursements,
       withdrawal_count: withdrawalTotals.count,
       withdrawal_total_amount: withdrawalTotals.total_amount,
       withdrawal_success_amount: withdrawalTotals.success_amount,
@@ -508,11 +521,15 @@ export const buildCityReportPack = async (query, user) => {
       },
       livelihood_impact: {
         total_earnings_generated: confirmedEarnings,
+        verified_earnings: confirmedEarnings,
+        disbursed_earnings: paidEarnings,
         paid_earnings: paidEarnings,
         in_flight_earnings: inFlightEarnings,
+        in_wallet_earnings: int(summary.in_wallet_earnings),
         average_earning_per_picker:
           registeredPickers > 0 ? Math.round(confirmedEarnings / registeredPickers) : 0,
         withdrawal_totals: withdrawalTotals,
+        daily_disbursements: disbursementSummary.daily_disbursements,
       },
       operations: {
         collection_points_active: int(summary.active_collection_points),
@@ -525,15 +542,29 @@ export const buildCityReportPack = async (query, user) => {
       narrative: undpNarrative,
     },
     sheets: {
-      executive_summary: buildExecutiveSummaryRows(filters, summary, withdrawalTotals, pilotDivisions),
+      executive_summary: buildExecutiveSummaryRows(
+        filters,
+        summary,
+        withdrawalTotals,
+        pilotDivisions,
+        {
+          verifiedEarnings: confirmedEarnings,
+          disbursedEarnings: paidEarnings,
+          processingDisbursements: inFlightEarnings,
+        }
+      ),
       waste_by_type: wasteByType,
       waste_by_collection_point: wasteByCollectionPoint,
       picker_participation: pickerParticipation,
       earnings_withdrawals: {
         earnings: {
+          verified_earnings: confirmedEarnings,
           confirmed_earnings: confirmedEarnings,
+          disbursed_earnings: paidEarnings,
           paid_earnings: paidEarnings,
           in_flight_earnings: inFlightEarnings,
+          in_wallet_earnings: int(summary.in_wallet_earnings),
+          daily_disbursements: disbursementSummary.daily_disbursements,
         },
         withdrawals: withdrawalRows,
       },
@@ -543,7 +574,7 @@ export const buildCityReportPack = async (query, user) => {
   };
 };
 
-const buildExecutiveSummaryRows = (filters, summary, withdrawalTotals, pilotDivisions) => [
+const buildExecutiveSummaryRows = (filters, summary, withdrawalTotals, pilotDivisions, livelihood = {}) => [
   { metric: 'Pilot city', value: filters.cityLabel },
   { metric: 'Reporting period', value: `${filters.startDate} to ${filters.endDate}` },
   { metric: 'Divisions covered', value: pilotDivisions.join(', ') || '—' },
@@ -559,9 +590,11 @@ const buildExecutiveSummaryRows = (filters, summary, withdrawalTotals, pilotDivi
   { metric: 'Verified kg (agent confirmed)', value: num(summary.total_verified_kg) },
   { metric: 'Pending / unverified kg', value: num(summary.pending_unverified_kg) },
   { metric: 'Rejected estimated kg', value: num(summary.rejected_estimated_kg) },
-  { metric: 'Confirmed earnings (UGX)', value: int(summary.confirmed_earnings) },
-  { metric: 'Paid earnings (UGX)', value: int(summary.paid_earnings) },
-  { metric: 'In-flight earnings (UGX)', value: int(summary.in_flight_earnings) },
+  { metric: 'Verified earnings at agent verify (UGX)', value: int(summary.confirmed_earnings) },
+  { metric: 'Verified earnings in period by verify date (UGX)', value: livelihood.verifiedEarnings ?? 0 },
+  { metric: 'Disbursed to mobile money (UGX)', value: livelihood.disbursedEarnings ?? 0 },
+  { metric: 'Processing disbursements (UGX)', value: livelihood.processingDisbursements ?? 0 },
+  { metric: 'In wallet / not yet withdrawn (UGX)', value: int(summary.in_wallet_earnings) },
   { metric: 'Withdrawals count', value: withdrawalTotals.count },
   { metric: 'Withdrawals total (UGX)', value: withdrawalTotals.total_amount },
   { metric: 'Withdrawals successful (UGX)', value: withdrawalTotals.success_amount },
@@ -585,7 +618,7 @@ const buildUndpNarrative = ({
   activeCollectionPoints,
   verifiedLogs,
 }) =>
-  `During ${periodLabel}, the WasteLink pilot in ${cityLabel} engaged ${registeredPickers} waste pickers across ${activeCollectionPoints} collection points. Pickers logged an estimated ${totalEstimatedKg.toFixed(1)} kg of waste; agents verified ${totalVerifiedKg.toFixed(1)} kg (${verifiedWasteTonnes} tonnes) across ${verifiedLogs} jobs. Pending/unverified material totalled ${pendingUnverifiedKg.toFixed(1)} kg, while ${rejectedEstimatedKg.toFixed(1)} kg was rejected during verification. Inclusion outcomes included ${womenPickers} women (${womenPercentage}%) and ${youthPickers} youth (${youthPercentage}%) among active pickers. The platform generated UGX ${confirmedEarnings.toLocaleString('en-UG')} in confirmed picker earnings, with UGX ${paidEarnings.toLocaleString('en-UG')} paid out through mobile money withdrawals. This UNDP-aligned pilot report demonstrates how digital traceability links informal waste collection to measurable environmental recovery and livelihood creation in ${cityLabel}.`;
+  `During ${periodLabel}, the WasteLink pilot in ${cityLabel} engaged ${registeredPickers} waste pickers across ${activeCollectionPoints} collection points. Pickers logged an estimated ${totalEstimatedKg.toFixed(1)} kg of waste; agents verified ${totalVerifiedKg.toFixed(1)} kg (${verifiedWasteTonnes} tonnes) across ${verifiedLogs} jobs. Pending/unverified material totalled ${pendingUnverifiedKg.toFixed(1)} kg, while ${rejectedEstimatedKg.toFixed(1)} kg was rejected during verification. Inclusion outcomes included ${womenPickers} women (${womenPercentage}%) and ${youthPickers} youth (${youthPercentage}%) among active pickers. Verified picker earnings totalled UGX ${confirmedEarnings.toLocaleString('en-UG')} when agents confirmed waste, while UGX ${paidEarnings.toLocaleString('en-UG')} was disbursed through mobile money withdrawals in the same reporting period. This UNDP-aligned pilot report separates livelihood generated at verification from cash actually sent to pickers.`;
 
 const scopedLogJoins = `
   FROM waste_logs wl

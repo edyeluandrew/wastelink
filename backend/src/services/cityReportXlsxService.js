@@ -74,9 +74,10 @@ export const generateCityReportXlsx = async (pack) => {
   ]);
 
   const earningsRows = [
-    { item: 'Confirmed earnings (UGX)', amount: sheets.earnings_withdrawals.earnings.confirmed_earnings },
-    { item: 'Paid earnings (UGX)', amount: sheets.earnings_withdrawals.earnings.paid_earnings },
-    { item: 'In-flight earnings (UGX)', amount: sheets.earnings_withdrawals.earnings.in_flight_earnings },
+    { item: 'Verified earnings at agent verify (UGX)', amount: sheets.earnings_withdrawals.earnings.verified_earnings },
+    { item: 'Disbursed to mobile money (UGX)', amount: sheets.earnings_withdrawals.earnings.disbursed_earnings },
+    { item: 'Processing disbursements (UGX)', amount: sheets.earnings_withdrawals.earnings.in_flight_earnings },
+    { item: 'In wallet / not yet withdrawn (UGX)', amount: sheets.earnings_withdrawals.earnings.in_wallet_earnings },
     { item: '', amount: '' },
     ...sheets.earnings_withdrawals.withdrawals.map((row) => ({
       item: `Withdrawal #${row.id} · ${row.picker_code}`,

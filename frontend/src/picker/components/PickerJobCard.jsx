@@ -1,7 +1,11 @@
 import { formatDate, formatUGX } from '../../utils/formatters';
+import { getEarningAmount, getWalletAmount, getWithdrawnAmount } from '../../utils/earningsHelper';
 import { MapPin, Clock, CheckCircle, XCircle, CreditCard } from 'lucide-react';
 
 export default function PickerJobCard({ job }) {
+  const earned = job.earning ? getEarningAmount(job) : 0;
+  const withdrawn = job.earning ? getWithdrawnAmount(job) : 0;
+  const inWallet = job.earning ? getWalletAmount(job) : 0;
   return (
     <div className="border border-gray-300 rounded-lg p-4 bg-white hover:shadow-md transition">
       <div className="flex justify-between items-start mb-3">
@@ -40,9 +44,14 @@ export default function PickerJobCard({ job }) {
           </div>
         )}
         {job.earning && (
-          <div>
-            <p className="text-xs text-gray-500">Actual earning</p>
-            <p className="text-lg font-semibold text-green-700">{formatUGX(job.earning.amount)}</p>
+          <div className="col-span-2 space-y-1">
+            <p className="text-xs text-gray-500">Earned (verified)</p>
+            <p className="text-lg font-semibold text-green-700">{formatUGX(earned)}</p>
+            {(withdrawn > 0 || inWallet > 0) && (
+              <p className="text-xs text-gray-600">
+                Withdrawn {formatUGX(withdrawn)} · In wallet {formatUGX(inWallet)}
+              </p>
+            )}
           </div>
         )}
       </div>

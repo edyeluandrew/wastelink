@@ -62,8 +62,9 @@ export const generateCityReportPdf = (pack) =>
     y = drawMetricRow(doc, 'Estimated kg (logged)', formatKg(summary.total_estimated_kg), y);
     y = drawMetricRow(doc, 'Pending / unverified kg', formatKg(summary.pending_unverified_kg), y);
     y = drawMetricRow(doc, 'Rejected estimated kg', formatKg(summary.rejected_estimated_kg), y);
-    y = drawMetricRow(doc, 'Picker earnings created', formatUGX(summary.confirmed_earnings), y);
-    y = drawMetricRow(doc, 'Paid earnings', formatUGX(summary.paid_earnings), y);
+    y = drawMetricRow(doc, 'Verified earnings (at agent verify)', formatUGX(summary.verified_earnings ?? summary.confirmed_earnings), y);
+    y = drawMetricRow(doc, 'Disbursed to mobile money', formatUGX(summary.disbursed_earnings ?? summary.paid_earnings), y);
+    y = drawMetricRow(doc, 'In wallet (not yet withdrawn)', formatUGX(summary.in_wallet_earnings ?? 0), y);
     y = drawMetricRow(doc, 'Withdrawals processed', `${summary.withdrawal_count} · ${formatUGX(summary.withdrawal_success_amount)}`, y);
 
     y += 8;

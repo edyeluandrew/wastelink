@@ -6,6 +6,12 @@ import {
   sqlEstimatedKgSum,
   sqlPendingEstimatedKgSum,
 } from "../utils/reportQueries.js";
+import {
+  sqlOriginalEarningAmount,
+  sqlVerifiedEarningsSum,
+  verifiedEarningsDateFilter,
+} from "../utils/earningReportQueries.js";
+import { getDisbursementSummaryForPeriod } from "../services/payment/disbursementReportService.js";
 import { DEFAULT_CITY, formatCityLabel } from "../utils/cityScope.js";
 
 // Helper: Parse month parameter (YYYY-MM format)
@@ -98,22 +104,25 @@ export const getMonthlyReport = async (req, res, next) => {
       pending_unverified_kg,
     } = wasteLogsResult.rows[0];
 
-    // Get earnings for the month
+    // Verified earnings counted on agent verification date (original amount, not wallet balance)
     const earningsResult = await pool.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) as confirmed_earnings,
-        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as paid_earnings,
-        COALESCE(SUM(CASE WHEN e.status IN ('AVAILABLE','PAYOUT_PROCESSING') THEN e.amount ELSE 0 END), 0) as in_flight_earnings
+        ${sqlVerifiedEarningsSum('e', 'wl')} as verified_earnings,
+        COALESCE(SUM(CASE WHEN e.status = 'AVAILABLE' THEN e.amount ELSE 0 END), 0) as in_wallet_earnings
       FROM earnings e
       JOIN waste_logs wl ON e.waste_log_id = wl.id
-      WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
+      WHERE ${verifiedEarningsDateFilter('wl', '$1', '$2')}
     `, [startDate, endDate]);
 
+    const disbursements = await getDisbursementSummaryForPeriod(startDate, endDate);
+
     const {
-      confirmed_earnings,
-      paid_earnings,
-      in_flight_earnings,
+      verified_earnings,
+      in_wallet_earnings,
     } = earningsResult.rows[0];
+
+    const total_disbursed = disbursements.total_disbursed;
+    const processing_disbursements = disbursements.processing_disbursements;
 
     // Get waste type breakdown for the month
     const wasteTypeBreakdownResult = await pool.query(`
@@ -122,7 +131,7 @@ export const getMonthlyReport = async (req, res, next) => {
         COUNT(*) as total_logs,
         COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
         COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        ${sqlVerifiedEarningsSum('e', 'wl')} as total_earnings
       FROM waste_logs wl
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
       WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
@@ -138,7 +147,7 @@ export const getMonthlyReport = async (req, res, next) => {
         COUNT(DISTINCT wl.id) as total_logs,
         COUNT(DISTINCT CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.id END) as verified_logs,
         COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings
       FROM pickers p
       LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
@@ -156,7 +165,7 @@ export const getMonthlyReport = async (req, res, next) => {
         COUNT(wl.id) as total_logs,
         COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
         COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings
       FROM collection_points cp
       LEFT JOIN waste_logs wl ON cp.id = wl.collection_point_id AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
@@ -176,7 +185,7 @@ export const getMonthlyReport = async (req, res, next) => {
         p.division,
         COUNT(wl.id) as verified_jobs,
         COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as total_verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings
       FROM pickers p
       LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND wl.status IN ('VERIFIED', 'PAID') AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
@@ -198,7 +207,7 @@ export const getMonthlyReport = async (req, res, next) => {
         wl.status,
         cp.name as collection_point_name,
         wl.verified_at,
-        COALESCE(e.amount, 0) as earning_amount
+        COALESCE(${sqlOriginalEarningAmount('e')}, 0) as earning_amount
       FROM waste_logs wl
       JOIN pickers p ON wl.picker_id = p.id
       JOIN collection_points cp ON wl.collection_point_id = cp.id
@@ -229,10 +238,15 @@ export const getMonthlyReport = async (req, res, next) => {
       total_estimated_kg: parseFloat(total_estimated_kg),
       total_verified_kg: parseFloat(total_verified_kg),
       pending_unverified_kg: parseFloat(pending_unverified_kg),
-      total_earnings: parseInt(confirmed_earnings),
-      confirmed_earnings: parseInt(confirmed_earnings),
-      in_flight_earnings: parseInt(in_flight_earnings),
-      paid_earnings: parseInt(paid_earnings),
+      total_earnings: parseInt(verified_earnings),
+      verified_earnings: parseInt(verified_earnings),
+      confirmed_earnings: parseInt(verified_earnings),
+      in_wallet_earnings: parseInt(in_wallet_earnings),
+      in_flight_earnings: parseInt(processing_disbursements),
+      disbursed_earnings: total_disbursed,
+      paid_earnings: total_disbursed,
+      daily_disbursements: disbursements.daily_disbursements,
+      disbursements,
       waste_type_breakdown: wasteTypeBreakdownResult.rows.map(row => ({
         waste_type: row.waste_type,
         total_logs: parseInt(row.total_logs),
@@ -330,20 +344,29 @@ export const getPlatformSummary = async (req, res, next) => {
       total_rejected_jobs,
     } = wasteResult.rows[0];
 
-    // Get all-time earnings
+    // Get all-time earnings (verified at agent confirm) and disbursements
     const earningsResult = await pool.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) as total_earnings,
-        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as total_paid_earnings,
-        COALESCE(SUM(CASE WHEN e.status IN ('AVAILABLE','PAYOUT_PROCESSING') THEN e.amount ELSE 0 END), 0) as total_in_flight_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings,
+        COALESCE(SUM(CASE WHEN e.status = 'AVAILABLE' THEN e.amount ELSE 0 END), 0) as in_wallet_earnings,
+        COALESCE(SUM(CASE WHEN e.status = 'PAYOUT_PROCESSING' THEN e.amount ELSE 0 END), 0) as total_in_flight_earnings
       FROM earnings e
+      JOIN waste_logs wl ON e.waste_log_id = wl.id
+      WHERE wl.verified_at IS NOT NULL
+    `);
+
+    const disbursedResult = await pool.query(`
+      SELECT COALESCE(SUM(amount), 0) AS total_disbursed
+      FROM withdrawal_requests
+      WHERE status = 'SUCCESS'
     `);
 
     const {
       total_earnings,
-      total_paid_earnings,
+      in_wallet_earnings,
       total_in_flight_earnings,
     } = earningsResult.rows[0];
+    const total_disbursed = parseInt(disbursedResult.rows[0]?.total_disbursed, 10);
 
     // Get divisions covered
     const divisionsResult = await pool.query(`
@@ -368,7 +391,11 @@ export const getPlatformSummary = async (req, res, next) => {
       total_collection_points: parseInt(total_collection_points),
       total_verified_kg: parseFloat(total_verified_kg),
       total_earnings: parseInt(total_earnings),
-      total_paid_earnings: parseInt(total_paid_earnings),
+      verified_earnings: parseInt(total_earnings),
+      total_paid_earnings: total_disbursed,
+      total_disbursed: total_disbursed,
+      disbursed_earnings: total_disbursed,
+      in_wallet_earnings: parseInt(in_wallet_earnings),
       total_pending_earnings: parseInt(total_in_flight_earnings),
       total_in_flight_earnings: parseInt(total_in_flight_earnings),
       total_verified_jobs: parseInt(total_verified_jobs),
@@ -480,7 +507,7 @@ export const getUndpPilotReport = async (req, res, next) => {
         ${sqlVerifiedKgSum('wl')} as verified_kg,
         COALESCE(SUM(CASE WHEN wl.status = 'PENDING' THEN wl.estimated_kg ELSE 0 END), 0) as pending_kg,
         COALESCE(SUM(CASE WHEN wl.status = 'REJECTED' THEN COALESCE(wl.estimated_kg, 0) ELSE 0 END), 0) as rejected_kg,
-        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as paid_earnings
+        ${sqlVerifiedEarningsSum('e', 'wl')} as verified_earnings
       FROM waste_logs wl
       LEFT JOIN reporting_categories rc ON wl.reporting_category_id = rc.id
       LEFT JOIN earnings e ON e.waste_log_id = wl.id
@@ -497,7 +524,8 @@ export const getUndpPilotReport = async (req, res, next) => {
       verified_kg: parseFloat(row.verified_kg),
       pending_kg: parseFloat(row.pending_kg),
       rejected_kg: parseFloat(row.rejected_kg),
-      paid_earnings: parseInt(row.paid_earnings, 10),
+      verified_earnings: parseInt(row.verified_earnings, 10),
+      paid_earnings: parseInt(row.verified_earnings, 10),
     }));
 
     const cityWasteTypeBreakdownResult = await pool.query(`
@@ -508,7 +536,7 @@ export const getUndpPilotReport = async (req, res, next) => {
         COALESCE(SUM(CASE WHEN wl.status != 'REJECTED' THEN wl.estimated_kg ELSE 0 END), 0) as estimated_kg,
         ${sqlVerifiedKgSum('wl')} as verified_kg,
         COALESCE(SUM(CASE WHEN wl.status = 'PENDING' THEN wl.estimated_kg ELSE 0 END), 0) as pending_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings
       FROM waste_logs wl
       LEFT JOIN city_waste_types cwt ON wl.city_waste_type_id = cwt.id
       LEFT JOIN reporting_categories rc ON wl.reporting_category_id = rc.id
@@ -528,22 +556,26 @@ export const getUndpPilotReport = async (req, res, next) => {
       total_earnings: parseInt(row.total_earnings, 10),
     }));
 
-    // Get livelihood impact for the period
-    const livelihoodResult = await pool.query(`
+    // Livelihood: verified earnings by verification date; disbursements by payout date
+    const earningsResult = await pool.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN e.status IN ${SQL_CONFIRMED_EARNING_STATUSES} THEN e.amount ELSE 0 END), 0) as total_earnings_generated,
-        COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) as paid_earnings,
-        COALESCE(SUM(CASE WHEN e.status IN ('AVAILABLE','PAYOUT_PROCESSING') THEN e.amount ELSE 0 END), 0) as in_flight_earnings
+        ${sqlVerifiedEarningsSum('e', 'wl')} as verified_earnings,
+        COALESCE(SUM(CASE WHEN e.status = 'AVAILABLE' THEN e.amount ELSE 0 END), 0) as in_wallet_earnings
       FROM earnings e
       JOIN waste_logs wl ON e.waste_log_id = wl.id
-      WHERE DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
+      WHERE ${verifiedEarningsDateFilter('wl', '$1', '$2')}
     `, [startDate, endDate]);
 
+    const disbursements = await getDisbursementSummaryForPeriod(startDate, endDate);
+
     const {
-      total_earnings_generated,
-      paid_earnings,
-      in_flight_earnings,
-    } = livelihoodResult.rows[0];
+      verified_earnings,
+      in_wallet_earnings,
+    } = earningsResult.rows[0];
+
+    const total_earnings_generated = parseInt(verified_earnings, 10);
+    const paid_earnings = disbursements.total_disbursed;
+    const in_flight_earnings = disbursements.processing_disbursements;
 
     const average_earning_per_picker = registered_pickers > 0
       ? Math.round(total_earnings_generated / registered_pickers)
@@ -577,7 +609,7 @@ export const getUndpPilotReport = async (req, res, next) => {
         COUNT(wl.id) as total_logs,
         COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
         COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings
       FROM pickers p
       LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
@@ -606,7 +638,7 @@ export const getUndpPilotReport = async (req, res, next) => {
         COUNT(wl.id) as total_logs,
         COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_logs,
         COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings
       FROM collection_points cp
       LEFT JOIN waste_logs wl ON cp.id = wl.collection_point_id AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
@@ -638,7 +670,7 @@ export const getUndpPilotReport = async (req, res, next) => {
         p.division,
         COUNT(wl.id) as verified_jobs,
         COALESCE(SUM(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN wl.verified_kg ELSE 0 END), 0) as verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings
       FROM pickers p
       LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND wl.status IN ('VERIFIED', 'PAID') AND DATE(wl.logged_at) >= $1 AND DATE(wl.logged_at) <= $2
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
@@ -687,10 +719,20 @@ export const getUndpPilotReport = async (req, res, next) => {
         city_waste_type_breakdown,
       },
       livelihood_impact: {
-        total_earnings_generated: parseInt(total_earnings_generated),
-        paid_earnings: parseInt(paid_earnings),
-        in_flight_earnings: parseInt(in_flight_earnings),
+        total_earnings_generated,
+        verified_earnings: total_earnings_generated,
+        disbursed_earnings: paid_earnings,
+        paid_earnings,
+        in_wallet_earnings: parseInt(in_wallet_earnings, 10),
+        in_flight_earnings,
+        pending_earnings: parseInt(in_wallet_earnings, 10),
         average_earning_per_picker,
+        daily_disbursements: disbursements.daily_disbursements,
+        withdrawal_totals: {
+          count: disbursements.successful_withdrawal_count,
+          success_amount: paid_earnings,
+          processing_amount: in_flight_earnings,
+        },
       },
       operations: {
         collection_points_active: parseInt(collection_points_active),

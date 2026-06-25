@@ -10,6 +10,7 @@ import {
   recordPaymentStatusChange,
   transitionEarningPayment,
 } from './earningPaymentService.js';
+import { sqlOriginalEarningAmount } from '../../utils/earningReportQueries.js';
 import { upsertPayoutTransaction } from './paymentService.js';
 import { PAYMENT_STATUS, normalizePaymentStatus } from '../../utils/paymentStatus.js';
 
@@ -81,9 +82,11 @@ export const getWithdrawalBalance = async (pickerId) => {
         COALESCE(SUM(CASE WHEN e.status = 'PAYOUT_PROCESSING' THEN e.amount ELSE 0 END), 0) AS payout_processing_balance,
         COALESCE(SUM(CASE WHEN e.status = 'PAID' THEN e.amount ELSE 0 END), 0) AS total_paid,
         COALESCE(SUM(CASE WHEN e.status = 'FAILED' THEN e.amount ELSE 0 END), 0) AS failed_balance,
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) AS total_earned,
         COUNT(CASE WHEN e.status = 'AVAILABLE' THEN 1 END) AS available_jobs
       FROM earnings e
-      WHERE e.picker_id = $1`,
+      JOIN waste_logs wl ON e.waste_log_id = wl.id
+      WHERE e.picker_id = $1 AND wl.verified_at IS NOT NULL`,
       [pickerId]
     );
 
@@ -109,12 +112,24 @@ export const getWithdrawalBalance = async (pickerId) => {
 
     const row = summary.rows[0];
     const availableBalance = parseInt(row.available_balance, 10);
+    const totalEarned = parseInt(row.total_earned, 10);
+
+    const withdrawnResult = await client.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total_withdrawn
+       FROM withdrawal_requests
+       WHERE picker_id = $1 AND status = 'SUCCESS'`,
+      [pickerId]
+    );
+    const totalWithdrawn = parseInt(withdrawnResult.rows[0]?.total_withdrawn, 10);
 
     return {
       available_balance: availableBalance,
       available_to_withdraw: availableBalance,
+      in_wallet: availableBalance,
       payout_processing_balance: parseInt(row.payout_processing_balance, 10),
-      total_paid: parseInt(row.total_paid, 10),
+      total_paid: totalWithdrawn,
+      total_withdrawn: totalWithdrawn,
+      total_earned: totalEarned,
       failed_balance: parseInt(row.failed_balance, 10),
       pending_logs_count: parseInt(pendingLogs.rows[0].pending_logs_count, 10),
       pending_estimated_total: parseInt(pendingEstimate.rows[0].pending_estimated_total, 10),
