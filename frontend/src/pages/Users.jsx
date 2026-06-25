@@ -13,6 +13,7 @@ import {
 import api from '../api/axios';
 import { formatDateTime, formatStatus } from '../utils/formatters';
 import { getAuthUser, normalizeRole } from '../utils/auth';
+import { useCityDivisions } from '../hooks/useCityDivisions';
 
 const ROLE_LABELS = {
   SUPER_ADMIN: 'Super Admin',
@@ -105,6 +106,11 @@ export default function Users() {
 
   const roleFilterOptions = useMemo(() => buildRoleFilterOptions(actorRole), [actorRole]);
   const createRoleOptions = useMemo(() => buildCreateRoleOptions(actorRole, form.role), [actorRole, form.role]);
+  const formCity = form.city.trim() || actorCity || '';
+  const { divisionNames, loading: divisionsLoading } = useCityDivisions({
+    city: formCity || undefined,
+    activeOnly: true,
+  });
 
   useEffect(() => {
     if (!isAdminUser) {
@@ -154,6 +160,15 @@ export default function Users() {
   useEffect(() => {
     fetchUsers(filters);
   }, [filters]);
+
+  useEffect(() => {
+    if (!modalOpen || isEditing || form.role !== 'AGENT' || form.division || divisionsLoading) {
+      return;
+    }
+    if (divisionNames.length > 0) {
+      setForm((prev) => ({ ...prev, division: divisionNames[0] }));
+    }
+  }, [modalOpen, isEditing, form.role, form.division, divisionsLoading, divisionNames]);
 
   const visibleUsers = useMemo(() => {
     if (isSuperAdmin) {
@@ -222,6 +237,10 @@ export default function Users() {
       return;
     }
 
+    const linkedPoint = collectionPoints.find(
+      (point) => String(point.id) === String(user.collection_point_id)
+    );
+
     setIsEditing(true);
     setSelectedUserId(user.id);
     setForm({
@@ -231,7 +250,7 @@ export default function Users() {
       password: '',
       role: user.role || 'AGENT',
       city: user.city || '',
-      division: user.division || '',
+      division: user.division || linkedPoint?.division || '',
       collection_point_id: user.collection_point_id || '',
       picker_id: user.picker_id || '',
       status: user.status || 'ACTIVE',
@@ -284,6 +303,11 @@ export default function Users() {
 
     if (!form.email && !form.phone) {
       setFormError('Either email or phone is required');
+      return;
+    }
+
+    if (form.role === 'AGENT' && !form.division.trim()) {
+      setFormError('AGENT users must be assigned to a division');
       return;
     }
 
@@ -418,12 +442,51 @@ export default function Users() {
         .filter(Boolean)
     );
 
+    const selectedDivision = String(form.division || '').trim().toLowerCase();
+
     return collectionPoints.filter((point) => {
       if (point.status !== 'ACTIVE') return false;
+      if (selectedDivision && String(point.division || '').trim().toLowerCase() !== selectedDivision) {
+        return String(point.id) === String(form.collection_point_id);
+      }
       if (String(point.id) === String(form.collection_point_id)) return true;
       return !takenPointIds.has(String(point.id));
     });
-  }, [collectionPoints, users, selectedUserId, form.collection_point_id]);
+  }, [collectionPoints, users, selectedUserId, form.collection_point_id, form.division]);
+
+  const handleDivisionChange = (division) => {
+    setForm((prev) => {
+      const selectedPoint = collectionPoints.find(
+        (point) => String(point.id) === String(prev.collection_point_id)
+      );
+      const keepPoint = selectedPoint
+        && String(selectedPoint.division || '').trim().toLowerCase() === String(division).trim().toLowerCase();
+
+      return {
+        ...prev,
+        division,
+        collection_point_id: keepPoint ? prev.collection_point_id : '',
+      };
+    });
+  };
+
+  const handleRoleChange = (role) => {
+    setForm((prev) => ({
+      ...prev,
+      role,
+      division: role === 'AGENT' ? (prev.division || divisionNames[0] || '') : prev.division,
+      collection_point_id: role === 'AGENT' ? prev.collection_point_id : '',
+    }));
+  };
+
+  const handleCityChange = (city) => {
+    setForm((prev) => ({
+      ...prev,
+      city,
+      division: '',
+      collection_point_id: '',
+    }));
+  };
 
   const isAgent = form.role === 'AGENT';
   const isPicker = form.role === 'PICKER';
@@ -593,7 +656,7 @@ export default function Users() {
               <label className="block text-sm font-medium text-wastelink-dark mb-2">Role *</label>
               <select
                 value={form.role}
-                onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
+                onChange={(e) => handleRoleChange(e.target.value)}
                 className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
               >
                 {createRoleOptions.map((role) => (
@@ -642,46 +705,77 @@ export default function Users() {
               <label className="block text-sm font-medium text-wastelink-dark mb-2">City {isFormCityAdmin ? '*' : ''}</label>
               <input
                 value={form.city}
-                onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
+                onChange={(e) => handleCityChange(e.target.value)}
                 className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
                 placeholder="Mbarara"
                 readOnly={isCityAdmin}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-wastelink-dark mb-2">Division</label>
-              <input
-                value={form.division}
-                onChange={(e) => setForm((prev) => ({ ...prev, division: e.target.value }))}
-                className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
-                placeholder="Division name"
-              />
-            </div>
+            {!isAgent && (
+              <div>
+                <label className="block text-sm font-medium text-wastelink-dark mb-2">Division</label>
+                <input
+                  value={form.division}
+                  onChange={(e) => setForm((prev) => ({ ...prev, division: e.target.value }))}
+                  className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+                  placeholder="Division name"
+                />
+              </div>
+            )}
           </div>
 
           {isAgent && (
-            <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-4">
               <p className="text-sm font-semibold text-green-900">
                 Every agent must be linked to a collection point. Create the point first under Collection Points, then assign it here.
               </p>
-              <div className="mt-3">
+              <div>
+                <label className="block text-sm font-medium text-wastelink-dark mb-2">Division *</label>
+                <select
+                  value={form.division}
+                  onChange={(e) => handleDivisionChange(e.target.value)}
+                  className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+                  disabled={divisionsLoading || (!formCity && isSuperAdmin)}
+                  required
+                >
+                  <option value="">
+                    {divisionsLoading
+                      ? 'Loading divisions...'
+                      : !formCity && isSuperAdmin
+                        ? 'Select a city first'
+                        : 'Select division'}
+                  </option>
+                  {divisionNames.map((division) => (
+                    <option key={division} value={division}>{division}</option>
+                  ))}
+                </select>
+                {!divisionsLoading && formCity && divisionNames.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    No divisions configured for this city. Add one under Divisions first.
+                  </p>
+                )}
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-wastelink-dark mb-2">Collection Point *</label>
                 <select
                   value={form.collection_point_id}
                   onChange={(e) => setForm((prev) => ({ ...prev, collection_point_id: e.target.value }))}
                   className="w-full rounded-lg border border-wastelink-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wastelink-primary"
+                  disabled={!form.division}
                   required
                 >
-                  <option value="">Select collection point</option>
+                  <option value="">
+                    {form.division ? 'Select collection point' : 'Select a division first'}
+                  </option>
                   {assignableCollectionPoints.map((point) => (
                     <option key={point.id} value={point.id}>
-                      {point.point_code} — {point.name} ({point.division || 'No division'})
+                      {point.point_code} — {point.name}
                     </option>
                   ))}
                 </select>
-                {assignableCollectionPoints.length === 0 && (
+                {form.division && assignableCollectionPoints.length === 0 && (
                   <p className="mt-2 text-xs text-amber-700">
-                    No unassigned active collection points. Add one under Collection Points first.
+                    No unassigned active collection points in {form.division}. Add one under Collection Points first.
                   </p>
                 )}
               </div>
