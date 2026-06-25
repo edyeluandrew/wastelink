@@ -13,12 +13,15 @@ import {
 import { formatNumber, formatKg, formatCurrencyUGX } from '../utils/formatters';
 import { formatCityLabel, resolveAppCity } from '../utils/city';
 import { getAuthUser, normalizeRole } from '../utils/auth';
+import { useCities } from '../hooks/useCities';
 import api from '../api/axios';
 import { TrendingUp, Users, Zap } from 'lucide-react';
 
 export default function Divisions() {
   const authUser = getAuthUser();
-  const city = resolveAppCity(authUser);
+  const isSuperAdmin = normalizeRole(authUser?.role) === 'SUPER_ADMIN';
+  const { defaultCity } = useCities({ usePublic: false });
+  const city = isSuperAdmin ? (defaultCity || resolveAppCity(authUser)) : resolveAppCity(authUser);
   const cityLabel = formatCityLabel(city);
   const canManage = ['SUPER_ADMIN', 'CITY_ADMIN'].includes(normalizeRole(authUser?.role));
 

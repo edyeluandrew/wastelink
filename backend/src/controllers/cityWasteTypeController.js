@@ -9,6 +9,7 @@ import {
   calculateEarningFromCityWasteType,
 } from '../services/wasteTypeGovernanceService.js';
 import { canManageCity, normalizeCity, resolveUserCity } from '../utils/cityScope.js';
+import { getDefaultCityRecord } from '../services/cityService.js';
 import { stripPickerWasteTypeFields } from '../utils/pickerResponseSanitizer.js';
 
 const resolveListCity = (req) => {
@@ -22,7 +23,7 @@ export const getPublicCityWasteTypes = async (req, res) => {
   try {
     const city = req.query.city
       ? normalizeCity(req.query.city)
-      : normalizeCity(process.env.DEFAULT_CITY || 'mbarara');
+      : (await getDefaultCityRecord()).slug;
 
     const items = await listCityWasteTypes({ city, activeOnly: true });
     sendSuccess(res, 'Active city waste types loaded', {

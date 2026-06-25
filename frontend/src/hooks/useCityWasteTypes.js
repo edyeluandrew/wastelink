@@ -36,8 +36,13 @@ export function useCityWasteTypes({ city: cityOverride, usePublic = false, activ
   }, [city, usePublic, activeOnly]);
 
   useEffect(() => {
+    if (!city) {
+      setWasteTypes([]);
+      setLoading(false);
+      return;
+    }
     fetchWasteTypes();
-  }, [fetchWasteTypes]);
+  }, [city, fetchWasteTypes]);
 
   return {
     wasteTypes,

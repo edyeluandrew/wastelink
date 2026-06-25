@@ -7,6 +7,7 @@ import {
   resolveDivisionListCity,
   assertCanManageDivisionCity,
 } from '../services/divisionService.js';
+import { getDefaultCityRecord } from '../services/cityService.js';
 import pool from '../config/db.js';
 import { normalizeCity } from '../utils/cityScope.js';
 
@@ -24,7 +25,9 @@ export const getDivisions = async (req, res, next) => {
 
 export const getPublicDivisions = async (req, res, next) => {
   try {
-    const city = normalizeCity(req.query.city || process.env.DEFAULT_CITY || 'mbarara');
+    const city = req.query.city
+      ? normalizeCity(req.query.city)
+      : (await getDefaultCityRecord()).slug;
     const divisions = await listCityDivisions({ city, activeOnly: true });
     sendSuccess(res, 'Active divisions loaded', {
       city,

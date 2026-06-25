@@ -31,8 +31,13 @@ export function useCityDivisions({ activeOnly = true, usePublic = false, city: c
   }, [city, activeOnly, usePublic]);
 
   useEffect(() => {
+    if (!city) {
+      setDivisions([]);
+      setLoading(false);
+      return;
+    }
     fetchDivisions();
-  }, [fetchDivisions]);
+  }, [city, fetchDivisions]);
 
   const divisionNames = divisions.map((d) => d.name);
 

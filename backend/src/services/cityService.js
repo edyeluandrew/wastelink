@@ -42,19 +42,42 @@ export const getCityBySlug = async (slug) => {
 };
 
 export const getDefaultCityRecord = async () => {
+  const envDefault = normalizeCity(process.env.DEFAULT_CITY || 'mbarara');
+
+  const flagged = await pool.query(
+    `SELECT * FROM cities
+     WHERE status = 'ACTIVE' AND is_default = TRUE
+     ORDER BY name ASC
+     LIMIT 1`
+  );
+  if (flagged.rows[0]) {
+    return mapCityRow(flagged.rows[0]);
+  }
+
+  const envMatch = await pool.query(
+    `SELECT * FROM cities
+     WHERE status = 'ACTIVE' AND LOWER(slug) = LOWER($1)
+     LIMIT 1`,
+    [envDefault]
+  );
+  if (envMatch.rows[0]) {
+    return mapCityRow(envMatch.rows[0]);
+  }
+
   const result = await pool.query(
     `SELECT * FROM cities
      WHERE status = 'ACTIVE'
-     ORDER BY is_default DESC, is_pilot DESC, name ASC
+     ORDER BY is_pilot DESC, name ASC
      LIMIT 1`
   );
   if (result.rows[0]) {
     return mapCityRow(result.rows[0]);
   }
+
   return {
     id: null,
     name: 'Mbarara',
-    slug: normalizeCity(process.env.DEFAULT_CITY || 'mbarara'),
+    slug: envDefault,
     status: 'ACTIVE',
     is_pilot: true,
     is_default: true,

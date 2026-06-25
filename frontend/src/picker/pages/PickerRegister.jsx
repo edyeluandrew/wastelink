@@ -20,9 +20,10 @@ const REQUIRED_FIELDS = ['name', 'phone', 'gender', 'age_group', 'division', 'ma
 
 export default function PickerRegister() {
   const navigate = useNavigate();
-  const { defaultCity } = useCities({ pilotOnly: true });
-  const { divisionNames, loading: divisionsLoading } = useCityDivisions({ usePublic: true, city: defaultCity });
-  const { wasteTypes, loading: wasteTypesLoading } = useCityWasteTypes({ city: defaultCity, usePublic: true });
+  const { defaultCity, loading: citiesLoading } = useCities({ pilotOnly: true });
+  const activeCity = citiesLoading ? '' : defaultCity;
+  const { divisionNames, loading: divisionsLoading } = useCityDivisions({ usePublic: true, city: activeCity });
+  const { wasteTypes, loading: wasteTypesLoading } = useCityWasteTypes({ city: activeCity, usePublic: true });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
