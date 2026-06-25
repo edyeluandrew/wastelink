@@ -50,7 +50,7 @@ export default function PickerJobCard({ job }) {
             <p className="text-lg font-semibold text-green-700">{formatUGX(earned)}</p>
             {(withdrawn > 0 || inWallet > 0) && (
               <p className="text-xs text-gray-600">
-                Withdrawn {formatUGX(withdrawn)} · In wallet {formatUGX(inWallet)}
+                Withdrawn {formatUGX(withdrawn)} · Withdrawable {formatUGX(inWallet)}
               </p>
             )}
           </div>

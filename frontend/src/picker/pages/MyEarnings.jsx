@@ -256,9 +256,9 @@ export default function MyEarnings() {
             <p className="mt-1 text-sm text-[#6B7280]">Sent to mobile money</p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">In Wallet</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Withdrawable Balance</p>
             <p className="mt-2 text-3xl font-bold text-[#111111]">{formatUGX(availableToWithdraw)}</p>
-            <p className="mt-1 text-sm text-[#6B7280]">Ready to withdraw</p>
+            <p className="mt-1 text-sm text-[#6B7280]">Verified, still in wallet</p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Pending Verification</p>
@@ -372,7 +372,7 @@ export default function MyEarnings() {
                       <p className="mt-1 text-base font-bold text-[#111111]">{formatUGX(withdrawn)}</p>
                     </div>
                     <div className="rounded-2xl bg-white p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">In Wallet</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Withdrawable</p>
                       <p className="mt-1 text-base font-bold text-[#111111]">{formatUGX(inWallet)}</p>
                     </div>
                   </div>

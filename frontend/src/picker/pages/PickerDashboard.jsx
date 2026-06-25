@@ -134,7 +134,7 @@ export default function PickerDashboard() {
           <p className="text-2xl font-bold text-blue-900">{formatUGX(totalWithdrawn)}</p>
         </div>
         <div className="bg-green-100 border border-green-300 rounded-lg p-4">
-          <p className="text-xs text-green-700 font-medium mb-1">In Wallet</p>
+          <p className="text-xs text-green-700 font-medium mb-1">Withdrawable Balance</p>
           <p className="text-2xl font-bold text-green-900">{formatUGX(availableBalance)}</p>
         </div>
         <div className="bg-purple-100 border border-purple-300 rounded-lg p-4">
