@@ -788,7 +788,7 @@ export default function Reports() {
                         <td className="table-cell">{formatKg(item.verified_kg)}</td>
                         <td className="table-cell">{formatKg(item.pending_kg || 0)}</td>
                         <td className="table-cell">{formatKg(item.rejected_kg || 0)}</td>
-                        <td className="table-cell">{formatCurrencyUGX(item.verified_earnings ?? item.paid_earnings || 0)}</td>
+                        <td className="table-cell">{formatCurrencyUGX(item.verified_earnings ?? item.paid_earnings ?? 0)}</td>
                       </tr>
                     ))}
                   </DataTable>
