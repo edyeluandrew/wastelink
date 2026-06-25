@@ -1,6 +1,8 @@
 import pool from "../config/db.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import { normalizeCity, resolveUserCity } from "../utils/cityScope.js";
+import { sqlOriginalEarningAmount } from "../utils/earningReportQueries.js";
+import { ensureWithdrawalTables } from "../services/payment/withdrawalService.js";
 
 const UGANDA_TZ = "Africa/Kampala";
 const todayInUganda = `(NOW() AT TIME ZONE '${UGANDA_TZ}')::date`;
@@ -85,20 +87,29 @@ export const getDashboardStats = async (req, res, next) => {
       total_verified_kg,
     } = wasteStats.rows[0];
 
-    // Get earnings statistics
+    // Verified earnings (locked at verify) vs disbursements vs withdrawable wallet
+    await ensureWithdrawalTables(pool);
+
     const earningsStats = await pool.query(`
       SELECT
-        COALESCE(SUM(amount), 0) as total_earnings,
-        COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount ELSE 0 END), 0) as pending_earnings,
-        COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount ELSE 0 END), 0) as paid_earnings
-      FROM earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earned,
+        COALESCE(SUM(CASE WHEN e.status = 'AVAILABLE' THEN e.amount ELSE 0 END), 0) as withdrawable_balance
+      FROM earnings e
+      JOIN waste_logs wl ON e.waste_log_id = wl.id
+      WHERE wl.verified_at IS NOT NULL
+    `);
+
+    const withdrawnStats = await pool.query(`
+      SELECT COALESCE(SUM(amount), 0) AS total_withdrawn
+      FROM withdrawal_requests
+      WHERE status = 'SUCCESS'
     `);
 
     const {
-      total_earnings,
-      pending_earnings,
-      paid_earnings,
+      total_earned,
+      withdrawable_balance,
     } = earningsStats.rows[0];
+    const total_withdrawn = withdrawnStats.rows[0]?.total_withdrawn ?? 0;
 
     // Calculate percentages
     const women_percentage =
@@ -120,9 +131,14 @@ export const getDashboardStats = async (req, res, next) => {
       paid_logs: parseInt(paid_logs),
       total_verified_kg: parseFloat(total_verified_kg),
       total_estimated_kg: parseFloat(total_estimated_kg),
-      total_earnings: parseInt(total_earnings),
-      pending_earnings: parseInt(pending_earnings),
-      paid_earnings: parseInt(paid_earnings),
+      total_earned: parseInt(total_earned, 10),
+      total_earnings: parseInt(total_earned, 10),
+      verified_earnings: parseInt(total_earned, 10),
+      total_withdrawn: parseInt(total_withdrawn, 10),
+      paid_earnings: parseInt(total_withdrawn, 10),
+      disbursed_earnings: parseInt(total_withdrawn, 10),
+      withdrawable_balance: parseInt(withdrawable_balance, 10),
+      in_wallet_earnings: parseInt(withdrawable_balance, 10),
       women_pickers: parseInt(women_pickers),
       men_pickers: parseInt(men_pickers),
       youth_pickers: parseInt(youth_pickers),
@@ -249,9 +265,10 @@ export const getDashboardWasteTypes = async (req, res, next) => {
         COUNT(CASE WHEN wl.status = 'PAID' THEN 1 END) as paid_logs,
         COALESCE(SUM(wl.estimated_kg), 0) as total_estimated_kg,
         COALESCE(SUM(wl.verified_kg), 0) as total_verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings
       FROM waste_logs wl
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
+      WHERE wl.verified_at IS NOT NULL
       GROUP BY wl.waste_type
       ORDER BY total_verified_kg DESC
     `);
@@ -291,10 +308,10 @@ export const getDashboardTopPickers = async (req, res, next) => {
         p.age_group,
         p.division,
         COALESCE(SUM(wl.verified_kg), 0) as total_verified_kg,
-        COALESCE(SUM(e.amount), 0) as total_earnings,
-        COUNT(CASE WHEN wl.status = 'VERIFIED' THEN 1 END) as verified_jobs
+        COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) as total_earnings,
+        COUNT(CASE WHEN wl.status IN ('VERIFIED', 'PAID') THEN 1 END) as verified_jobs
       FROM pickers p
-      LEFT JOIN waste_logs wl ON p.id = wl.picker_id
+      LEFT JOIN waste_logs wl ON p.id = wl.picker_id AND wl.verified_at IS NOT NULL
       LEFT JOIN earnings e ON wl.id = e.waste_log_id
       GROUP BY p.id, p.picker_code, p.name, p.phone, p.gender, p.age_group, p.division
       HAVING COALESCE(SUM(wl.verified_kg), 0) > 0
@@ -414,11 +431,12 @@ export const getDashboardToday = async (req, res, next) => {
 
     const earningsResult = await pool.query(
       `
-      SELECT COALESCE(SUM(e.amount), 0) AS earnings_today
+      SELECT COALESCE(SUM(${sqlOriginalEarningAmount('e')}), 0) AS earnings_today
       FROM earnings e
       JOIN waste_logs wl ON wl.id = e.waste_log_id
       JOIN collection_points cp ON cp.id = wl.collection_point_id
-      WHERE (e.created_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
+      WHERE wl.verified_at IS NOT NULL
+        AND (wl.verified_at AT TIME ZONE '${UGANDA_TZ}')::date = ${todayInUganda}
       ${cityFilter.clause}
       `,
       params

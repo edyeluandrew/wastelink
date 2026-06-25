@@ -126,24 +126,22 @@ export default function Earnings() {
 
   const filteredLogs = getFilteredLogs();
 
-  const totalVerified = logs.reduce((sum, log) => sum + getEarningAmount(log), 0);
+  const totalEarned = logs.reduce((sum, log) => sum + getEarningAmount(log), 0);
   const totalWithdrawn = sumSuccessfulWithdrawals(withdrawals);
-  const totalAvailable = logs
-    .filter((log) => normalizeEarningStatus(getEarningStatus(log)) === 'AVAILABLE')
-    .reduce((sum, log) => sum + getWalletAmount(log), 0);
+  const totalWithdrawable = logs.reduce((sum, log) => sum + getWalletAmount(log), 0);
   const totalProcessing = sumProcessingWithdrawals(withdrawals);
 
   return (
     <div className="space-y-8">
       <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">
-        Agent verification creates withdrawable earnings — no admin approval required.
-        Admin monitors payouts and can simulate provider confirm/fail during demo.
+        Agent verification locks <strong>Total Earned</strong> per job. Withdrawals increase{' '}
+        <strong>Total Withdrawn</strong>; whatever remains is the <strong>Withdrawable Balance</strong>.
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Verified Earnings" value={formatCurrencyUGX(totalVerified)} subtitle="Locked at agent verify" icon={DollarSign} />
-        <StatCard title="Disbursed (Withdrawn)" value={formatCurrencyUGX(totalWithdrawn)} subtitle="Successful withdrawals" />
-        <StatCard title="In Wallet" value={formatCurrencyUGX(totalAvailable)} subtitle="Available to withdraw" />
+        <StatCard title="Total Earned" value={formatCurrencyUGX(totalEarned)} subtitle="All verified jobs" icon={DollarSign} />
+        <StatCard title="Total Withdrawn" value={formatCurrencyUGX(totalWithdrawn)} subtitle="Successful withdrawals" />
+        <StatCard title="Withdrawable Balance" value={formatCurrencyUGX(totalWithdrawable)} subtitle="Verified, still in wallet" />
         <StatCard title="Processing Payouts" value={formatCurrencyUGX(totalProcessing)} subtitle="In-flight withdrawals" />
       </div>
 

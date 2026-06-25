@@ -96,13 +96,6 @@ export default function Overview() {
           icon={TrendingUp}
         />
         <StatCard
-          title="Total Earnings"
-          shortTitle="Earnings"
-          value={formatCurrencyUGX(stats?.total_earnings || 0)}
-          subtitle={`${formatCurrencyUGX(stats?.paid_earnings || 0)} paid`}
-          icon={Zap}
-        />
-        <StatCard
           title="Women Participation"
           value={formatPercentage(stats?.women_percentage || 0)}
           subtitle={`${stats?.women_pickers || 0} women pickers`}
@@ -132,6 +125,34 @@ export default function Overview() {
         />
       </div>
 
+      <div className="card">
+        <h3 className="text-lg font-semibold text-wastelink-dark mb-1">Picker Livelihood Summary</h3>
+        <p className="text-sm text-wastelink-muted mb-4">
+          Verified earnings stay fixed; withdrawals and withdrawable balance split across all jobs.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 md:gap-4">
+          <StatCard
+            title="Total Earned"
+            shortTitle="Earned"
+            value={formatCurrencyUGX(stats?.total_earned ?? stats?.verified_earnings ?? stats?.total_earnings ?? 0)}
+            subtitle="Locked when agents verify"
+            icon={Zap}
+          />
+          <StatCard
+            title="Total Withdrawn"
+            shortTitle="Withdrawn"
+            value={formatCurrencyUGX(stats?.total_withdrawn ?? stats?.disbursed_earnings ?? stats?.paid_earnings ?? 0)}
+            subtitle="Sent to mobile money"
+          />
+          <StatCard
+            title="Withdrawable Balance"
+            shortTitle="Withdrawable"
+            value={formatCurrencyUGX(stats?.withdrawable_balance ?? stats?.in_wallet_earnings ?? 0)}
+            subtitle="Verified, still in wallet"
+          />
+        </div>
+      </div>
+
       {/* Today's Activity */}
       {today && (
         <div className="card">
@@ -158,7 +179,7 @@ export default function Overview() {
               </p>
             </div>
             <div>
-              <p className="text-wastelink-muted text-sm mb-1">Earnings Today</p>
+              <p className="text-wastelink-muted text-sm mb-1">Verified Earnings Today</p>
               <p className="text-2xl font-bold text-wastelink-dark">
                 {formatCurrencyUGX(earningsToday)}
               </p>
@@ -237,7 +258,7 @@ export default function Overview() {
                 'Total Logs',
                 'Verified',
                 'Total KG',
-                'Earnings',
+                'Verified Earnings',
               ]}
             >
               {wasteTypes.map((type, idx) => (
@@ -269,7 +290,7 @@ export default function Overview() {
                 'Name',
                 'Division',
                 'Verified KG',
-                'Earnings',
+                'Verified Earnings',
               ]}
             >
               {topPickers.map((picker, idx) => (

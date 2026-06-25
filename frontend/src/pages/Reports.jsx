@@ -497,8 +497,16 @@ export default function Reports() {
               value={formatKg(summaryReport.total_verified_kg)}
             />
             <StatCard
-              title="Verified Earnings (All Time)"
+              title="Total Earned (All Time)"
               value={formatCurrencyUGX(summaryReport.verified_earnings ?? summaryReport.total_earnings)}
+            />
+            <StatCard
+              title="Total Withdrawn (All Time)"
+              value={formatCurrencyUGX(summaryReport.total_disbursed ?? summaryReport.disbursed_earnings ?? summaryReport.total_paid_earnings ?? 0)}
+            />
+            <StatCard
+              title="Withdrawable Balance"
+              value={formatCurrencyUGX(summaryReport.in_wallet_earnings ?? 0)}
             />
             <StatCard
               title="Verified Jobs"
@@ -571,15 +579,15 @@ export default function Reports() {
                 value={formatKg(monthlyReport.pending_unverified_kg || 0)}
               />
               <StatCard
-                title="Verified Earnings"
+                title="Total Earned"
                 value={formatCurrencyUGX(monthlyReport.verified_earnings ?? monthlyReport.total_earnings)}
               />
               <StatCard
-                title="Disbursed (Withdrawn)"
+                title="Total Withdrawn"
                 value={formatCurrencyUGX(monthlyReport.disbursed_earnings ?? monthlyReport.paid_earnings)}
               />
               <StatCard
-                title="In Wallet (Outstanding)"
+                title="Withdrawable Balance"
                 value={formatCurrencyUGX(monthlyReport.in_wallet_earnings ?? 0)}
               />
             </div>
@@ -839,21 +847,21 @@ export default function Reports() {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <StatCard
-                  title="Verified Earnings"
+                  title="Total Earned"
                   value={formatCurrencyUGX(
                     undpReport.livelihood_impact.verified_earnings
                       ?? undpReport.livelihood_impact.total_earnings_generated
                   )}
                 />
                 <StatCard
-                  title="Disbursed (Withdrawn)"
+                  title="Total Withdrawn"
                   value={formatCurrencyUGX(
                     undpReport.livelihood_impact.disbursed_earnings
                       ?? undpReport.livelihood_impact.paid_earnings
                   )}
                 />
                 <StatCard
-                  title="In Wallet (Not Yet Withdrawn)"
+                  title="Withdrawable Balance"
                   value={formatCurrencyUGX(undpReport.livelihood_impact.in_wallet_earnings ?? 0)}
                 />
                 <StatCard
